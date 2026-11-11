@@ -46,3 +46,4 @@ public interface IMobileApiClient
     // Auxiliares
     Task<List<ContratoAlquilerDarsenaDto>> GetMisContratosAsync();
 }
+

@@ -31,3 +31,4 @@ public class UiNotificationService
     public void Warning(string text) => Show(text, "warning");
     public void Info(string text) => Show(text, "info");
 }
+

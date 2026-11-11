@@ -1,5 +1,7 @@
 @inherits LayoutComponentBase
 @inject NavigationManager Nav
+@inject ITokenStorage TokenStorage
+@inject UiNotificationService Notifier
 
 <div class="mobile-viewport-container">
     <div class="mobile-phone-frame">
@@ -13,13 +15,16 @@
             </div>
         </div>
 
-        <MobileHeader />
+        @if (!IsIntroPage)
+        {
+            <MobileHeader />
+        }
 
-        <main class="mobile-body">
+        <main class="mobile-body @(IsIntroPage ? "mobile-body-intro" : "")">
             @Body
         </main>
 
-        @if (!IsAuthPage)
+        @if (!IsAuthPage && !IsIntroPage)
         {
             <MobileBottomNav />
         }
@@ -30,9 +35,32 @@
 
 @code {
     private bool IsAuthPage => Nav.Uri.ToLowerInvariant().Contains("/login");
+    private bool IsIntroPage => Nav.Uri.ToLowerInvariant().Contains("/intro");
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        Nav.LocationChanged += (s, e) => StateHasChanged();
+        Nav.LocationChanged += async (s, e) =>
+        {
+            await CheckSession();
+            StateHasChanged();
+        };
+
+        await CheckSession();
+    }
+
+    private async Task CheckSession()
+    {
+        var path = new Uri(Nav.Uri).AbsolutePath.ToLowerInvariant();
+        if (path.Contains("/login") || path.Contains("/intro"))
+        {
+            return;
+        }
+
+        var isAuth = await TokenStorage.IsAuthenticatedAsync();
+        if (!isAuth)
+        {
+            Notifier.Warning("Sesión vencida tras 30 minutos de inactividad. Por favor inicie sesión nuevamente.");
+            Nav.NavigateTo("/login");
+        }
     }
 }

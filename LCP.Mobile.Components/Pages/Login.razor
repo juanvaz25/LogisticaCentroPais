@@ -110,18 +110,33 @@
                 </div>
             </button>
         </div>
+
+        <div style="text-align: center; margin-top: 14px;">
+            <button type="button" class="btn-lcp-outline btn-lcp-sm" @onclick='() => Nav.NavigateTo("/intro")' style="border-radius: 20px; font-size: 0.75rem; color: #64748B;">
+                <i class="fa-solid fa-rotate-left"></i>
+                <span>Ver Introducción Animada</span>
+            </button>
+        </div>
     </div>
 </div>
 
 @code {
     private LoginRequestDto loginModel = new()
     {
-        Email = "operador@lcp.com",
-        Password = "Admin123!"
+        Email = "",
+        Password = ""
     };
 
     private bool ShowPassword = false;
     private bool IsLoading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (await TokenStorage.IsAuthenticatedAsync())
+        {
+            Nav.NavigateTo("/");
+        }
+    }
 
     private async Task SetDemoUser(string email, string pass)
     {
@@ -162,3 +177,4 @@
         }
     }
 }
+

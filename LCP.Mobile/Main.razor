@@ -1,4 +1,4 @@
-﻿<Router AppAssembly="@typeof(Main).Assembly" AdditionalAssemblies="new[] { typeof(LCP.Mobile.Components.Layout.MobileLayout).Assembly }">
+<Router AppAssembly="@typeof(Main).Assembly" AdditionalAssemblies="new[] { typeof(LCP.Mobile.Components.Layout.MobileLayout).Assembly }">
 	<Found Context="routeData">
 		<RouteView RouteData="@routeData" DefaultLayout="@typeof(LCP.Mobile.Components.Layout.MobileLayout)" />
         <FocusOnNavigate RouteData="@routeData" Selector="h1" />

@@ -191,6 +191,11 @@ html, body {
     flex-direction: column;
 }
 
+.mobile-body-intro {
+    padding: 0 !important;
+    background-color: #07090C !important;
+}
+
 /* Bottom Navigation Bar */
 .mobile-bottom-nav {
     background-color: #FFFFFF;
@@ -482,3 +487,4 @@ html, body {
     from { transform: translateY(-20px); opacity: 0; }
     to { transform: translateY(0); opacity: 1; }
 }
+

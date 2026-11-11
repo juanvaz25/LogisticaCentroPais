@@ -190,14 +190,22 @@
 
     protected override async Task OnInitializedAsync()
     {
-        CurrentUser = await TokenStorage.GetUserAsync();
-
-        // If no user in storage, initialize default operator for instant preview
-        if (CurrentUser == null)
+        var isAuth = await TokenStorage.IsAuthenticatedAsync();
+        if (!isAuth)
         {
-            await ApiClient.LoginAsync(new LoginRequestDto { Email = "operador@lcp.com", Password = "Admin123!" });
-            CurrentUser = await TokenStorage.GetUserAsync();
+            var introShown = await TokenStorage.IsIntroShownAsync();
+            if (!introShown)
+            {
+                Nav.NavigateTo("/intro");
+            }
+            else
+            {
+                Nav.NavigateTo("/login");
+            }
+            return;
         }
+
+        CurrentUser = await TokenStorage.GetUserAsync();
 
         try
         {
@@ -214,3 +222,4 @@
         catch { }
     }
 }
+

@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Components.WebView.Maui;
+using Microsoft.AspNetCore.Components.WebView.Maui;
 using LCP.Mobile.Components.Extensions;
 
 namespace LCP.Mobile;

@@ -87,7 +87,7 @@ public class AuthController : ControllerBase
             Exitoso = true,
             Mensaje = "Inicio de sesión exitoso.",
             Token = token,
-            Expiracion = DateTime.UtcNow.AddDays(7),
+            Expiracion = DateTime.UtcNow.AddMinutes(30),
             Usuario = usuarioDto
         });
     }

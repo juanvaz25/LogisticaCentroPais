@@ -60,7 +60,8 @@ public class MobileApiClient : IMobileApiClient
                 var result = await response.Content.ReadFromJsonAsync<LoginResponseDto>(_jsonOptions);
                 if (result != null && result.Exitoso && result.Usuario != null)
                 {
-                    await _tokenStorage.SetTokenAsync(result.Token);
+                    var exp = result.Expiracion > DateTime.UtcNow ? result.Expiracion : DateTime.UtcNow.AddMinutes(30);
+                    await _tokenStorage.SetTokenAsync(result.Token, exp);
                     await _tokenStorage.SetUserAsync(result.Usuario);
                     return result;
                 }
@@ -122,7 +123,8 @@ public class MobileApiClient : IMobileApiClient
         };
 
         var fakeToken = "demo_jwt_token_" + Guid.NewGuid().ToString("N");
-        await _tokenStorage.SetTokenAsync(fakeToken);
+        var expiration = DateTime.UtcNow.AddMinutes(30);
+        await _tokenStorage.SetTokenAsync(fakeToken, expiration);
         await _tokenStorage.SetUserAsync(demoUser);
 
         return new LoginResponseDto
@@ -130,7 +132,7 @@ public class MobileApiClient : IMobileApiClient
             Exitoso = true,
             Mensaje = "Sesión iniciada correctamente",
             Token = fakeToken,
-            Expiracion = DateTime.UtcNow.AddDays(7),
+            Expiracion = expiration,
             Usuario = demoUser
         };
     }

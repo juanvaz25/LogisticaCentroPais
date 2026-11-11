@@ -157,7 +157,7 @@ public class AuthController : Controller
         var authProperties = new AuthenticationProperties
         {
             IsPersistent = rememberMe,
-            ExpiresUtc = DateTimeOffset.UtcNow.AddDays(7)
+            ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(30)
         };
 
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, authProperties);
@@ -168,7 +168,7 @@ public class AuthController : Controller
             HttpOnly = false, // Permite a JS en SignalR leer el token para WebSocket auth
             Secure = false,
             SameSite = SameSiteMode.Lax,
-            Expires = DateTimeOffset.UtcNow.AddDays(7)
+            Expires = DateTimeOffset.UtcNow.AddMinutes(30)
         });
     }
 }
