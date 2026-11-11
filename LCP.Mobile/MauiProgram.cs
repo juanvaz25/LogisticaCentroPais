@@ -21,7 +21,10 @@ public static class MauiProgram
 #endif
 
 		builder.Services.AddHttpClient();
-		builder.Services.AddLcpMobileComponents();
+		var apiBaseUrl = DeviceInfo.Platform == DevicePlatform.Android 
+			? "http://10.0.2.2:5152" 
+			: "http://localhost:5152";
+		builder.Services.AddLcpMobileComponents(apiBaseUrl);
 
 		return builder.Build();
 	}

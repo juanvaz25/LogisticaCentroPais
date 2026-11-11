@@ -6,10 +6,10 @@ namespace LCP.Mobile.Components.Extensions;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddLcpMobileComponents(this IServiceCollection services)
+    public static IServiceCollection AddLcpMobileComponents(this IServiceCollection services, string? apiBaseUrl = null)
     {
         services.AddAuthorizationCore();
-        services.AddSingleton<ITokenStorage, InMemoryTokenStorage>();
+        services.AddSingleton<ITokenStorage>(sp => new InMemoryTokenStorage(apiBaseUrl ?? "http://localhost:5152"));
         services.AddScoped<AuthenticationStateProvider, CustomAuthStateProvider>();
         services.AddScoped<CustomAuthStateProvider>(sp => (CustomAuthStateProvider)sp.GetRequiredService<AuthenticationStateProvider>());
         services.AddScoped<IMobileApiClient, MobileApiClient>();

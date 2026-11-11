@@ -110,12 +110,183 @@ public static class DbInitializer
         }
         catch { }
 
-        if (await context.Usuarios.AnyAsync())
+        // 1. Asegurar Admin
+        var adminUser = await context.Usuarios.FirstOrDefaultAsync(u => u.Email == "admin@lcp.com");
+        if (adminUser == null)
         {
-            return; // Already seeded
+            adminUser = new Usuario
+            {
+                Nombre = "Roberto",
+                Apellido = "Gómez",
+                Email = "admin@lcp.com",
+                PasswordHash = HashPassword("Admin123!"),
+                Telefono = "2954-600100",
+                Rol = RolUsuario.Administrador,
+                Activo = true,
+                EmailConfirmado = true,
+                FechaAlta = DateTime.UtcNow
+            };
+            context.Usuarios.Add(adminUser);
+            await context.SaveChangesAsync();
         }
 
-        await SeedInternalAsync(context);
+        // 2. Asegurar Operador Demo
+        if (!await context.Usuarios.AnyAsync(u => u.Email == "operador@lcp.com"))
+        {
+            context.Usuarios.Add(new Usuario
+            {
+                Nombre = "Martín",
+                Apellido = "Benítez",
+                Email = "operador@lcp.com",
+                PasswordHash = HashPassword("Operador123!"),
+                Telefono = "2954-600200",
+                Rol = RolUsuario.Operador,
+                Activo = true,
+                EmailConfirmado = true,
+                FechaAlta = DateTime.UtcNow
+            });
+        }
+
+        // 3. Asegurar Auditor Demo
+        if (!await context.Usuarios.AnyAsync(u => u.Email == "auditor@lcp.com"))
+        {
+            context.Usuarios.Add(new Usuario
+            {
+                Nombre = "Lucía",
+                Apellido = "Pereyra",
+                Email = "auditor@lcp.com",
+                PasswordHash = HashPassword("Auditor123!"),
+                Telefono = "2954-600300",
+                Rol = RolUsuario.Auditor,
+                Activo = true,
+                EmailConfirmado = true,
+                FechaAlta = DateTime.UtcNow
+            });
+        }
+
+        // 4. Asegurar Empresa Cliente y Usuario Cliente Demo
+        var clienteEmpresa = await context.ClientesEmpresa.FirstOrDefaultAsync(c => c.CUIT == "30-71122334-9");
+        if (clienteEmpresa == null)
+        {
+            clienteEmpresa = new ClienteEmpresa
+            {
+                RazonSocial = "Distribuidora Pampeana S.A.",
+                CUIT = "30-71122334-9",
+                Rubro = "Alimentos y Bebidas",
+                Domicilio = "Av. Spinetto 1420",
+                Localidad = "Santa Rosa",
+                Provincia = "La Pampa",
+                EmailContacto = "cliente@pampeana.com",
+                TelefonoContacto = "2954-411223",
+                EstadoAlta = EstadoPostulacionAlta.Aprobada,
+                FechaSolicitud = DateTime.UtcNow,
+                EmailConfirmado = true,
+                FechaConfirmacionEmail = DateTime.UtcNow
+            };
+            context.ClientesEmpresa.Add(clienteEmpresa);
+            await context.SaveChangesAsync();
+        }
+
+        var clienteUser = await context.Usuarios.FirstOrDefaultAsync(u => u.Email == "cliente@pampeana.com");
+        if (clienteUser == null)
+        {
+            clienteUser = new Usuario
+            {
+                Nombre = "Carlos",
+                Apellido = "Rossi",
+                Email = "cliente@pampeana.com",
+                PasswordHash = HashPassword("Cliente123!"),
+                Telefono = "2954-411223",
+                Rol = RolUsuario.Cliente,
+                ClienteId = clienteEmpresa.Id,
+                Activo = true,
+                EmailConfirmado = true,
+                FechaAlta = DateTime.UtcNow
+            };
+            context.Usuarios.Add(clienteUser);
+            await context.SaveChangesAsync();
+        }
+
+        // 5. Asegurar Conductor Flota LCP Demo
+        var conductorUser = await context.Usuarios.FirstOrDefaultAsync(u => u.Email == "conductor@flota.com");
+        if (conductorUser == null)
+        {
+            conductorUser = new Usuario
+            {
+                Nombre = "Esteban",
+                Apellido = "Morales",
+                Email = "conductor@flota.com",
+                PasswordHash = HashPassword("Chofer123!"),
+                Telefono = "2954-555888",
+                Rol = RolUsuario.Conductor,
+                Activo = true,
+                EmailConfirmado = true,
+                FechaAlta = DateTime.UtcNow
+            };
+            context.Usuarios.Add(conductorUser);
+            await context.SaveChangesAsync();
+        }
+
+        if (!await context.Conductores.AnyAsync(c => c.UsuarioId == conductorUser.Id || c.Email == "conductor@flota.com"))
+        {
+            context.Conductores.Add(new Conductor
+            {
+                Nombre = "Esteban",
+                Apellido = "Morales",
+                CUIL = "20-33445566-7",
+                Email = "conductor@flota.com",
+                CelularWhatsApp = "2954-555888",
+                PatenteCamion = "AF-123-LP",
+                CapacidadCargaKg = 24000m,
+                CapacidadVolumenM3 = 85m,
+                TipoConductor = TipoConductor.FlotaLCP,
+                EstadoPostulacion = EstadoPostulacionAlta.Aprobada,
+                FechaPostulacion = DateTime.UtcNow,
+                UsuarioId = conductorUser.Id,
+                EmailConfirmado = true
+            });
+        }
+
+        // Si existen usuarios previos creados en pruebas manuales (juanjosev259...), asegurar que también puedan iniciar sesión con Admin123!
+        var manualUsers = await context.Usuarios.Where(u => u.Email.StartsWith("juanjosev259")).ToListAsync();
+        foreach (var u in manualUsers)
+        {
+            // Dejar HashPassword("Admin123!") por si el usuario lo olvidó
+            u.PasswordHash = HashPassword("Admin123!");
+            u.Activo = true;
+            u.EmailConfirmado = true;
+        }
+
+        // 6. Tarifas si no existen
+        if (!await context.TarifasConfiguracion.AnyAsync())
+        {
+            var tarifas = new List<TarifaConfiguracion>
+            {
+                new() { CodigoConcepto = TarifaCodigos.AlquilerTrimestral, Descripcion = "Alquiler de Dársena Plan Trimestral (3 meses)", ValorUnitario = 450000m, ActualizadoPorUsuarioId = adminUser.Id },
+                new() { CodigoConcepto = TarifaCodigos.AlquilerSemestral, Descripcion = "Alquiler de Dársena Plan Semestral (6 meses)", ValorUnitario = 820000m, ActualizadoPorUsuarioId = adminUser.Id },
+                new() { CodigoConcepto = TarifaCodigos.AlquilerAnual, Descripcion = "Alquiler de Dársena Plan Anual (12 meses)", ValorUnitario = 1500000m, ActualizadoPorUsuarioId = adminUser.Id },
+                new() { CodigoConcepto = TarifaCodigos.PrecioPorKg, Descripcion = "Tarifa Flota LCP por Kilogramo transportado", ValorUnitario = 50m, ActualizadoPorUsuarioId = adminUser.Id },
+                new() { CodigoConcepto = TarifaCodigos.PrecioPorM3, Descripcion = "Tarifa Flota LCP por Metro Cúbico transportado", ValorUnitario = 8000m, ActualizadoPorUsuarioId = adminUser.Id },
+                new() { CodigoConcepto = TarifaCodigos.PrecioPorKm, Descripcion = "Tarifa Flota LCP por Kilómetro recorrido", ValorUnitario = 1200m, ActualizadoPorUsuarioId = adminUser.Id },
+                new() { CodigoConcepto = TarifaCodigos.CargoDescargaOperador, Descripcion = "Cargo operativo muelle descarga/carga y ordenamiento", ValorUnitario = 15000m, ActualizadoPorUsuarioId = adminUser.Id },
+                new() { CodigoConcepto = TarifaCodigos.CargoDiaDeposito, Descripcion = "Cargo por estadía extraordinaria de acopio por día", ValorUnitario = 5000m, ActualizadoPorUsuarioId = adminUser.Id }
+            };
+            context.TarifasConfiguracion.AddRange(tarifas);
+        }
+
+        // 7. Dársenas si no existen
+        if (!await context.Darsenas.AnyAsync())
+        {
+            var d1 = new Darsena { NumeroDarsena = 1, Codigo = "Dársena 1", CapacidadMaximaPallets = 32, CapacidadMaximaM3 = 140m, EstadoActual = EstadoDarsena.Libre, DetalleOperacionActual = "Disponible ahora (Sin alquiler)" };
+            var d2 = new Darsena { NumeroDarsena = 2, Codigo = "Dársena 2", CapacidadMaximaPallets = 30, CapacidadMaximaM3 = 120m, EstadoActual = EstadoDarsena.Libre, DetalleOperacionActual = "Disponible ahora (Sin alquiler)" };
+            var d3 = new Darsena { NumeroDarsena = 3, Codigo = "Dársena 3", CapacidadMaximaPallets = 28, CapacidadMaximaM3 = 110m, EstadoActual = EstadoDarsena.Libre, DetalleOperacionActual = "Disponible ahora (Sin alquiler)" };
+            var d4 = new Darsena { NumeroDarsena = 4, Codigo = "Dársena 4", CapacidadMaximaPallets = 36, CapacidadMaximaM3 = 150m, EstadoActual = EstadoDarsena.Libre, DetalleOperacionActual = "Disponible ahora (Sin alquiler)" };
+            var d5 = new Darsena { NumeroDarsena = 5, Codigo = "Dársena 5", CapacidadMaximaPallets = 30, CapacidadMaximaM3 = 120m, EstadoActual = EstadoDarsena.Libre, DetalleOperacionActual = "Disponible ahora (Sin alquiler)" };
+            var d6 = new Darsena { NumeroDarsena = 6, Codigo = "Dársena 6", CapacidadMaximaPallets = 30, CapacidadMaximaM3 = 120m, EstadoActual = EstadoDarsena.Libre, DetalleOperacionActual = "Disponible ahora (Sin alquiler)" };
+            context.Darsenas.AddRange(d1, d2, d3, d4, d5, d6);
+        }
+
+        await context.SaveChangesAsync();
     }
 
     public static async Task ResetDatabaseToDemoAsync(LcpDbContext context)

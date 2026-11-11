@@ -9,7 +9,8 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 builder.Services.AddHttpClient();
-builder.Services.AddLcpMobileComponents();
+var apiBaseUrl = builder.Configuration["ApiSettings:BaseUrl"] ?? "http://localhost:5152";
+builder.Services.AddLcpMobileComponents(apiBaseUrl);
 
 var app = builder.Build();
 

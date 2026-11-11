@@ -9,7 +9,12 @@ public class InMemoryTokenStorage : ITokenStorage
     private DateTime? _expiration;
     private DateTime? _lastActivity;
     private bool _introShown = false;
-    private string _apiBaseUrl = "http://localhost:5147";
+    private string _apiBaseUrl;
+
+    public InMemoryTokenStorage(string defaultBaseUrl = "http://localhost:5152")
+    {
+        _apiBaseUrl = defaultBaseUrl;
+    }
 
     public event Action? OnChange;
 
