@@ -1,0 +1,236 @@
+@model LCP.Web.Models.MiStockViewModel
+@using LCP.Shared.Constants
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = "Mi Stock e Inventario por Dársenas";
+    var darsenasFiltradas = Model.DarsenaSeleccionadaId.HasValue
+        ? Model.Darsenas.Where(d => d.DarsenaId == Model.DarsenaSeleccionadaId.Value).ToList()
+        : Model.Darsenas;
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Mi Stock e Inventario por Dársena</h1>
+        <p class="page-subtitle">Cada dársena alquilada funciona como tu centro de acopio independiente y reservado en LCP Santa Rosa</p>
+    </div>
+
+    <div>
+        @if (Model.TotalDarsenasAlquiladas > 0)
+        {
+            <a asp-controller="Solicitudes" asp-action="Nueva" class="btn-lcp-primary">
+                + Nueva Solicitud de Operación
+            </a>
+        }
+        else
+        {
+            <a asp-controller="ClienteDarsenas" asp-action="MisContratos" class="btn-lcp-primary">
+                + Solicitar Alquiler de Dársena
+            </a>
+        }
+    </div>
+</div>
+
+<!-- RESUMEN GLOBAL DE STOCK -->
+<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px;">
+    <div class="stat-card">
+        <span class="stat-label">🏢 Dársenas Alquiladas</span>
+        <div class="stat-value">@Model.TotalDarsenasAlquiladas</div>
+        <div style="font-size: 12px; color: var(--lcp-text-muted); margin-top: 4px;">Muelles de acopio activos</div>
+    </div>
+    <div class="stat-card">
+        <span class="stat-label">📦 Bultos / Cajas Totales</span>
+        <div class="stat-value">@Model.TotalBultosGlobal</div>
+        <div style="font-size: 12px; color: var(--lcp-text-muted); margin-top: 4px;">@Model.TotalUnidadesGlobal unidades en custodia</div>
+    </div>
+    <div class="stat-card">
+        <span class="stat-label">⚖️ Peso Total en Custodia</span>
+        <div class="stat-value">@Model.TotalPesoKgGlobal.ToString("N0") <span style="font-size: 15px; font-weight: 500;">kg</span></div>
+        <div style="font-size: 12px; color: var(--lcp-text-muted); margin-top: 4px;">En báscula oficial LCP</div>
+    </div>
+    <div class="stat-card">
+        <span class="stat-label">📐 Volumen Ocupado</span>
+        <div class="stat-value">@Model.TotalVolumenM3Global.ToString("N2") <span style="font-size: 15px; font-weight: 500;">m³</span></div>
+        <div style="font-size: 12px; color: var(--lcp-text-muted); margin-top: 4px;">Distribuido en tus muelles</div>
+    </div>
+</div>
+
+<!-- SELECTOR / PESTAÑAS POR DÁRSENA -->
+@if (Model.Darsenas.Count > 1)
+{
+    <div class="filter-tabs" style="margin-bottom: 20px;">
+        <a asp-action="MiStock" class="tab-btn @(!Model.DarsenaSeleccionadaId.HasValue ? "active" : "")">
+            Todas mis dársenas (@Model.TotalDarsenasAlquiladas)
+        </a>
+        @foreach (var d in Model.Darsenas)
+        {
+            <a asp-action="MiStock" asp-route-darsenaId="@d.DarsenaId" class="tab-btn @(Model.DarsenaSeleccionadaId == d.DarsenaId ? "active" : "")">
+                @d.DarsenaCodigo (@d.TotalBultosCajas cajas · @d.TotalLotes lotes)
+            </a>
+        }
+    </div>
+}
+
+@if (!Model.Darsenas.Any())
+{
+    <div class="lcp-card" style="text-align: center; padding: 48px 24px; background: #FAF8F5; border: 2px dashed #DDD7CD;">
+        <div style="font-size: 48px; margin-bottom: 12px;">🏢</div>
+        <h3 style="margin-top: 0; color: #192A33; font-size: 20px; font-weight: 800;">Aún no poseés dársenas alquiladas</h3>
+        <p style="color: var(--lcp-text-muted); max-width: 520px; margin: 0 auto 24px; font-size: 14px;">
+            En Logística Centro País, cada cliente dispone de sus propias dársenas alquiladas para acopiar y gestionar su inventario en Santa Rosa.
+        </p>
+        <a asp-controller="ClienteDarsenas" asp-action="MisContratos" class="btn-lcp-primary" style="padding: 10px 24px;">
+            + Alquilar una Dársena para comenzar
+        </a>
+    </div>
+}
+
+<!-- SECCIÓN POR CADA DÁRSENA ALQUILADA (COMPARTIMENTALIZADA) -->
+@foreach (var d in darsenasFiltradas)
+{
+    var darsenaTitulo = d.DarsenaCodigo.StartsWith("Dársena", StringComparison.OrdinalIgnoreCase) ? d.DarsenaCodigo : $"Dársena {d.DarsenaCodigo}";
+    <div class="lcp-card" style="margin-bottom: 28px; border: 1px solid #D5CEBE; box-shadow: 0 4px 16px rgba(0,0,0,0.04);">
+        <!-- CABECERA DE LA DÁRSENA -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 16px; border-bottom: 2px solid #EFECE6; flex-wrap: wrap; gap: 14px;">
+            <div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 22px;">🏢</span>
+                    <h2 style="margin: 0; font-size: 20px; font-weight: 800; color: #192A33;">
+                        @darsenaTitulo
+                    </h2>
+                    <span class="badge-estado badge-encurso" style="font-size: 11px;">
+                        Plan @d.PlanNombre · Vigente
+                    </span>
+                    @if (!string.IsNullOrEmpty(d.ClienteRazonSocial))
+                    {
+                        <span style="font-size: 12px; color: var(--lcp-text-muted); font-weight: 600;">
+                            (@d.ClienteRazonSocial)
+                        </span>
+                    }
+                </div>
+                <div style="font-size: 12px; color: var(--lcp-text-muted); margin-top: 6px;">
+                    Vigencia hasta: <strong>@d.FechaFin.ToString("dd/MM/yyyy")</strong> · 
+                    Capacidad máxima teórica: <strong>@d.CapacidadPallets pallets</strong> (@d.CapacidadM3.ToString("N0") m³)
+                </div>
+            </div>
+
+            <!-- BOTONES DE ACCIÓN DIRECTOS SOBRE ESTA DÁRSENA -->
+            <div style="display: flex; gap: 8px;">
+                <a asp-controller="Solicitudes" asp-action="Nueva" asp-route-darsenaId="@d.DarsenaId" asp-route-tipo="1" 
+                   class="btn-lcp-primary btn-lcp-sm" style="background-color: #2B7A4B; border-color: #2B7A4B;">
+                    📥 Ingresar Carga a @darsenaTitulo
+                </a>
+                <a asp-controller="Solicitudes" asp-action="Nueva" asp-route-darsenaId="@d.DarsenaId" asp-route-tipo="2" 
+                   class="btn-lcp-outline btn-lcp-sm" style="color: #28536B; border-color: #28536B;">
+                    📤 Retirar de @darsenaTitulo
+                </a>
+            </div>
+        </div>
+
+        <!-- BARRA DE CAPACIDAD Y MÉTRICAS PROPIAS DE ESTA DÁRSENA -->
+        <div style="background-color: #F8F5EE; border-radius: 6px; padding: 14px 18px; margin: 16px 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+            <div style="flex: 1; min-width: 260px;">
+                <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; color: #192A33; margin-bottom: 6px;">
+                    <span>Ocupación volumétrica del espacio:</span>
+                    <span style="color: @(d.PorcentajeOcupacionVolumen > 80 ? "#C2410C" : "#2B7A4B");">
+                        @d.TotalVolumenM3.ToString("N2") m³ de @d.CapacidadM3.ToString("N0") m³ (@d.PorcentajeOcupacionVolumen%)
+                    </span>
+                </div>
+                <div style="width: 100%; height: 8px; background: #DDD7CD; border-radius: 4px; overflow: hidden;">
+                    <div style="width: @Math.Min(100, d.PorcentajeOcupacionVolumen)%; height: 100%; background: @(d.PorcentajeOcupacionVolumen > 80 ? "#C2410C" : "#2B7A4B"); border-radius: 4px; transition: width 0.3s ease;"></div>
+                </div>
+            </div>
+
+            <!-- METRIC PILLS -->
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <span style="background: #FFFFFF; border: 1px solid #D5CEBE; border-radius: 20px; padding: 5px 12px; font-size: 12px; font-weight: 700; color: #192A33;">
+                    📦 @d.TotalBultosCajas cajas
+                </span>
+                <span style="background: #FFFFFF; border: 1px solid #D5CEBE; border-radius: 20px; padding: 5px 12px; font-size: 12px; font-weight: 700; color: #192A33;">
+                    🏷️ @d.TotalUnidades un.
+                </span>
+                <span style="background: #FFFFFF; border: 1px solid #D5CEBE; border-radius: 20px; padding: 5px 12px; font-size: 12px; font-weight: 700; color: #192A33;">
+                    ⚖️ @d.TotalPesoKg.ToString("N0") kg
+                </span>
+                <span style="background: #FFFFFF; border: 1px solid #D5CEBE; border-radius: 20px; padding: 5px 12px; font-size: 12px; font-weight: 700; color: #192A33;">
+                    📋 @d.TotalLotes lote(s)
+                </span>
+            </div>
+        </div>
+
+        <!-- TABLA DE LOTES DENTRO DE ESTA DÁRSENA -->
+        @if (d.Lotes.Any())
+        {
+            <div class="lcp-table-container" style="margin-top: 10px; border: 1px solid #E5DFD5;">
+                <table class="lcp-table">
+                    <thead>
+                        <tr style="background-color: #FAF8F5;">
+                            <th style="width: 140px;">Código Lote</th>
+                            <th>Producto / Mercadería Almacenada</th>
+                            <th style="width: 170px;">Ubicación en Dársena</th>
+                            <th style="width: 130px;">Cajas / Unidades</th>
+                            <th style="width: 130px;">Peso / Volumen</th>
+                            <th style="width: 160px;">Ingreso Oficial</th>
+                            <th style="width: 130px; text-align: right;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var l in d.Lotes)
+                        {
+                            <tr>
+                                <td style="font-weight: 800; color: #192A33;">
+                                    📦 @l.CodigoLote
+                                </td>
+                                <td>
+                                    <div style="font-weight: 700; color: #192A33;">@l.ProductoDescripcion</div>
+                                    <div style="font-size: 11px; color: var(--lcp-text-muted);">
+                                        @(l.SolicitudIngresoId.HasValue ? $"Ingresado mediante Solicitud #{l.SolicitudIngresoId}" : "Ingreso directo en muelle")
+                                    </div>
+                                </td>
+                                <td>
+                                    <span style="background-color: #EFECE6; color: #192A33; padding: 4px 8px; border-radius: 4px; font-weight: 700; font-size: 12px;">
+                                        📍 @l.UbicacionInternaDarsena
+                                    </span>
+                                </td>
+                                <td>
+                                    <strong>@l.CantidadBultosCajas cajas</strong>
+                                    <div style="font-size: 11px; color: var(--lcp-text-muted);">(@l.CantidadUnidades u. totales)</div>
+                                </td>
+                                <td>
+                                    <strong>@l.PesoKg.ToString("N0") kg</strong>
+                                    <div style="font-size: 11px; color: var(--lcp-text-muted);">@l.VolumenM3.ToString("N2") m³</div>
+                                </td>
+                                <td>
+                                    <div>@l.FechaIngreso.ToString("dd/MM/yyyy HH:mm")</div>
+                                    <div style="font-size: 11px; color: var(--lcp-text-muted);">Por @l.OrdenadoPorOperadorNombre</div>
+                                </td>
+                                <td style="text-align: right;">
+                                    <a asp-controller="Solicitudes" asp-action="Nueva" 
+                                       asp-route-darsenaId="@d.DarsenaId" 
+                                       asp-route-tipo="2" 
+                                       asp-route-loteId="@l.Id" 
+                                       class="btn-lcp-outline btn-lcp-sm" 
+                                       title="Retirar mercadería de este lote específico">
+                                        📤 Retirar
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div style="text-align: center; padding: 36px 20px; background-color: #FAF8F5; border: 1px dashed #DDD7CD; border-radius: 6px; margin-top: 10px;">
+                <div style="font-size: 32px; margin-bottom: 6px;">📦✨</div>
+                <div style="font-weight: 700; color: #192A33; font-size: 15px;">@darsenaTitulo actualmente vacía</div>
+                <p style="font-size: 13px; color: var(--lcp-text-muted); margin: 4px auto 16px; max-width: 480px;">
+                    Este espacio está asignado exclusivamente a tu empresa. Podés coordinar un arribo para comenzar a guardar mercadería aquí.
+                </p>
+                <a asp-controller="Solicitudes" asp-action="Nueva" asp-route-darsenaId="@d.DarsenaId" asp-route-tipo="1" class="btn-lcp-primary btn-lcp-sm">
+                    + Programar Primer Ingreso a @darsenaTitulo
+                </a>
+            </div>
+        }
+    </div>
+}

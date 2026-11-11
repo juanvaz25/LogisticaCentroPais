@@ -1,0 +1,32 @@
+@inject UiNotificationService Notifier
+@implements IDisposable
+
+<div class="toast-container">
+    @foreach (var toast in Notifier.ActiveToasts)
+    {
+        <div class="toast-item @toast.Type">
+            <i class="@GetIcon(toast.Type)"></i>
+            <span>@toast.Text</span>
+        </div>
+    }
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Notifier.OnChange += StateHasChanged;
+    }
+
+    private string GetIcon(string type) => type switch
+    {
+        "success" => "fa-solid fa-circle-check",
+        "danger" => "fa-solid fa-triangle-exclamation",
+        "warning" => "fa-solid fa-circle-exclamation",
+        _ => "fa-solid fa-circle-info"
+    };
+
+    public void Dispose()
+    {
+        Notifier.OnChange -= StateHasChanged;
+    }
+}

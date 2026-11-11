@@ -1,0 +1,326 @@
+@model List<SolicitudOperacionDto>
+@{
+    ViewData["Title"] = "Mis Viajes y Tareas - Conductor";
+    var activos = ViewBag.ViajesActivos as List<SolicitudOperacionDto> ?? new();
+    var historial = ViewBag.ViajesHistorial as List<SolicitudOperacionDto> ?? new();
+
+    var misionEnCurso = activos.FirstOrDefault(s => s.Estado == EstadoSolicitud.EnCurso)
+                     ?? activos.FirstOrDefault(s => s.Estado == EstadoSolicitud.Programada);
+}
+
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+    <div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 26px;">🚚</span>
+            <h1 class="page-title" style="margin: 0;">Mis Viajes y Tareas de Conducción</h1>
+        </div>
+        <p class="page-subtitle" style="margin-top: 6px;">
+            Itinerarios de ruta, asignación de dársenas y control operativo en tiempo real para conductores de la red LCP.
+        </p>
+    </div>
+    <div style="display: flex; gap: 10px;">
+        <a asp-controller="Calendario" asp-action="Index" class="btn-lcp-outline btn-lcp-sm">
+            📅 Ver Agenda / Calendario
+        </a>
+        <a asp-controller="Inbox" asp-action="Index" class="btn-lcp-outline btn-lcp-sm">
+            💬 Chat Operativo Tripartito
+        </a>
+    </div>
+</div>
+
+<!-- KPIS SUMMARY -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
+    <div class="lcp-card" style="padding: 16px; border-left: 4px solid var(--lcp-primary); margin: 0;">
+        <span style="font-size: 11px; font-weight: 700; color: var(--lcp-text-muted); text-transform: uppercase;">Misiones Activas</span>
+        <div style="font-size: 26px; font-weight: 800; color: var(--lcp-text-dark); margin-top: 4px;">
+            @activos.Count
+        </div>
+        <span style="font-size: 12px; color: var(--lcp-text-muted);">En tránsito o programadas</span>
+    </div>
+
+    <div class="lcp-card" style="padding: 16px; border-left: 4px solid #C2821E; margin: 0;">
+        <span style="font-size: 11px; font-weight: 700; color: var(--lcp-text-muted); text-transform: uppercase;">Dobles Viajes (Flota LCP)</span>
+        <div style="font-size: 26px; font-weight: 800; color: #C2821E; margin-top: 4px;">
+            @activos.Count(s => s.EsDobleViaje)
+        </div>
+        <span style="font-size: 12px; color: var(--lcp-text-muted);">Circuito Ida y Vuelta a Base</span>
+    </div>
+
+    <div class="lcp-card" style="padding: 16px; border-left: 4px solid #2B7A4B; margin: 0;">
+        <span style="font-size: 11px; font-weight: 700; color: var(--lcp-text-muted); text-transform: uppercase;">Viajes Simples Directos</span>
+        <div style="font-size: 26px; font-weight: 800; color: #2B7A4B; margin-top: 4px;">
+            @activos.Count(s => !s.EsDobleViaje)
+        </div>
+        <span style="font-size: 12px; color: var(--lcp-text-muted);">Chofer propio (un tramo)</span>
+    </div>
+
+    <div class="lcp-card" style="padding: 16px; border-left: 4px solid #6C7A82; margin: 0;">
+        <span style="font-size: 11px; font-weight: 700; color: var(--lcp-text-muted); text-transform: uppercase;">Misiones Completadas</span>
+        <div style="font-size: 26px; font-weight: 800; color: var(--lcp-text-dark); margin-top: 4px;">
+            @historial.Count(s => s.Estado == EstadoSolicitud.Completada)
+        </div>
+        <span style="font-size: 12px; color: var(--lcp-text-muted);">Historial finalizado</span>
+    </div>
+</div>
+
+@if (misionEnCurso != null)
+{
+    <!-- HERO CARD: MISIÓN DESTACADA / EN CURSO -->
+    <div class="lcp-card" style="background: linear-gradient(135deg, #162E3B 0%, #1F4356 100%); color: #FFFFFF; border: none; padding: 26px; margin-bottom: 28px; box-shadow: 0 10px 25px rgba(22, 46, 59, 0.2);">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: #2ECC71; box-shadow: 0 0 10px #2ECC71; animation: pulse 2s infinite;"></span>
+                <span style="font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #A5D6A7;">
+                    @(misionEnCurso.Estado == EstadoSolicitud.EnCurso ? "MISIÓN EN CURSO AHORA" : "PRÓXIMA MISIÓN ASIGNADA")
+                </span>
+                <span style="background-color: rgba(255,255,255,0.15); padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700;">
+                    Operación @misionEnCurso.CodigoSolicitud
+                </span>
+            </div>
+
+            @if (misionEnCurso.EsDobleViaje)
+            {
+                <span style="background-color: #C2821E; color: #FFF; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 800; display: inline-flex; align-items: center; gap: 6px;">
+                    🔁 DOBLE VIAJE (IDA Y VUELTA) · FLOTA LCP
+                </span>
+            }
+            else
+            {
+                <span style="background-color: #2B7A4B; color: #FFF; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 800; display: inline-flex; align-items: center; gap: 6px;">
+                    ➡️ VIAJE SIMPLE DIRECTO · CHOFER PROPIO
+                </span>
+            }
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; align-items: center;">
+            <div>
+                <h2 style="font-size: 22px; font-weight: 800; margin: 0 0 8px; color: #FFFFFF;">
+                    @misionEnCurso.ClienteRazonSocial
+                </h2>
+                <div style="font-size: 14px; color: #D5E1E8; margin-bottom: 16px;">
+                    <strong>Tipo:</strong> @misionEnCurso.TipoOperacionNombre · <strong>Mercadería:</strong> @misionEnCurso.DescripcionMercaderia
+                </div>
+
+                <!-- CIRCUITO DE LA RUTA -->
+                <div style="background-color: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+                    <div style="font-size: 11px; text-transform: uppercase; color: #A5D6A7; font-weight: 800; letter-spacing: 0.5px; margin-bottom: 6px;">
+                        Itinerario Operativo:
+                    </div>
+                    @if (misionEnCurso.EsDobleViaje)
+                    {
+                        <div style="font-size: 13px; line-height: 1.6; color: #FFFFFF;">
+                            <div>📍 <strong>Tramo 1 (Salida con Carga):</strong> Base LCP Santa Rosa (Dársena @misionEnCurso.DarsenaCodigo) ➔ @(misionEnCurso.CiudadDestino ?? "Destino Cliente") (@misionEnCurso.DistanciaEstimadaKm.ToString("N0") km)</div>
+                            <div>📦 <strong>Despacho:</strong> Entrega física de mercadería en destino (@misionEnCurso.PesoTotalKg.ToString("N0") kg / @misionEnCurso.VolumenTotalM3.ToString("N1") m³)</div>
+                            <div>🏁 <strong>Tramo 2 (Retorno Vacío):</strong> @(misionEnCurso.CiudadDestino ?? "Destino Cliente") ➔ Base Central LCP Santa Rosa (@misionEnCurso.DistanciaEstimadaKm.ToString("N0") km)</div>
+                            <div style="margin-top: 6px; font-weight: 700; color: #FFD54F;">
+                                🛣️ Distancia Total: @misionEnCurso.DistanciaTotalKm.ToString("N0") km recorridos en circuito de doble viaje.
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div style="font-size: 13px; line-height: 1.6; color: #FFFFFF;">
+                            <div>📍 <strong>Origen:</strong> @(misionEnCurso.CiudadOrigen ?? "Planta Cliente")</div>
+                            <div>🏁 <strong>Destino:</strong> Nodo Central LCP Santa Rosa · @misionEnCurso.DarsenaCodigo</div>
+                            <div style="margin-top: 6px; font-weight: 700; color: #A5D6A7;">
+                                🛣️ Distancia Trayecto Directo: @misionEnCurso.DistanciaEstimadaKm.ToString("N0") km.
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div style="background-color: rgba(0,0,0,0.2); border-radius: 8px; padding: 18px; border: 1px solid rgba(255,255,255,0.1);">
+                <div style="font-size: 11px; text-transform: uppercase; color: #ADC2CE; font-weight: 700;">Dársena Asignada</div>
+                <div style="font-size: 20px; font-weight: 800; color: #FFFFFF; margin-bottom: 12px;">
+                    @misionEnCurso.DarsenaCodigo
+                </div>
+
+                <div style="font-size: 11px; text-transform: uppercase; color: #ADC2CE; font-weight: 700;">Puerta de Ingreso</div>
+                <div style="font-size: 14px; font-weight: 600; color: #FFFFFF; margin-bottom: 12px;">
+                    Calle San Martín 245 (Predio Central LCP)
+                </div>
+
+                <div style="font-size: 11px; text-transform: uppercase; color: #ADC2CE; font-weight: 700;">Turno Programado</div>
+                <div style="font-size: 15px; font-weight: 700; color: #FFD54F; margin-bottom: 18px;">
+                    @misionEnCurso.FechaHoraTurnoProgramado.ToString("dd/MM/yyyy HH:mm") hs
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <a asp-action="HojaDeRuta" asp-route-id="@misionEnCurso.Id" class="btn-lcp-primary" style="background-color: #2ECC71; border-color: #2ECC71; color: #162E3B; font-weight: 800; text-align: center; text-decoration: none; padding: 12px;">
+                        🗺️ Abrir Hoja de Ruta e Itinerario
+                    </a>
+                    <a asp-controller="Inbox" asp-action="Index" class="btn-lcp-outline" style="border-color: rgba(255,255,255,0.3); color: #FFF; text-align: center; text-decoration: none; font-size: 13px;">
+                        💬 Abrir Chat con Cliente y Operador
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- SECCIÓN 1: MISIÓNES ACTIVAS Y PROGRAMADAS -->
+<div class="lcp-card" style="margin-bottom: 28px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div>
+            <h2 class="lcp-card-title" style="margin: 0;">📋 Tareas y Viajes Asignados</h2>
+            <p style="font-size: 13px; color: var(--lcp-text-muted); margin: 4px 0 0;">
+                Misiones con camión y chofer designados para operaciones de arribo o despacho.
+            </p>
+        </div>
+        <span class="badge-estado badge-encurso">@activos.Count viaje(s) pendiente(s) / activo(s)</span>
+    </div>
+
+    @if (!activos.Any())
+    {
+        <div style="text-align: center; padding: 40px 20px; background-color: #F8F6F0; border-radius: 8px; border: 1px dashed #CCC5B7;">
+            <div style="font-size: 40px; margin-bottom: 10px;">🚛</div>
+            <h3 style="font-size: 16px; font-weight: 700; color: var(--lcp-text-dark); margin: 0 0 6px;">No tenés viajes activos asignados en este momento</h3>
+            <p style="font-size: 13px; color: var(--lcp-text-muted); margin: 0 auto; max-width: 480px;">
+                Cuando un operador programe una solicitud de arribo o despacho asignándote como chofer de la unidad, verás aquí los detalles, la dársena y el acceso a la hoja de ruta en vivo.
+            </p>
+        </div>
+    }
+    else
+    {
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 18px;">
+            @foreach (var s in activos)
+            {
+                <div style="background-color: #FFFFFF; border: 1px solid var(--lcp-card-border); border-radius: 8px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; transition: all 0.2s ease; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
+                    <div>
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                            <div>
+                                <span style="font-size: 11px; font-weight: 800; color: var(--lcp-primary); text-transform: uppercase;">
+                                    Operación @s.CodigoSolicitud
+                                </span>
+                                <h3 style="font-size: 16px; font-weight: 800; color: var(--lcp-text-dark); margin: 2px 0 0;">
+                                    @s.ClienteRazonSocial
+                                </h3>
+                            </div>
+                            <span class="badge-estado @(s.Estado == EstadoSolicitud.EnCurso ? "badge-encurso" : "badge-programada")">
+                                @(s.Estado == EstadoSolicitud.EnCurso ? "En Curso" : "Programada")
+                            </span>
+                        </div>
+
+                        <!-- MODALIDAD BADGE -->
+                        <div style="margin-bottom: 12px;">
+                            @if (s.EsDobleViaje)
+                            {
+                                <span style="background-color: #FDF3E3; border: 1px solid #F6D69B; color: #946712; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 800; display: inline-flex; align-items: center; gap: 5px;">
+                                    🔁 Doble Viaje (Ida y Vuelta) · Flota LCP
+                                </span>
+                            }
+                            else
+                            {
+                                <span style="background-color: #EBF8F0; border: 1px solid #C3E6D0; color: #1E663B; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 800; display: inline-flex; align-items: center; gap: 5px;">
+                                    ➡️ Viaje Simple Directo · Chofer Propio
+                                </span>
+                            }
+                        </div>
+
+                        <!-- DETALLES OPERATIVOS -->
+                        <div style="background-color: #F8F6F0; border-radius: 6px; padding: 12px; font-size: 12px; line-height: 1.8; margin-bottom: 14px;">
+                            <div><strong>Tipo:</strong> @s.TipoOperacionNombre</div>
+                            <div>
+                                <strong>Ruta:</strong> @(s.TipoOperacion == TipoOperacionSolicitud.ArriboIngreso ? s.CiudadOrigen : "Base Central LCP") ➔ 
+                                @(s.TipoOperacion == TipoOperacionSolicitud.ArriboIngreso ? "Base Central LCP" : s.CiudadDestino)
+                            </div>
+                            <div><strong>Doble Viaje:</strong> @(s.EsDobleViaje ? $"Sí (Total: {s.DistanciaTotalKm:N0} km)" : $"No (Directo: {s.DistanciaEstimadaKm:N0} km)")</div>
+                            <div><strong>Dársena asignada:</strong> <span style="font-weight: 700; color: var(--lcp-primary);">@s.DarsenaCodigo</span></div>
+                            <div><strong>Puerta de ingreso:</strong> Calle San Martín 245</div>
+                            <div><strong>Carga:</strong> @s.DescripcionMercaderia (@s.PesoTotalKg.ToString("N0") kg · @s.VolumenTotalM3.ToString("N1") m³)</div>
+                            <div><strong>Turno LCP:</strong> <span style="font-weight: 700; color: #C2821E;">@s.FechaHoraTurnoProgramado.ToString("dd/MM/yyyy HH:mm") hs</span></div>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 8px;">
+                        <a asp-action="HojaDeRuta" asp-route-id="@s.Id" class="btn-lcp-primary btn-lcp-sm" style="flex: 1; text-align: center; text-decoration: none;">
+                            🗺️ Ver Hoja de Ruta
+                        </a>
+                        <a asp-controller="Solicitudes" asp-action="Detalle" asp-route-id="@s.Id" class="btn-lcp-outline btn-lcp-sm" style="text-decoration: none;">
+                            Detalle Ficha
+                        </a>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<!-- SECCIÓN 2: HISTORIAL DE VIAJES FINALIZADOS -->
+<div class="lcp-card">
+    <h2 class="lcp-card-title">📜 Historial de Misiones Finalizadas</h2>
+    <p style="font-size: 13px; color: var(--lcp-text-muted); margin: 4px 0 16px;">
+        Registro histórico de viajes completados y remitos entregados en Logística Centro País.
+    </p>
+
+    @if (!historial.Any())
+    {
+        <p style="color: var(--lcp-text-muted); font-size: 13px; margin: 0;">
+            Aún no hay viajes completados en tu historial.
+        </p>
+    }
+    else
+    {
+        <div class="lcp-table-container">
+            <table class="lcp-table">
+                <thead>
+                    <tr>
+                        <th>Operación</th>
+                        <th>Cliente</th>
+                        <th>Tipo</th>
+                        <th>Modalidad</th>
+                        <th>Dársena</th>
+                        <th>Distancia</th>
+                        <th>Turno Operado</th>
+                        <th>Estado</th>
+                        <th style="text-align: right;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var h in historial)
+                    {
+                        <tr>
+                            <td style="font-weight: 800; color: var(--lcp-primary);">@h.CodigoSolicitud</td>
+                            <td style="font-weight: 600;">@h.ClienteRazonSocial</td>
+                            <td>@h.TipoOperacionNombre</td>
+                            <td>
+                                @if (h.EsDobleViaje)
+                                {
+                                    <span style="font-size: 11px; font-weight: 700; color: #946712;">🔁 Doble Viaje (Flota)</span>
+                                }
+                                else
+                                {
+                                    <span style="font-size: 11px; font-weight: 700; color: #1E663B;">➡️ Simple (Propio)</span>
+                                }
+                            </td>
+                            <td style="font-weight: 600;">@h.DarsenaCodigo</td>
+                            <td>@(h.EsDobleViaje ? $"{h.DistanciaTotalKm:N0} km (x2)" : $"{h.DistanciaEstimadaKm:N0} km")</td>
+                            <td>@h.FechaHoraTurnoProgramado.ToString("dd/MM/yyyy HH:mm")</td>
+                            <td>
+                                <span class="badge-estado @(h.Estado == EstadoSolicitud.Completada ? "badge-completada" : "badge-cancelada")">
+                                    @h.EstadoNombre
+                                </span>
+                            </td>
+                            <td style="text-align: right;">
+                                <a asp-action="HojaDeRuta" asp-route-id="@h.Id" class="btn-lcp-outline btn-lcp-sm" style="text-decoration: none;">
+                                    Ver Hoja
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <style>
+        @@keyframes pulse {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.15); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+    </style>
+}

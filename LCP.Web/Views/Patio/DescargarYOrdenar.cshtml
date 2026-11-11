@@ -1,0 +1,265 @@
+@model CompletarDescargaDto
+@using LCP.Shared.Enums
+@{
+    Layout = "_Layout";
+    var sol = ViewBag.Solicitud as SolicitudOperacionDto;
+    bool esDespacho = (ViewBag.EsDespacho == true) || (sol != null && sol.TipoOperacion == TipoOperacionSolicitud.DespachoRetiro);
+    var lotesCliente = ViewBag.LotesCliente as List<LoteInventarioDto> ?? new();
+    var loteSel = ViewBag.LoteSeleccionado as LoteInventarioDto;
+
+    ViewData["Title"] = esDespacho ? "Confirmar Despacho y Salida de Stock" : "Recepción de Muelle, Descarga y Stock";
+}
+
+<div style="max-width: 860px; margin: 0 auto; padding-bottom: 60px;">
+    <div class="page-header">
+        <div>
+            <a asp-action="Darsenas" style="font-size: 13px; color: var(--lcp-primary); font-weight: 600; text-decoration: none;">← Volver al patio</a>
+            <h1 class="page-title" style="margin-top: 8px;">
+                @(esDespacho ? "📤 Confirmar Despacho y Descontar Stock de Dársena" : "📥 Recepción en Muelle y Descarga de Stock")
+            </h1>
+            <p class="page-subtitle">
+                @(esDespacho 
+                    ? "Control físico de salida: los productos se descontarán directamente del inventario del cliente en su dársena asignada" 
+                    : "Operación física de descarga y ordenamiento en dársena alquilada (Ingreso de nuevo stock)")
+            </p>
+        </div>
+    </div>
+
+    @if (sol != null)
+    {
+        <div class="lcp-card" style="background-color: #F3EFE7; border-left: 4px solid @(esDespacho ? "#C2821E" : "var(--lcp-primary)"); margin-bottom: 20px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
+                <div>
+                    <span style="font-size: 11px; text-transform: uppercase; color: var(--lcp-text-muted); font-weight: 700;">Solicitud</span>
+                    <div style="font-size: 16px; font-weight: 800; color: #192A33;">@sol.CodigoSolicitud</div>
+                </div>
+                <div>
+                    <span style="font-size: 11px; text-transform: uppercase; color: var(--lcp-text-muted); font-weight: 700;">Cliente Alquiler</span>
+                    <div style="font-size: 15px; font-weight: 700; color: #192A33;">@sol.ClienteRazonSocial</div>
+                </div>
+                <div>
+                    <span style="font-size: 11px; text-transform: uppercase; color: var(--lcp-text-muted); font-weight: 700;">@(esDespacho ? "Dársena de Origen (Retiro)" : "Dársena Asignada (Ingreso)")</span>
+                    <div style="font-size: 15px; font-weight: 700; color: #192A33;">@sol.DarsenaCodigo</div>
+                </div>
+            </div>
+            <div style="margin-top: 12px; font-size: 13px; color: #4B5A63;">
+                <strong>Detalle de Carga:</strong> @sol.DescripcionMercaderia | Modalidad: <strong>@sol.ModalidadNombre</strong> | Chofer: <strong>@sol.ConductorNombreCompleto</strong>
+                @if (sol.EsDobleViaje)
+                {
+                    <span style="background: #C2821E; color: #FFF; font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 4px; margin-left: 6px;">
+                        🔁 Flota LCP (Doble Viaje)
+                    </span>
+                }
+            </div>
+        </div>
+    }
+
+    <form asp-action="ConfirmarDescarga" method="post">
+        @Html.AntiForgeryToken()
+        <input asp-for="SolicitudId" type="hidden" />
+        <input asp-for="EsRetiro" type="hidden" value="@(esDespacho ? "true" : "false")" />
+
+        <div class="lcp-card">
+            @if (esDespacho)
+            {
+                <!-- MODO DESPACHO / DESCUENTO DE STOCK -->
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                    <span style="font-size: 24px;">📤</span>
+                    <h2 class="lcp-card-title" style="margin: 0; color: #8C5311;">
+                        Verificación de Mercadería Despachada (Descuento de Stock)
+                    </h2>
+                </div>
+                <p style="font-size: 13px; color: var(--lcp-text-muted); margin: 0 0 18px;">
+                    Indique el lote y la cantidad de unidades que salieron de la dársena para su descuento directo en el inventario.
+                </p>
+
+                @if (lotesCliente.Any())
+                {
+                    <div class="form-group" style="margin-bottom: 16px;">
+                        <label class="form-label" style="font-weight: 700;">Lote de Inventario a Descontar *</label>
+                        <select asp-for="LoteInventarioId" id="selectLoteDescuento" class="form-input" required onchange="actualizarInfoLoteDescuento()">
+                            @foreach (var l in lotesCliente)
+                            {
+                                <option value="@l.Id"
+                                        data-codigo="@l.CodigoLote"
+                                        data-producto="@l.ProductoDescripcion"
+                                        data-unidades="@l.CantidadUnidades"
+                                        data-peso="@l.PesoKg"
+                                        data-volumen="@l.VolumenM3"
+                                        selected="@(l.Id == Model.LoteInventarioId ? "selected" : null)">
+                                    [@l.CodigoLote] @l.ProductoDescripcion — Disponible: @l.CantidadUnidades u. (@l.PesoKg.ToString("N0") kg / @l.VolumenM3.ToString("N2") m³)
+                                </option>
+                            }
+                        </select>
+                    </div>
+                }
+                else
+                {
+                    <input type="hidden" asp-for="LoteInventarioId" />
+                }
+
+                <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 16px; margin-bottom: 16px;">
+                    <div class="form-group">
+                        <label class="form-label" style="font-weight: 700;">Código de Lote</label>
+                        <input asp-for="CodigoLote" id="inputCodigoLote" class="form-input" readonly style="background: #F8F6F0; font-weight: 700;" required />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" style="font-weight: 700;">Descripción del Producto</label>
+                        <input asp-for="ProductoDescripcion" id="inputProductoDesc" class="form-input" readonly style="background: #F8F6F0; font-weight: 700;" required />
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1.2fr 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                    <div class="form-group">
+                        <label class="form-label" style="font-weight: 700; color: #C0392B;">Unidades a Descontar *</label>
+                        <input asp-for="CantidadUnidades" id="inputUnidadesDescontar" type="number" min="1" class="form-input" required style="font-weight: 800; font-size: 16px; color: #C0392B;" oninput="recalcularStockRestante()" />
+                        <span id="ayudaStockMaximo" style="font-size: 11px; color: var(--lcp-text-muted); display: block; margin-top: 3px;"></span>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Stock Proyectado Restante</label>
+                        <input id="inputStockRestante" type="text" class="form-input" readonly style="background: #F8F6F0; font-weight: 800; color: #2B7A4B;" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Peso Despachado (kg)</label>
+                        <input asp-for="PesoKg" type="number" step="any" min="0.01" class="form-input" required />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Volumen Despachado (m³)</label>
+                        <input asp-for="VolumenM3" type="number" step="any" min="0.001" class="form-input" required />
+                    </div>
+                </div>
+
+                <input asp-for="CantidadBultosCajas" type="hidden" value="@Model.CantidadBultosCajas" />
+                <input asp-for="UbicacionInternaDarsena" type="hidden" value="@Model.UbicacionInternaDarsena" />
+
+                <!-- AVISO DE IMPACTO EN DESPACHO -->
+                <div style="background-color: #FEF3C7; border: 1px solid #FCD34D; border-radius: 6px; padding: 14px 16px; margin-top: 18px; font-size: 13px; color: #92400E; display: flex; align-items: flex-start; gap: 10px;">
+                    <span style="font-size: 20px; line-height: 1;">ℹ️</span>
+                    <div>
+                        <strong>Descuento directo de stock en la dársena:</strong>
+                        <br />Al confirmar este despacho, las <strong>unidades serán descontadas automáticamente del inventario</strong> del cliente en la dársena <strong>@(sol?.DarsenaCodigo)</strong>. El muelle quedará liberado (manteniendo la vigencia del contrato de alquiler) y se generará la liquidación de transporte para auditoría.
+                    </div>
+                </div>
+
+                <div style="margin-top: 24px; display: flex; gap: 14px; align-items: center;">
+                    <button type="submit" class="btn-lcp-primary" style="background-color: #C2821E; border-color: #C2821E; padding: 13px 28px; font-size: 15px; font-weight: 800;">
+                        📤 Confirmar Despacho y Descontar Stock de Dársena
+                    </button>
+                    <a asp-action="Darsenas" class="btn-lcp-outline" style="padding: 12px 20px;">Cancelar</a>
+                </div>
+            }
+            else
+            {
+                <!-- MODO ARRIBO / INGRESO DE NUEVO STOCK -->
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                    <span style="font-size: 24px;">📥</span>
+                    <h2 class="lcp-card-title" style="margin: 0;">
+                        Registro de Lote y Ubicación en Dársena
+                    </h2>
+                </div>
+                <p style="font-size: 13px; color: var(--lcp-text-muted); margin: 0 0 18px;">
+                    Ingrese los datos del nuevo lote recibido en muelle para ordenarlo dentro de la dársena alquilada.
+                </p>
+
+                <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 16px; margin-bottom: 16px;">
+                    <div class="form-group">
+                        <label class="form-label">Código de Lote *</label>
+                        <input asp-for="CodigoLote" class="form-input" required />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Descripción del Producto / Carga *</label>
+                        <input asp-for="ProductoDescripcion" class="form-input" required />
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                    <div class="form-group">
+                        <label class="form-label">Cantidad Unidades *</label>
+                        <input asp-for="CantidadUnidades" type="number" min="1" class="form-input" required />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Bultos / Cajas</label>
+                        <input asp-for="CantidadBultosCajas" type="number" class="form-input" required />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Peso Real (kg) *</label>
+                        <input asp-for="PesoKg" type="number" step="any" min="0.01" class="form-input" required />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Volumen (m³) *</label>
+                        <input asp-for="VolumenM3" type="number" step="any" min="0.001" class="form-input" required />
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Ubicación Interna en Dársena:</label>
+                    <input asp-for="UbicacionInternaDarsena" class="form-input" placeholder="Ej: Pasillo A - Estante 2 / Módulo Central" required />
+                </div>
+
+                <div style="background-color: #EBF3ED; border: 1px solid #D2E7D7; border-radius: 6px; padding: 14px; margin-top: 16px; font-size: 13px; color: #1E603B;">
+                    ℹ️ <strong>Impacto del ingreso:</strong> Al confirmar la descarga, se ingresa el nuevo lote al stock del cliente, el muelle se libera manteniendo el contrato, y se genera la liquidación para auditoría.
+                </div>
+
+                <div style="margin-top: 24px; display: flex; gap: 14px; align-items: center;">
+                    <button type="submit" class="btn-lcp-primary" style="padding: 13px 28px; font-size: 15px; font-weight: 800;">
+                        ✓ Confirmar Descarga y Cargar al Stock
+                    </button>
+                    <a asp-action="Darsenas" class="btn-lcp-outline" style="padding: 12px 20px;">Cancelar</a>
+                </div>
+            }
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        function actualizarInfoLoteDescuento() {
+            const select = document.getElementById("selectLoteDescuento");
+            if (!select) return;
+            const opt = select.options[select.selectedIndex];
+            if (!opt) return;
+
+            const codigo = opt.getAttribute("data-codigo") || "";
+            const producto = opt.getAttribute("data-producto") || "";
+            const disponibles = parseInt(opt.getAttribute("data-unidades") || "0");
+
+            const inputCodigo = document.getElementById("inputCodigoLote");
+            const inputProd = document.getElementById("inputProductoDesc");
+            const inputUnidades = document.getElementById("inputUnidadesDescontar");
+            const ayuda = document.getElementById("ayudaStockMaximo");
+
+            if (inputCodigo) inputCodigo.value = codigo;
+            if (inputProd) inputProd.value = producto;
+            if (ayuda) ayuda.textContent = `Stock disponible actual: ${disponibles} unidades`;
+
+            recalcularStockRestante();
+        }
+
+        function recalcularStockRestante() {
+            const select = document.getElementById("selectLoteDescuento");
+            const inputUnidades = document.getElementById("inputUnidadesDescontar");
+            const inputRestante = document.getElementById("inputStockRestante");
+            if (!inputUnidades || !inputRestante) return;
+
+            let disponible = 0;
+            if (select && select.selectedIndex >= 0) {
+                const opt = select.options[select.selectedIndex];
+                disponible = parseInt(opt.getAttribute("data-unidades") || "0");
+            }
+
+            const descontar = parseInt(inputUnidades.value || "0");
+            const restante = Math.max(0, disponible - descontar);
+
+            inputRestante.value = `${restante} u. restantes`;
+            if (restante === 0 && disponible > 0) {
+                inputRestante.style.color = "#C0392B";
+            } else {
+                inputRestante.style.color = "#2B7A4B";
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            actualizarInfoLoteDescuento();
+        });
+    </script>
+}

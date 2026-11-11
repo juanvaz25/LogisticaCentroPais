@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="LCP.Api/LCP.Api.csproj" />
+  <Project Path="LCP.Shared/LCP.Shared.csproj" />
+  <Project Path="LCP.Web/LCP.Web.csproj" />
+</Solution>

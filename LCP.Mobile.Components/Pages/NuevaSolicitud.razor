@@ -1,0 +1,254 @@
+@page "/solicitudes/nueva"
+@layout MobileLayout
+@inject IMobileApiClient ApiClient
+@inject NavigationManager Nav
+@inject UiNotificationService Notifier
+
+<div style="display: flex; flex-direction: column; gap: 14px; padding-bottom: 30px;">
+    <!-- Title -->
+    <div>
+        <h2 style="font-size: 1.15rem; font-weight: 800; color: var(--lcp-navy);">Nueva Solicitud de Operación</h2>
+        <div style="font-size: 0.72rem; color: var(--lcp-text-muted);">Programa un arribo o retiro de mercadería</div>
+    </div>
+
+    <EditForm Model="@Model" OnValidSubmit="GuardarSolicitud">
+        <DataAnnotationsValidator />
+
+        <!-- 1. Tipo de Operación -->
+        <div class="card-lcp" style="padding: 14px;">
+            <label class="form-label-lcp">Tipo de Operación</label>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <button type="button" class="btn-lcp-outline"
+                        style="@(Model.TipoOperacion == TipoOperacionSolicitud.ArriboIngreso ? "background: #ECFDF5; border-color: #10B981; color: #047857; font-weight: 700;" : "")"
+                        @onclick="() => SeleccionarTipo(TipoOperacionSolicitud.ArriboIngreso)">
+                    <i class="fa-solid fa-arrow-down"></i>
+                    <span>Arribo / Ingreso</span>
+                </button>
+                <button type="button" class="btn-lcp-outline"
+                        style="@(Model.TipoOperacion == TipoOperacionSolicitud.DespachoRetiro ? "background: #EFF6FF; border-color: #3B82F6; color: #1D4ED8; font-weight: 700;" : "")"
+                        @onclick="() => SeleccionarTipo(TipoOperacionSolicitud.DespachoRetiro)">
+                    <i class="fa-solid fa-arrow-up"></i>
+                    <span>Despacho / Retiro</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 2. Modalidad de Transporte -->
+        <div class="card-lcp" style="padding: 14px;">
+            <label class="form-label-lcp">Modalidad de Transporte</label>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <button type="button" class="btn-lcp-outline"
+                        style="@(Model.ModalidadTransporte == ModalidadTransporte.FlotaLCP ? "background: var(--lcp-gold-light); border-color: var(--lcp-gold); color: #B45309; font-weight: 700;" : "")"
+                        @onclick="() => Model.ModalidadTransporte = ModalidadTransporte.FlotaLCP">
+                    <i class="fa-solid fa-truck"></i>
+                    <div style="text-align: left; line-height: 1.1;">
+                        <div>Flota LCP</div>
+                        <div style="font-size: 0.65rem; color: #94A3B8;">Doble Viaje</div>
+                    </div>
+                </button>
+                <button type="button" class="btn-lcp-outline"
+                        style="@(Model.ModalidadTransporte == ModalidadTransporte.ChoferPropio ? "background: #F1F5F9; border-color: var(--lcp-navy); color: var(--lcp-navy); font-weight: 700;" : "")"
+                        @onclick="() => Model.ModalidadTransporte = ModalidadTransporte.ChoferPropio">
+                    <i class="fa-solid fa-user-gear"></i>
+                    <div style="text-align: left; line-height: 1.1;">
+                        <div>Chofer Propio</div>
+                        <div style="font-size: 0.65rem; color: #94A3B8;">Envío Empresa</div>
+                    </div>
+                </button>
+            </div>
+        </div>
+
+        <!-- 3. Ciudades y Cálculo de Distancia -->
+        <div class="card-lcp" style="padding: 14px;">
+            <label class="form-label-lcp">Ruta Pampeana</label>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+                <div>
+                    <span style="font-size: 0.7rem; color: #64748B;">Ciudad Origen</span>
+                    <select class="form-select-lcp" @bind="Model.CiudadOrigen" @bind:after="RecalcularDistancia">
+                        <option value="Santa Rosa (Base LCP)">Santa Rosa (Base LCP)</option>
+                        <option value="General Pico">General Pico</option>
+                        <option value="Realicó">Realicó</option>
+                        <option value="Toay">Toay</option>
+                        <option value="General Acha">General Acha</option>
+                        <option value="Eduardo Castex">Eduardo Castex</option>
+                    </select>
+                </div>
+                <div>
+                    <span style="font-size: 0.7rem; color: #64748B;">Ciudad Destino</span>
+                    <select class="form-select-lcp" @bind="Model.CiudadDestino" @bind:after="RecalcularDistancia">
+                        <option value="Santa Rosa (Base LCP)">Santa Rosa (Base LCP)</option>
+                        <option value="General Pico">General Pico</option>
+                        <option value="Realicó">Realicó</option>
+                        <option value="Toay">Toay</option>
+                        <option value="General Acha">General Acha</option>
+                        <option value="Eduardo Castex">Eduardo Castex</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Calculo badge -->
+            <div style="background: #F8FAFC; border-radius: 8px; padding: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem;">
+                <div>
+                    <i class="fa-solid fa-route" style="color: var(--lcp-gold); margin-right: 6px;"></i>
+                    <span>Distancia calculada: <strong>@Model.DistanciaEstimadaKm km</strong></span>
+                </div>
+                <div style="color: var(--lcp-teal); font-weight: 700;">
+                    <i class="fa-regular fa-clock"></i> ~@TiempoEstimadoTexto
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. Carga y Dársena -->
+        <div class="card-lcp" style="padding: 14px;">
+            <div class="form-group-lcp">
+                <label class="form-label-lcp">Descripción de Mercadería</label>
+                <InputText class="form-input-lcp" placeholder="Ej: 15 Pallets de Bebidas y Enlatados" @bind-Value="Model.DescripcionMercaderia" />
+                <ValidationMessage For="@(() => Model.DescripcionMercaderia)" style="color: #EF4444; font-size: 0.72rem; margin-top: 4px;" />
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
+                <div>
+                    <label class="form-label-lcp">Peso Total (kg)</label>
+                    <InputNumber class="form-input-lcp" @bind-Value="Model.PesoTotalKg" />
+                </div>
+                <div>
+                    <label class="form-label-lcp">Volumen (m³)</label>
+                    <InputNumber class="form-input-lcp" @bind-Value="Model.VolumenTotalM3" />
+                </div>
+            </div>
+
+            <div class="form-group-lcp">
+                <label class="form-label-lcp">Dársena Asignada</label>
+                <select class="form-select-lcp" @bind="Model.DarsenaId">
+                    <option value="2">Dársena 2 (Alquiler Vigente Pampeana)</option>
+                    <option value="1">Dársena 1 (General)</option>
+                    <option value="3">Dársena 3 (General)</option>
+                    <option value="4">Dársena 4 (General)</option>
+                </select>
+            </div>
+
+            <div class="form-group-lcp" style="margin-bottom: 0;">
+                <label class="form-label-lcp">Fecha y Hora Programada</label>
+                <input type="datetime-local" class="form-input-lcp" @bind="FechaHoraTurnoTemp" />
+            </div>
+        </div>
+
+        <!-- Submit Button -->
+        <button type="submit" class="btn-lcp-gold" disabled="@IsSubmitting">
+            @if (IsSubmitting)
+            {
+                <i class="fa-solid fa-circle-notch fa-spin"></i>
+                <span>Creando Solicitud...</span>
+            }
+            else
+            {
+                <i class="fa-solid fa-paper-plane"></i>
+                <span>Confirmar y Enviar Solicitud</span>
+            }
+        </button>
+    </EditForm>
+</div>
+
+@code {
+    private CrearSolicitudDto Model = new()
+    {
+        ClienteEmpresaId = 1,
+        DarsenaId = 2,
+        TipoOperacion = TipoOperacionSolicitud.ArriboIngreso,
+        ModalidadTransporte = ModalidadTransporte.FlotaLCP,
+        DescripcionMercaderia = "20 Pallets de Conservas y Productos Secos",
+        PesoTotalKg = 5400,
+        VolumenTotalM3 = 19.5m,
+        CiudadOrigen = "General Pico",
+        CiudadDestino = "Santa Rosa (Base LCP)",
+        DistanciaEstimadaKm = 145m
+    };
+
+    private DateTime FechaHoraTurnoTemp = DateTime.Now.AddDays(1).Date.AddHours(10);
+    private bool IsSubmitting = false;
+
+    private string TiempoEstimadoTexto => Model.DistanciaEstimadaKm > 0
+        ? $"{(Model.DistanciaEstimadaKm / 70m):N1} hs"
+        : "Directo";
+
+    private void SeleccionarTipo(TipoOperacionSolicitud tipo)
+    {
+        Model.TipoOperacion = tipo;
+        if (tipo == TipoOperacionSolicitud.ArriboIngreso)
+        {
+            Model.CiudadOrigen = "General Pico";
+            Model.CiudadDestino = "Santa Rosa (Base LCP)";
+        }
+        else
+        {
+            Model.CiudadOrigen = "Santa Rosa (Base LCP)";
+            Model.CiudadDestino = "General Pico";
+        }
+        RecalcularDistancia();
+    }
+
+    private void RecalcularDistancia()
+    {
+        var origen = Model.CiudadOrigen ?? "";
+        var destino = Model.CiudadDestino ?? "";
+
+        if (origen == destino)
+        {
+            Model.DistanciaEstimadaKm = 10;
+        }
+        else if ((origen.Contains("Pico") && destino.Contains("Santa Rosa")) || (origen.Contains("Santa Rosa") && destino.Contains("Pico")))
+        {
+            Model.DistanciaEstimadaKm = 145;
+        }
+        else if ((origen.Contains("Realicó") && destino.Contains("Santa Rosa")) || (origen.Contains("Santa Rosa") && destino.Contains("Realicó")))
+        {
+            Model.DistanciaEstimadaKm = 180;
+        }
+        else if ((origen.Contains("Toay") && destino.Contains("Santa Rosa")) || (origen.Contains("Santa Rosa") && destino.Contains("Toay")))
+        {
+            Model.DistanciaEstimadaKm = 12;
+        }
+        else if ((origen.Contains("Acha") && destino.Contains("Santa Rosa")) || (origen.Contains("Santa Rosa") && destino.Contains("Acha")))
+        {
+            Model.DistanciaEstimadaKm = 105;
+        }
+        else
+        {
+            Model.DistanciaEstimadaKm = 90;
+        }
+    }
+
+    private async Task GuardarSolicitud()
+    {
+        if (string.IsNullOrWhiteSpace(Model.DescripcionMercaderia))
+        {
+            Notifier.Warning("Por favor ingrese la descripción de la mercadería.");
+            return;
+        }
+
+        IsSubmitting = true;
+        try
+        {
+            Model.FechaHoraTurnoProgramado = FechaHoraTurnoTemp;
+            Model.FechaSalidaCliente = FechaHoraTurnoTemp.AddHours(-2);
+            var res = await ApiClient.CrearSolicitudAsync(Model);
+            if (res != null)
+            {
+                Notifier.Success($"Solicitud {res.CodigoSolicitud} creada exitosamente.");
+                Nav.NavigateTo($"/solicitudes/{res.Id}");
+            }
+            else
+            {
+                Notifier.Error("Ocurrió un error al registrar la solicitud.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Notifier.Error($"Error: {ex.Message}");
+        }
+        finally
+        {
+            IsSubmitting = false;
+        }
+    }
+}

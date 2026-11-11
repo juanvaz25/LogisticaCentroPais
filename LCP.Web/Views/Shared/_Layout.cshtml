@@ -1,0 +1,1750 @@
+@using System.Security.Claims
+@using LCP.Shared.Constants
+@{
+    var layoutUserName = User.Identity?.Name ?? "Usuario";
+}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Logística Centro País (LCP)</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+@if (User.Identity?.IsAuthenticated == true && User.FindFirstValue("DebeCambiarPassword") != "true")
+{
+    var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
+    var currentAction = ViewContext.RouteData.Values["action"]?.ToString();
+    var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "";
+    var userName = User.Identity?.Name ?? "Usuario";
+    var empresaRazonSocial = User.FindFirstValue("EmpresaRazonSocial");
+
+    <div class="app-container">
+        <!-- SIDEBAR STRICTLY FILTERED BY ROLE -->
+        <aside class="app-sidebar">
+            <a asp-controller="Dashboard" asp-action="Index" class="sidebar-brand">
+                <span class="brand-badge">LCP</span>
+                <span class="brand-title">Logística<br />Centro País</span>
+            </a>
+
+            <nav class="sidebar-nav">
+                <a asp-controller="Dashboard" asp-action="Index" class="sidebar-item @(currentController == "Dashboard" ? "active" : "")">
+                    <span>Inicio</span>
+                </a>
+
+                @if (User.IsInRole(Roles.Operador) || User.IsInRole(Roles.Administrador) || User.IsInRole(Roles.Auditor))
+                {
+                    <a asp-controller="Patio" asp-action="Darsenas" class="sidebar-item @(currentController == "Patio" ? "active" : "")">
+                        <span>Dársenas</span>
+                    </a>
+                }
+
+                @if (User.IsInRole(Roles.Cliente))
+                {
+                    <a asp-controller="ClienteDarsenas" asp-action="MisContratos" class="sidebar-item @(currentController == "ClienteDarsenas" && currentAction == "MisContratos" ? "active" : "")">
+                        <span>Mis Dársenas</span>
+                    </a>
+                    <a asp-controller="ClienteDarsenas" asp-action="MiStock" class="sidebar-item @(currentController == "ClienteDarsenas" && currentAction == "MiStock" ? "active" : "")">
+                        <span>Mi Stock</span>
+                    </a>
+                    <a asp-controller="ClienteDarsenas" asp-action="MisChoferes" class="sidebar-item @(currentController == "ClienteDarsenas" && currentAction == "MisChoferes" ? "active" : "")">
+                        <span>Mis Choferes</span>
+                    </a>
+                }
+
+                @if (User.IsInRole(Roles.Conductor))
+                {
+                    <a asp-controller="Conductor" asp-action="Index" class="sidebar-item @(currentController == "Conductor" ? "active" : "")">
+                        <span>Mis Viajes y Tareas</span>
+                    </a>
+                }
+
+                @if (User.IsInRole(Roles.Operador) || User.IsInRole(Roles.Cliente) || User.IsInRole(Roles.Administrador) || User.IsInRole(Roles.Conductor))
+                {
+                    <a asp-controller="Solicitudes" asp-action="Index" class="sidebar-item @(currentController == "Solicitudes" ? "active" : "")">
+                        <span>Solicitudes</span>
+                    </a>
+                }
+
+                @if (User.IsInRole(Roles.Auditor) || User.IsInRole(Roles.Cliente) || User.IsInRole(Roles.Administrador))
+                {
+                    <a asp-controller="Facturacion" asp-action="Index" class="sidebar-item @(currentController == "Facturacion" ? "active" : "")">
+                        <span>Facturación</span>
+                    </a>
+                }
+
+                <a asp-controller="Calendario" asp-action="Index" class="sidebar-item @(currentController == "Calendario" ? "active" : "")">
+                    <span>Calendario</span>
+                </a>
+
+                <a asp-controller="Inbox" asp-action="Index" class="sidebar-item @(currentController == "Inbox" ? "active" : "")">
+                    <span>Inbox / Chat</span>
+                </a>
+
+                @if (User.IsInRole(Roles.Administrador))
+                {
+                    <div class="nav-section-title">Administración</div>
+                    <a asp-controller="Admin" asp-action="Tarifas" class="sidebar-item @(currentController == "Admin" && currentAction == "Tarifas" ? "active" : "")">
+                        <span>Tarifas</span>
+                    </a>
+                    <a asp-controller="Admin" asp-action="Usuarios" class="sidebar-item @(currentController == "Admin" && currentAction == "Usuarios" ? "active" : "")">
+                        <span>Personal Interno</span>
+                    </a>
+                    <a asp-controller="Admin" asp-action="Aprobaciones" class="sidebar-item @(currentController == "Admin" && currentAction == "Aprobaciones" ? "active" : "")">
+                        <span>Aprobaciones</span>
+                    </a>
+                    <a asp-controller="Admin" asp-action="FlotaLCP" class="sidebar-item @(currentController == "Admin" && currentAction == "FlotaLCP" ? "active" : "")">
+                        <span>Flota LCP (Choferes)</span>
+                    </a>
+                }
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-profile-badge">
+                    <span class="user-name">@userName</span>
+                    @if (!string.IsNullOrEmpty(empresaRazonSocial))
+                    {
+                        <span style="font-size: 11px; color: #ADC2CE;">@empresaRazonSocial</span>
+                    }
+                    <span class="user-role-chip">@userRole</span>
+                </div>
+                <form asp-controller="Auth" asp-action="Logout" method="post" style="margin: 0;">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn-lcp-outline btn-lcp-sm" style="width: 100%; border-color: rgba(255,255,255,0.2); color: #FFF;">
+                        Cerrar sesión
+                    </button>
+                </form>
+            </div>
+        </aside>
+
+        <!-- MAIN WRAPPER -->
+        <div class="app-main">
+            <header class="app-topbar">
+                <div style="display: flex; align-items: center; gap: 14px;">
+                    <div id="signalr-status-badge" class="signalr-live-pill">
+                        <span class="signalr-pulse"></span> Patio en vivo
+                    </div>
+                </div>
+
+                <div class="topbar-right">
+                    <!-- CAMPANAS DE NOTIFICACIONES (OPERACIONES Y MENSAJES) -->
+                    <div class="topbar-notifications-group">
+                        
+                        <!-- 1. Campana de Operaciones y Cambios de Estados -->
+                        <div class="notif-dropdown-wrapper">
+                            <button id="btnNotifOperaciones" type="button" class="btn-topbar-bell" title="Notificaciones de Operaciones y Estados" onclick="toggleDropdownOperaciones(event)">
+                                <span class="bell-icon">🔔</span>
+                                <span id="badgeNotifOperaciones" class="notif-badge" style="display: none;">0</span>
+                            </button>
+
+                            <div id="dropdownNotifOperaciones" class="notif-dropdown-panel" style="display: none;">
+                                <div class="notif-panel-header">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span style="font-size: 16px;">🔔</span>
+                                        <strong style="color: #192A33; font-size: 13.5px;">Operaciones y Estados</strong>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span id="labelNotifOperacionesCount" class="badge-estado badge-encurso" style="font-size: 10px; padding: 2px 6px;">0 novedades</span>
+                                        <button type="button" class="btn-clear-all-notifs" title="Borrar todas las notificaciones" onclick="borrarTodasOperaciones(event)">
+                                            🗑️ Limpiar
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="listaNotifOperaciones" class="notif-panel-body">
+                                    <div style="text-align: center; padding: 22px; color: var(--lcp-text-muted); font-size: 12px;">
+                                        Cargando novedades operativas...
+                                    </div>
+                                </div>
+                                <div class="notif-panel-footer">
+                                    <a asp-controller="Solicitudes" asp-action="Index" style="text-decoration: none; color: #28536B; font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 4px;">
+                                        Ver todas las operaciones y turnos ➔
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2. Campana / Buzón de Mensajes al Usuario -->
+                        <div class="notif-dropdown-wrapper">
+                            <button id="btnNotifMensajes" type="button" class="btn-topbar-bell" title="Mensajes y Avisos al Usuario" onclick="toggleDropdownMensajes(event)">
+                                <span class="bell-icon">💬</span>
+                                <span id="badgeNotifMensajes" class="notif-badge" style="display: none; background-color: #28536B;">0</span>
+                            </button>
+
+                            <div id="dropdownNotifMensajes" class="notif-dropdown-panel" style="display: none;">
+                                <div class="notif-panel-header">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span style="font-size: 16px;">💬</span>
+                                        <strong style="color: #192A33; font-size: 13.5px;">Mensajes al Usuario</strong>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span id="labelNotifMensajesCount" class="badge-estado badge-encurso" style="font-size: 10px; padding: 2px 6px;">0 mensajes</span>
+                                        <button type="button" class="btn-clear-all-notifs" title="Borrar todos los mensajes" onclick="borrarTodosMensajes(event)">
+                                            🗑️ Limpiar
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="listaNotifMensajes" class="notif-panel-body">
+                                    <div style="text-align: center; padding: 22px; color: var(--lcp-text-muted); font-size: 12px;">
+                                        Cargando mensajes del usuario...
+                                    </div>
+                                </div>
+                                <div class="notif-panel-footer">
+                                    <a asp-controller="Inbox" asp-action="Index" style="text-decoration: none; color: #28536B; font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 4px;">
+                                        Ir al Inbox / Chat en vivo ➔
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </header>
+
+            <main class="app-content">
+                @RenderBody()
+            </main>
+        </div>
+    </div>
+}
+else
+{
+    @RenderBody()
+}
+
+<style>
+    /* ==========================================================================
+       CUSTOM SCROLLBARS (DISEÑO SISTEMA LCP & NAV BAR LATERAL)
+       ========================================================================== */
+    html, body, * {
+        scrollbar-width: thin;
+        scrollbar-color: #8DA3AF #EAE6DC;
+    }
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+        background: #EAE6DC;
+        border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #8DA3AF;
+        border-radius: 4px;
+        border: 2px solid #EAE6DC;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #28536B;
+    }
+
+    /* Barra de desplazamiento exclusiva para el Nav Bar Lateral */
+    .app-sidebar,
+    .sidebar-nav {
+        scrollbar-width: thin;
+        scrollbar-color: #28536B #10212B;
+    }
+    .app-sidebar::-webkit-scrollbar,
+    .sidebar-nav::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+    .app-sidebar::-webkit-scrollbar-track,
+    .sidebar-nav::-webkit-scrollbar-track {
+        background: #10212B;
+        border-radius: 3px;
+    }
+    .app-sidebar::-webkit-scrollbar-thumb,
+    .sidebar-nav::-webkit-scrollbar-thumb {
+        background: #28536B;
+        border-radius: 3px;
+        border: 1px solid #10212B;
+    }
+    .app-sidebar::-webkit-scrollbar-thumb:hover,
+    .sidebar-nav::-webkit-scrollbar-thumb:hover {
+        background: #3E7796;
+    }
+
+    /* Contenedores de chat y paneles */
+    .chat-messages::-webkit-scrollbar,
+    .chat-sidebar::-webkit-scrollbar,
+    .lcp-fb-directory-list::-webkit-scrollbar,
+    .lcp-fb-window-body::-webkit-scrollbar,
+    .notif-panel-body::-webkit-scrollbar,
+    .lcp-table-container::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+    .chat-messages::-webkit-scrollbar-thumb,
+    .chat-sidebar::-webkit-scrollbar-thumb,
+    .lcp-fb-directory-list::-webkit-scrollbar-thumb,
+    .lcp-fb-window-body::-webkit-scrollbar-thumb,
+    .notif-panel-body::-webkit-scrollbar-thumb,
+    .lcp-table-container::-webkit-scrollbar-thumb {
+        background: #8DA3AF;
+        border-radius: 3px;
+    }
+    .chat-messages::-webkit-scrollbar-thumb:hover,
+    .chat-sidebar::-webkit-scrollbar-thumb:hover,
+    .lcp-fb-directory-list::-webkit-scrollbar-thumb:hover,
+    .lcp-fb-window-body::-webkit-scrollbar-thumb:hover,
+    .notif-panel-body::-webkit-scrollbar-thumb:hover,
+    .lcp-table-container::-webkit-scrollbar-thumb:hover {
+        background: #28536B;
+    }
+
+    /* Estilos Campanas de Notificaciones Topbar */
+    .topbar-notifications-group {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .notif-dropdown-wrapper {
+        position: relative;
+    }
+    .btn-topbar-bell {
+        background: #FFFFFF;
+        border: 1px solid #DDD7CD;
+        border-radius: 50%;
+        width: 38px;
+        height: 38px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        position: relative;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .btn-topbar-bell:hover {
+        background: #F8F6F0;
+        border-color: #C2821E;
+        transform: translateY(-1px);
+        box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+    }
+    .bell-icon {
+        font-size: 17px;
+        line-height: 1;
+    }
+    .notif-badge {
+        position: absolute;
+        top: -4px;
+        right: -4px;
+        background-color: #C0392B;
+        color: #FFFFFF;
+        font-size: 10px;
+        font-weight: 800;
+        min-width: 18px;
+        height: 18px;
+        border-radius: 9px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 4px;
+        border: 2px solid #FFFFFF;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .notif-dropdown-panel {
+        position: absolute;
+        top: 48px;
+        right: 0;
+        width: 370px;
+        background: #FFFFFF;
+        border: 1px solid #D5CFC5;
+        border-radius: 10px;
+        box-shadow: 0 12px 32px rgba(22, 46, 59, 0.22);
+        z-index: 9999;
+        overflow: hidden;
+        animation: lcpDropdownFade 0.2s ease-out;
+    }
+    @@keyframes lcpDropdownFade {
+        from { opacity: 0; transform: translateY(-8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .notif-panel-header {
+        padding: 12px 16px;
+        background: #F8F6F0;
+        border-bottom: 1px solid #EBE5DB;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .notif-panel-body {
+        max-height: 380px;
+        overflow-y: auto;
+    }
+    .notif-panel-footer {
+        padding: 10px 16px;
+        background: #FAF8F5;
+        border-top: 1px solid #EBE5DB;
+        text-align: center;
+    }
+    .notif-item-container {
+        display: flex;
+        align-items: center;
+        border-bottom: 1px solid #F0ECE4;
+        position: relative;
+        transition: all 0.25s ease-out;
+    }
+    .notif-item-container:hover {
+        background-color: #F8F6F0;
+    }
+    .notif-item-container:last-child {
+        border-bottom: none;
+    }
+    .notif-item-link {
+        flex: 1;
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        padding: 12px 14px;
+        text-decoration: none;
+        color: inherit;
+        min-width: 0;
+    }
+    .btn-borrar-notif {
+        background: transparent;
+        border: none;
+        color: #A09A90;
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        font-weight: 700;
+        margin-right: 10px;
+        transition: all 0.15s ease;
+        flex-shrink: 0;
+    }
+    .btn-borrar-notif:hover {
+        background: #FDEDEC;
+        color: #C0392B;
+        transform: scale(1.15);
+    }
+    .btn-clear-all-notifs {
+        background: transparent;
+        border: 1px solid #D5CFC5;
+        border-radius: 4px;
+        padding: 2px 7px;
+        font-size: 10.5px;
+        font-weight: 600;
+        color: #666;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+    }
+    .btn-clear-all-notifs:hover {
+        background: #FDEDEC;
+        border-color: #F3C7C7;
+        color: #C0392B;
+    }
+    .notif-icon-circle {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: #EAE6DC;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 15px;
+        flex-shrink: 0;
+    }
+
+    /* SISTEMA DE NOTIFICACIONES MODAL / POPUP FLOTANTE (5 SEGUNDOS) */
+    .lcp-toast-container {
+        position: fixed;
+        top: 24px;
+        right: 24px;
+        z-index: 999999;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        max-width: 440px;
+        width: calc(100vw - 48px);
+        pointer-events: none;
+    }
+    .lcp-toast {
+        pointer-events: auto;
+        background: #FFFFFF;
+        border-radius: 12px;
+        box-shadow: 0 16px 38px rgba(22, 46, 59, 0.22), 0 4px 12px rgba(0,0,0,0.08);
+        border: 1px solid #E2E8F0;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        animation: lcpToastSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        transition: all 0.3s ease;
+        position: relative;
+    }
+    .lcp-toast.hiding {
+        animation: lcpToastSlideOut 0.3s cubic-bezier(0.7, 0, 0.84, 0) forwards;
+    }
+    @@keyframes lcpToastSlideIn {
+        from { opacity: 0; transform: translateY(-24px) scale(0.95); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @@keyframes lcpToastSlideOut {
+        from { opacity: 1; transform: translateY(0) scale(1); }
+        to { opacity: 0; transform: translateY(-20px) scale(0.95); }
+    }
+
+    .lcp-toast-body {
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+        padding: 16px 18px 14px 18px;
+    }
+    .lcp-toast-icon-circle {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        font-weight: 800;
+        flex-shrink: 0;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+    }
+    .lcp-toast-content {
+        flex: 1;
+        min-width: 0;
+    }
+    .lcp-toast-badge {
+        font-size: 10.5px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 2px 8px;
+        border-radius: 4px;
+        display: inline-block;
+        margin-bottom: 4px;
+    }
+    .lcp-toast-title {
+        font-size: 14px;
+        font-weight: 800;
+        color: #192A33;
+        line-height: 1.3;
+        margin-bottom: 3px;
+    }
+    .lcp-toast-message {
+        font-size: 12.5px;
+        color: #4B5A63;
+        line-height: 1.4;
+    }
+    .lcp-toast-close {
+        background: transparent;
+        border: none;
+        color: #94A3B8;
+        cursor: pointer;
+        font-size: 16px;
+        font-weight: 700;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s ease;
+        flex-shrink: 0;
+        margin-top: -2px;
+        margin-right: -4px;
+    }
+    .lcp-toast-close:hover {
+        background: #F1F5F9;
+        color: #1E293B;
+    }
+
+    .lcp-toast-timer-bar {
+        height: 4px;
+        width: 100%;
+        background: rgba(0, 0, 0, 0.06);
+        position: relative;
+        overflow: hidden;
+    }
+    .lcp-toast-timer-progress {
+        height: 100%;
+        width: 100%;
+        transform-origin: left;
+        animation: lcpToastCountdown 5s linear forwards;
+    }
+    @@keyframes lcpToastCountdown {
+        from { transform: scaleX(1); }
+        to { transform: scaleX(0); }
+    }
+
+    /* 1. Confirmación de Acción */
+    .lcp-toast-confirmacion {
+        border-left: 5px solid #2E7D32;
+    }
+    .lcp-toast-confirmacion .lcp-toast-icon-circle {
+        background: linear-gradient(135deg, #2E7D32, #1B5E20);
+        color: #FFFFFF;
+    }
+    .lcp-toast-confirmacion .lcp-toast-badge {
+        background: #E8F5E9;
+        color: #1E663B;
+        border: 1px solid #C8E6C9;
+    }
+    .lcp-toast-confirmacion .lcp-toast-timer-progress {
+        background: #2E7D32;
+    }
+
+    /* 2. Avance o Cambio de Estado de Proceso */
+    .lcp-toast-estado {
+        border-left: 5px solid #28536B;
+    }
+    .lcp-toast-estado .lcp-toast-icon-circle {
+        background: linear-gradient(135deg, #28536B, #162E3B);
+        color: #FFFFFF;
+    }
+    .lcp-toast-estado .lcp-toast-badge {
+        background: #E2ECF2;
+        color: #1E465C;
+        border: 1px solid #BFD7E4;
+    }
+    .lcp-toast-estado .lcp-toast-timer-progress {
+        background: #28536B;
+    }
+
+    /* 3. Proceso Cancelado, Rechazado o Error */
+    .lcp-toast-cancelado {
+        border-left: 5px solid #C0392B;
+    }
+    .lcp-toast-cancelado .lcp-toast-icon-circle {
+        background: linear-gradient(135deg, #C0392B, #96281B);
+        color: #FFFFFF;
+    }
+    .lcp-toast-cancelado .lcp-toast-badge {
+        background: #FDEDEC;
+        color: #9D2424;
+        border: 1px solid #F3C7C7;
+    }
+    .lcp-toast-cancelado .lcp-toast-timer-progress {
+        background: #C0392B;
+    }
+
+    /* ==========================================================================
+       FACEBOOK-STYLE FLOATING CHAT HUD & DOCKED WINDOWS
+       ========================================================================== */
+    .lcp-fb-chat-dock {
+        position: fixed;
+        bottom: 0;
+        right: 24px;
+        z-index: 99990;
+        display: flex;
+        align-items: flex-end;
+        gap: 12px;
+        pointer-events: none;
+        font-family: inherit;
+    }
+    .lcp-fb-chat-dock * {
+        box-sizing: border-box;
+    }
+
+    /* Launcher Pill */
+    .lcp-fb-launcher {
+        pointer-events: auto;
+        background: #162E3B;
+        color: #FFFFFF;
+        border-radius: 12px 12px 0 0;
+        padding: 9px 18px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        box-shadow: 0 -4px 18px rgba(22, 46, 59, 0.25);
+        transition: background 0.15s ease;
+        user-select: none;
+        border: 1px solid #28536B;
+        border-bottom: none;
+    }
+    .lcp-fb-launcher:hover {
+        background: #28536B;
+    }
+    .lcp-fb-launcher-icon {
+        font-size: 16px;
+    }
+    .lcp-fb-launcher-text {
+        font-size: 13.5px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+    }
+    .lcp-fb-badge {
+        background: #C0392B;
+        color: #FFFFFF;
+        font-size: 10px;
+        font-weight: 800;
+        padding: 2px 6px;
+        border-radius: 10px;
+        min-width: 18px;
+        text-align: center;
+    }
+
+    /* Directory Popup Panel */
+    .lcp-fb-directory-panel {
+        pointer-events: auto;
+        position: absolute;
+        bottom: 46px;
+        right: 0;
+        width: 320px;
+        background: #FFFFFF;
+        border: 1px solid #D5CFC5;
+        border-radius: 12px 12px 0 0;
+        box-shadow: 0 -8px 30px rgba(0,0,0,0.18);
+        display: flex;
+        flex-direction: column;
+        max-height: 460px;
+        overflow: hidden;
+        animation: lcpFbFadeUp 0.2s ease-out;
+    }
+    @@keyframes lcpFbFadeUp {
+        from { opacity: 0; transform: translateY(12px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .lcp-fb-directory-header {
+        padding: 12px 16px;
+        background: #F8F6F0;
+        border-bottom: 1px solid #EBE5DB;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .lcp-fb-directory-title {
+        font-size: 13.5px;
+        font-weight: 800;
+        color: #192A33;
+    }
+    .lcp-fb-directory-search {
+        padding: 8px 12px;
+        border-bottom: 1px solid #EBE5DB;
+        background: #FFFFFF;
+    }
+    .lcp-fb-directory-search input {
+        width: 100%;
+        padding: 6px 10px;
+        font-size: 12px;
+        border: 1px solid #DDD7CD;
+        border-radius: 6px;
+        outline: none;
+    }
+    .lcp-fb-directory-list {
+        flex: 1;
+        overflow-y: auto;
+        max-height: 300px;
+    }
+    .lcp-fb-directory-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        border-bottom: 1px solid #F5F1EA;
+        cursor: pointer;
+        transition: background 0.15s ease;
+    }
+    .lcp-fb-directory-item:hover {
+        background: #F8F6F0;
+    }
+    .lcp-fb-item-avatar {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: #28536B;
+        color: #FFFFFF;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 13px;
+        flex-shrink: 0;
+    }
+    .lcp-fb-item-info {
+        flex: 1;
+        min-width: 0;
+    }
+    .lcp-fb-item-title {
+        font-size: 12.5px;
+        font-weight: 700;
+        color: #192A33;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .lcp-fb-item-sub {
+        font-size: 11px;
+        color: #718096;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .lcp-fb-directory-footer {
+        padding: 10px;
+        text-align: center;
+        background: #FAF8F5;
+        border-top: 1px solid #EBE5DB;
+    }
+    .lcp-fb-directory-footer a {
+        text-decoration: none;
+        font-size: 11.5px;
+        font-weight: 700;
+        color: #28536B;
+    }
+
+    /* Floating Chat Windows */
+    .lcp-fb-chat-windows {
+        display: flex;
+        align-items: flex-end;
+        gap: 12px;
+        pointer-events: none;
+    }
+    .lcp-fb-window {
+        pointer-events: auto;
+        width: 310px;
+        background: #FFFFFF;
+        border-radius: 12px 12px 0 0;
+        border: 1px solid #D5CFC5;
+        box-shadow: 0 -6px 25px rgba(22, 46, 59, 0.2);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        transition: height 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        height: 410px;
+    }
+    .lcp-fb-window.minimized {
+        height: 40px;
+    }
+    .lcp-fb-window.minimized .lcp-fb-window-body,
+    .lcp-fb-window.minimized .lcp-fb-window-footer {
+        display: none;
+    }
+    .lcp-fb-window-header {
+        background: #162E3B;
+        color: #FFFFFF;
+        padding: 9px 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+        user-select: none;
+    }
+    .lcp-fb-window-title-wrap {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        min-width: 0;
+        flex: 1;
+    }
+    .lcp-fb-window-status-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #2ECC71;
+        flex-shrink: 0;
+    }
+    .lcp-fb-window-title {
+        font-size: 12.5px;
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .lcp-fb-window-controls {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .lcp-fb-btn-control {
+        background: transparent;
+        border: none;
+        color: #ADC2CE;
+        font-size: 12px;
+        cursor: pointer;
+        width: 22px;
+        height: 22px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s ease;
+    }
+    .lcp-fb-btn-control:hover {
+        background: rgba(255, 255, 255, 0.15);
+        color: #FFFFFF;
+    }
+
+    .lcp-fb-window-body {
+        flex: 1;
+        padding: 10px;
+        background: #FDFCF9;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .lcp-fb-msg {
+        max-width: 82%;
+        padding: 7px 11px;
+        border-radius: 12px;
+        font-size: 12px;
+        line-height: 1.35;
+        word-break: break-word;
+        position: relative;
+    }
+    .lcp-fb-msg-sent {
+        align-self: flex-end;
+        background: #28536B;
+        color: #FFFFFF;
+        border-bottom-right-radius: 2px;
+    }
+    .lcp-fb-msg-recv {
+        align-self: flex-start;
+        background: #EAE6DC;
+        color: #192A33;
+        border-bottom-left-radius: 2px;
+    }
+    .lcp-fb-msg-incident {
+        align-self: flex-start;
+        background: #FDEDEC;
+        color: #9D2424;
+        border: 1px solid #F3C7C7;
+        border-bottom-left-radius: 2px;
+    }
+    .lcp-fb-msg-time {
+        font-size: 9px;
+        opacity: 0.7;
+        margin-top: 2px;
+        text-align: right;
+    }
+
+    .lcp-fb-window-footer {
+        padding: 8px;
+        background: #FFFFFF;
+        border-top: 1px solid #EBE5DB;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .lcp-fb-input {
+        flex: 1;
+        border: 1px solid #DDD7CD;
+        border-radius: 18px;
+        padding: 6px 11px;
+        font-size: 12px;
+        outline: none;
+        transition: border-color 0.15s ease;
+    }
+    .lcp-fb-input:focus {
+        border-color: #28536B;
+    }
+    .lcp-fb-btn-send {
+        background: #28536B;
+        color: #FFFFFF;
+        border: none;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        transition: all 0.15s ease;
+        flex-shrink: 0;
+    }
+    .lcp-fb-btn-send:hover {
+        background: #162E3B;
+        transform: scale(1.08);
+    }
+</style>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+<script src="~/js/lcp-signalr.js" asp-append-version="true"></script>
+
+<script>
+    // GESTIÓN DE NOTIFICACIONES CON DESAPARICIÓN AL VER Y BORRADO PERSISTENTE
+    const currentUserName = '@layoutUserName';
+    const storageScope = currentUserName.replace(/[^a-zA-Z0-9]/g, '_');
+    const KEY_OP_DISMISSED = `lcp_notif_op_dismissed_${storageScope}`;
+    const KEY_OP_CLEARED_TIME = `lcp_notif_op_cleared_time_${storageScope}`;
+    const KEY_MSG_DISMISSED = `lcp_notif_msg_dismissed_${storageScope}`;
+    const KEY_MSG_CLEARED_TIME = `lcp_notif_msg_cleared_time_${storageScope}`;
+
+    function getDismissedOperaciones() {
+        try {
+            return (JSON.parse(localStorage.getItem(KEY_OP_DISMISSED) || '[]')).map(String);
+        } catch {
+            return [];
+        }
+    }
+    function saveDismissedOperacion(id) {
+        const idStr = String(id);
+        const list = getDismissedOperaciones();
+        if (!list.includes(idStr)) {
+            list.push(idStr);
+            localStorage.setItem(KEY_OP_DISMISSED, JSON.stringify(list));
+        }
+    }
+    function getClearedTimeOperaciones() {
+        return parseInt(localStorage.getItem(KEY_OP_CLEARED_TIME) || '0', 10);
+    }
+
+    function getDismissedMensajes() {
+        try {
+            return (JSON.parse(localStorage.getItem(KEY_MSG_DISMISSED) || '[]')).map(String);
+        } catch {
+            return [];
+        }
+    }
+    function saveDismissedMensaje(id) {
+        const idStr = String(id);
+        const list = getDismissedMensajes();
+        if (!list.includes(idStr)) {
+            list.push(idStr);
+            localStorage.setItem(KEY_MSG_DISMISSED, JSON.stringify(list));
+        }
+    }
+    function getClearedTimeMensajes() {
+        return parseInt(localStorage.getItem(KEY_MSG_CLEARED_TIME) || '0', 10);
+    }
+
+    // CONTROL DE DROPDOWNS DE CAMPANAS DE NOTIFICACIÓN
+    function toggleDropdownOperaciones(e) {
+        if (e) e.stopPropagation();
+        const dd = document.getElementById("dropdownNotifOperaciones");
+        const ddMsg = document.getElementById("dropdownNotifMensajes");
+        if (ddMsg) ddMsg.style.display = "none";
+
+        if (dd.style.display === "none") {
+            dd.style.display = "block";
+            cargarNotificacionesOperaciones();
+        } else {
+            dd.style.display = "none";
+        }
+    }
+
+    function toggleDropdownMensajes(e) {
+        if (e) e.stopPropagation();
+        const dd = document.getElementById("dropdownNotifMensajes");
+        const ddOp = document.getElementById("dropdownNotifOperaciones");
+        if (ddOp) ddOp.style.display = "none";
+
+        if (dd.style.display === "none") {
+            dd.style.display = "block";
+            cargarNotificacionesMensajes();
+        } else {
+            dd.style.display = "none";
+        }
+    }
+
+    // Cerrar al hacer clic fuera
+    document.addEventListener("click", function (e) {
+        const ddOp = document.getElementById("dropdownNotifOperaciones");
+        const btnOp = document.getElementById("btnNotifOperaciones");
+        if (ddOp && !ddOp.contains(e.target) && !btnOp.contains(e.target)) {
+            ddOp.style.display = "none";
+        }
+
+        const ddMsg = document.getElementById("dropdownNotifMensajes");
+        const btnMsg = document.getElementById("btnNotifMensajes");
+        if (ddMsg && !ddMsg.contains(e.target) && !btnMsg.contains(e.target)) {
+            ddMsg.style.display = "none";
+        }
+    });
+
+    // 1. CARGA Y RENDERIZADO DE NOTIFICACIONES DE OPERACIONES
+    let cacheOperacionesActuales = [];
+
+    async function cargarNotificacionesOperaciones() {
+        try {
+            const resp = await fetch('/Notificaciones/Operaciones');
+            if (resp.ok) {
+                const list = await resp.json();
+                const dismissed = getDismissedOperaciones();
+                const clearedTime = getClearedTimeOperaciones();
+
+                // Filtrar las que fueron visualizadas, borradas o limpiadas antes de este timestamp
+                const activas = list.filter(n => {
+                    const idStr = String(n.id);
+                    if (dismissed.includes(idStr)) return false;
+                    if (clearedTime > 0 && n.fechaHora) {
+                        const notifEpoch = new Date(n.fechaHora).getTime();
+                        if (notifEpoch <= clearedTime) return false;
+                    }
+                    return true;
+                });
+
+                cacheOperacionesActuales = activas;
+                renderNotificacionesOperaciones(activas);
+            }
+        } catch (err) {
+            console.error("Error al cargar notificaciones operativas", err);
+        }
+    }
+
+    function renderNotificacionesOperaciones(list) {
+        const cont = document.getElementById("listaNotifOperaciones");
+        const badge = document.getElementById("badgeNotifOperaciones");
+        const countLabel = document.getElementById("labelNotifOperacionesCount");
+
+        if (!list || list.length === 0) {
+            cont.innerHTML = `
+                <div style="text-align: center; padding: 26px 16px; color: var(--lcp-text-muted); font-size: 12.5px;">
+                    <div style="font-size: 24px; margin-bottom: 6px;">✓</div>
+                    Sin novedades operativas pendientes
+                </div>
+            `;
+            badge.style.display = "none";
+            countLabel.textContent = "0 novedades";
+            return;
+        }
+
+        badge.textContent = list.length;
+        badge.style.display = "flex";
+        countLabel.textContent = `${list.length} novedades`;
+
+        cont.innerHTML = "";
+        list.forEach(n => {
+            const row = document.createElement("div");
+            row.className = "notif-item-container";
+            row.id = `notif-op-row-${n.id}`;
+
+            row.innerHTML = `
+                <a href="${n.url || '/Solicitudes'}" class="notif-item-link" onclick="marcarNotifOperacionVista(${n.id})">
+                    <div class="notif-icon-circle">${n.icono || '🔔'}</div>
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 6px;">
+                            <strong style="font-size: 12.5px; color: #192A33; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${n.titulo}</strong>
+                            <span style="font-size: 10px; color: var(--lcp-text-muted); white-space: nowrap;">${n.tiempoHace}</span>
+                        </div>
+                        <div style="font-size: 11.5px; color: #555; margin-top: 2px; line-height: 1.35;">${n.mensaje}</div>
+                    </div>
+                </a>
+                <button type="button" class="btn-borrar-notif" title="Borrar notificación de la lista" onclick="borrarNotifOperacion(event, ${n.id})">
+                    ✕
+                </button>
+            `;
+            cont.appendChild(row);
+        });
+    }
+
+    function marcarNotifOperacionVista(id) {
+        saveDismissedOperacion(id);
+    }
+
+    function borrarNotifOperacion(e, id) {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        saveDismissedOperacion(id);
+
+        const row = document.getElementById(`notif-op-row-${id}`);
+        if (row) {
+            row.style.opacity = '0';
+            row.style.transform = 'translateX(24px)';
+            setTimeout(() => {
+                row.remove();
+                cacheOperacionesActuales = cacheOperacionesActuales.filter(n => String(n.id) !== String(id));
+                renderNotificacionesOperaciones(cacheOperacionesActuales);
+            }, 200);
+        }
+    }
+
+    function borrarTodasOperaciones(e) {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        localStorage.setItem(KEY_OP_CLEARED_TIME, Date.now().toString());
+        cacheOperacionesActuales.forEach(n => saveDismissedOperacion(n.id));
+        cacheOperacionesActuales = [];
+        renderNotificacionesOperaciones([]);
+    }
+
+    // 2. CARGA Y RENDERIZADO DE MENSAJES AL USUARIO
+    let cacheMensajesActuales = [];
+
+    async function cargarNotificacionesMensajes() {
+        try {
+            const resp = await fetch('/Notificaciones/Mensajes');
+            if (resp.ok) {
+                const list = await resp.json();
+                const dismissed = getDismissedMensajes();
+                const clearedTime = getClearedTimeMensajes();
+
+                // Filtrar los que fueron visualizados o limpiados
+                const activas = list.filter(m => {
+                    const idStr = String(m.id);
+                    if (dismissed.includes(idStr)) return false;
+                    if (clearedTime > 0 && m.fechaHora) {
+                        const msgEpoch = new Date(m.fechaHora).getTime();
+                        if (msgEpoch <= clearedTime) return false;
+                    }
+                    return true;
+                });
+
+                cacheMensajesActuales = activas;
+                renderNotificacionesMensajes(activas);
+            }
+        } catch (err) {
+            console.error("Error al cargar mensajes del usuario", err);
+        }
+    }
+
+    function renderNotificacionesMensajes(list) {
+        const cont = document.getElementById("listaNotifMensajes");
+        const badge = document.getElementById("badgeNotifMensajes");
+        const countLabel = document.getElementById("labelNotifMensajesCount");
+
+        if (!list || list.length === 0) {
+            cont.innerHTML = `
+                <div style="text-align: center; padding: 26px 16px; color: var(--lcp-text-muted); font-size: 12.5px;">
+                    <div style="font-size: 24px; margin-bottom: 6px;">💬</div>
+                    No tenés mensajes entrantes nuevos
+                </div>
+            `;
+            badge.style.display = "none";
+            countLabel.textContent = "0 mensajes";
+            return;
+        }
+
+        badge.textContent = list.length;
+        badge.style.display = "flex";
+        countLabel.textContent = `${list.length} mensajes`;
+
+        cont.innerHTML = "";
+        list.forEach(m => {
+            const row = document.createElement("div");
+            row.className = "notif-item-container";
+            row.id = `notif-msg-row-${m.id}`;
+            const inicial = m.remitenteNombre ? m.remitenteNombre.charAt(0).toUpperCase() : 'U';
+
+            row.innerHTML = `
+                <a href="${m.url || '/Inbox'}" class="notif-item-link" onclick="marcarNotifMensajeVista(${m.id}, '${m.conversacionId}')">
+                    <div class="notif-icon-circle" style="background: #28536B; color: #FFF; font-weight: 800; font-size: 12px;">${inicial}</div>
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 6px;">
+                            <strong style="font-size: 12.5px; color: #192A33;">${m.remitenteNombre}</strong>
+                            <span style="font-size: 10px; color: var(--lcp-text-muted); white-space: nowrap;">${m.tiempoHace}</span>
+                        </div>
+                        <div style="font-size: 11px; color: #28536B; font-weight: 600;">${m.asunto}</div>
+                        <div style="font-size: 11.5px; color: #666; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${m.textoMensaje}</div>
+                    </div>
+                </a>
+                <button type="button" class="btn-borrar-notif" title="Borrar mensaje de la lista" onclick="borrarNotifMensaje(event, ${m.id}, '${m.conversacionId}')">
+                    ✕
+                </button>
+            `;
+            cont.appendChild(row);
+        });
+    }
+
+    function marcarNotifMensajeVista(id, convId) {
+        saveDismissedMensaje(id);
+        if (convId) {
+            fetch(`/Notificaciones/MarcarMensajesLeidos?conversacionId=${encodeURIComponent(convId)}`, { method: 'POST' }).catch(() => {});
+        }
+    }
+
+    function borrarNotifMensaje(e, id, convId) {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        saveDismissedMensaje(id);
+        if (convId) {
+            fetch(`/Notificaciones/MarcarMensajesLeidos?conversacionId=${encodeURIComponent(convId)}`, { method: 'POST' }).catch(() => {});
+        }
+
+        const row = document.getElementById(`notif-msg-row-${id}`);
+        if (row) {
+            row.style.opacity = '0';
+            row.style.transform = 'translateX(24px)';
+            setTimeout(() => {
+                row.remove();
+                cacheMensajesActuales = cacheMensajesActuales.filter(m => String(m.id) !== String(id));
+                renderNotificacionesMensajes(cacheMensajesActuales);
+            }, 200);
+        }
+    }
+
+    function borrarTodosMensajes(e) {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        localStorage.setItem(KEY_MSG_CLEARED_TIME, Date.now().toString());
+        cacheMensajesActuales.forEach(m => saveDismissedMensaje(m.id));
+        cacheMensajesActuales = [];
+        renderNotificacionesMensajes([]);
+        // Marcar en la base de datos a través de la API
+        fetch('/Notificaciones/MarcarMensajesLeidos', { method: 'POST' }).catch(() => {});
+    }
+
+    // Inicializar contadores en carga
+    document.addEventListener("DOMContentLoaded", function () {
+        cargarNotificacionesOperaciones();
+        cargarNotificacionesMensajes();
+        // Chequeo periódico cada 45 segundos
+        setInterval(() => {
+            cargarNotificacionesOperaciones();
+            cargarNotificacionesMensajes();
+        }, 45000);
+    });
+
+    // SISTEMA FLOTANTE DE POPUPS / MODALES DE NOTIFICACIÓN DEL SISTEMA (5 SEGUNDOS)
+    window.mostrarPopupNotificacion = function(options) {
+        if (!options) return;
+        const container = document.getElementById("lcp-toast-container");
+        if (!container) return;
+
+        const tipo = (options.tipo || 'confirmacion').toLowerCase();
+        const duracion = options.duracion || 5000;
+        let badgeText = '✓ Confirmación de Acción';
+        let iconoDefecto = '✓';
+        let toastClass = 'lcp-toast-confirmacion';
+
+        if (tipo === 'estado' || tipo === 'avance' || tipo === 'proceso' || tipo === 'info') {
+            badgeText = '🔄 Avance de Estado';
+            iconoDefecto = '🚀';
+            toastClass = 'lcp-toast-estado';
+        } else if (tipo === 'cancelado' || tipo === 'error' || tipo === 'alerta' || tipo === 'rechazado') {
+            badgeText = '⛔ Proceso Cancelado / Alerta';
+            iconoDefecto = '⛔';
+            toastClass = 'lcp-toast-cancelado';
+        }
+
+        const titulo = options.titulo || (tipo === 'confirmacion' ? 'Acción Confirmada' : tipo === 'estado' ? 'Actualización de Estado' : 'Proceso Cancelado / Alerta');
+        const mensaje = options.mensaje || '';
+        const icono = options.icono || iconoDefecto;
+
+        const toast = document.createElement("div");
+        toast.className = `lcp-toast ${toastClass}`;
+        toast.innerHTML = `
+            <div class="lcp-toast-body">
+                <div class="lcp-toast-icon-circle">${icono}</div>
+                <div class="lcp-toast-content">
+                    <span class="lcp-toast-badge">${badgeText}</span>
+                    <div class="lcp-toast-title">${titulo}</div>
+                    <div class="lcp-toast-message">${mensaje}</div>
+                </div>
+                <button type="button" class="lcp-toast-close" title="Cerrar notificación">✕</button>
+            </div>
+            <div class="lcp-toast-timer-bar">
+                <div class="lcp-toast-timer-progress" style="animation-duration: ${duracion}ms;"></div>
+            </div>
+        `;
+
+        container.appendChild(toast);
+
+        let timer = setTimeout(() => cerrar(), duracion);
+
+        function cerrar() {
+            if (!toast.classList.contains("hiding")) {
+                toast.classList.add("hiding");
+                setTimeout(() => toast.remove(), 280);
+            }
+        }
+
+        toast.querySelector(".lcp-toast-close").addEventListener("click", (e) => {
+            e.stopPropagation();
+            clearTimeout(timer);
+            cerrar();
+        });
+
+        // Pausar countdown al colocar el mouse sobre el popup
+        toast.addEventListener("mouseenter", () => {
+            clearTimeout(timer);
+            const bar = toast.querySelector(".lcp-toast-timer-progress");
+            if (bar) bar.style.animationPlayState = "paused";
+        });
+
+        toast.addEventListener("mouseleave", () => {
+            const bar = toast.querySelector(".lcp-toast-timer-progress");
+            if (bar) bar.style.animationPlayState = "running";
+            timer = setTimeout(() => cerrar(), 2000);
+        });
+    };
+</script>
+
+<!-- CONTENEDOR FLOTANTE PARA POPUPS/MODALES DE NOTIFICACIÓN DEL SISTEMA (5 SEGUNDOS) -->
+<div id="lcp-toast-container" class="lcp-toast-container" aria-live="polite" aria-atomic="true"></div>
+
+<!-- DISPARADORES AUTOMÁTICOS DESDE EL SERVIDOR (TEMPDATA) -->
+@if (TempData["Mensaje"] != null || TempData["Success"] != null || TempData["Exito"] != null || TempData["MensajeExito"] != null)
+{
+    var msg = (TempData["Mensaje"] ?? TempData["Success"] ?? TempData["Exito"] ?? TempData["MensajeExito"])?.ToString() ?? "";
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            mostrarPopupNotificacion({
+                tipo: 'confirmacion',
+                titulo: 'Confirmación de Acción',
+                mensaje: '@Html.Raw(System.Web.HttpUtility.JavaScriptStringEncode(msg))',
+                duracion: 5000
+            });
+        });
+    </script>
+}
+@if (TempData["Estado"] != null || TempData["Avance"] != null)
+{
+    var msg = (TempData["Estado"] ?? TempData["Avance"])?.ToString() ?? "";
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            mostrarPopupNotificacion({
+                tipo: 'estado',
+                titulo: 'Actualización de Estado',
+                mensaje: '@Html.Raw(System.Web.HttpUtility.JavaScriptStringEncode(msg))',
+                duracion: 5000
+            });
+        });
+    </script>
+}
+@if (TempData["Error"] != null || TempData["Cancelado"] != null || TempData["Alerta"] != null)
+{
+    var msg = (TempData["Error"] ?? TempData["Cancelado"] ?? TempData["Alerta"])?.ToString() ?? "";
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            mostrarPopupNotificacion({
+                tipo: 'cancelado',
+                titulo: 'Proceso Cancelado / Alerta',
+                mensaje: '@Html.Raw(System.Web.HttpUtility.JavaScriptStringEncode(msg))',
+                duracion: 5000
+            });
+        });
+    </script>
+}
+
+@{
+    var currentCtrlName = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+    bool isInboxPage = currentCtrlName.Equals("Inbox", StringComparison.OrdinalIgnoreCase);
+}
+
+@if (!isInboxPage && User.Identity?.IsAuthenticated == true)
+{
+    <!-- HUD DE CHAT FLOTANTE ESTILO FACEBOOK EN PARTE INFERIOR DE LA PANTALLA -->
+    <div id="lcp-fb-chat-dock" class="lcp-fb-chat-dock">
+        <!-- Contenedor de Ventanitas Flotantes de Conversación -->
+        <div id="lcp-fb-chat-windows" class="lcp-fb-chat-windows"></div>
+
+        <!-- Botón / Pestaña Launcher Principal -->
+        <div style="position: relative;">
+            <div id="lcp-fb-directory-panel" class="lcp-fb-directory-panel" style="display: none;">
+                <div class="lcp-fb-directory-header">
+                    <span class="lcp-fb-directory-title">💬 Mensajes y Salas</span>
+                    <button type="button" class="lcp-fb-btn-control" style="color: #666;" onclick="toggleFbChatDirectory()">✕</button>
+                </div>
+                <div class="lcp-fb-directory-search">
+                    <input type="text" id="lcp-fb-search-input" placeholder="Buscar contacto o sala..." oninput="filtrarFbConversaciones(this.value)" />
+                </div>
+                <div class="lcp-fb-directory-list" id="lcp-fb-directory-list">
+                    <div style="text-align: center; padding: 20px; font-size: 12px; color: var(--lcp-text-muted);">
+                        Cargando conversaciones...
+                    </div>
+                </div>
+                <div class="lcp-fb-directory-footer">
+                    <a asp-controller="Inbox" asp-action="Index">Ver todos en Inbox completo ➔</a>
+                </div>
+            </div>
+
+            <div id="lcp-fb-chat-launcher" class="lcp-fb-launcher" onclick="toggleFbChatDirectory()">
+                <span class="lcp-fb-launcher-icon">💬</span>
+                <span class="lcp-fb-launcher-text">Chats</span>
+                <span id="lcp-fb-launcher-badge" class="lcp-fb-badge" style="display: none;">0</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // LÓGICA DE VENTANAS FLOTANTES Y COMUNICACIÓN CHAT ESTILO FACEBOOK
+        let fbConversacionesCache = [];
+        let fbVentanasAbiertas = {};
+        const currentUserIdNum = @(int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out int cUId) ? cUId : 0);
+
+        async function cargarFbConversaciones() {
+            try {
+                const resp = await fetch('/Inbox/ConversacionesAjax');
+                if (resp.ok) {
+                    const list = await resp.json();
+                    fbConversacionesCache = list;
+                    renderFbDirectorio(list);
+                    actualizarBadgeTotalFb(list);
+                }
+            } catch (e) {
+                console.error("Error al cargar conversaciones flotantes", e);
+            }
+        }
+
+        function renderFbDirectorio(list) {
+            const cont = document.getElementById("lcp-fb-directory-list");
+            if (!cont) return;
+
+            if (!list || list.length === 0) {
+                cont.innerHTML = `
+                    <div style="text-align: center; padding: 24px 16px; color: var(--lcp-text-muted); font-size: 12px;">
+                        No tenés conversaciones activas todavía
+                    </div>`;
+                return;
+            }
+
+            cont.innerHTML = "";
+            list.forEach(c => {
+                const item = document.createElement("div");
+                item.className = "lcp-fb-directory-item";
+                item.onclick = () => abrirFbChat(c.conversacionId, c.titulo);
+
+                const inicial = c.titulo ? c.titulo.charAt(0).toUpperCase() : 'C';
+                const badgeHtml = c.mensajesNoLeidos > 0 ? `<span class="lcp-fb-badge">${c.mensajesNoLeidos}</span>` : '';
+
+                item.innerHTML = `
+                    <div class="lcp-fb-item-avatar">${inicial}</div>
+                    <div class="lcp-fb-item-info">
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 4px;">
+                            <div class="lcp-fb-item-title">${c.titulo}</div>
+                            <span style="font-size: 10px; color: #888;">${c.horaUltimoMensaje || ''}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 4px;">
+                            <div class="lcp-fb-item-sub">${c.ultimoMensaje || c.subtitulo || ''}</div>
+                            ${badgeHtml}
+                        </div>
+                    </div>
+                `;
+                cont.appendChild(item);
+            });
+        }
+
+        function actualizarBadgeTotalFb(list) {
+            const badge = document.getElementById("lcp-fb-launcher-badge");
+            if (!badge) return;
+            const totalNoLeidos = list.reduce((acc, curr) => acc + (curr.mensajesNoLeidos || 0), 0);
+            if (totalNoLeidos > 0) {
+                badge.textContent = totalNoLeidos;
+                badge.style.display = "inline-block";
+            } else {
+                badge.style.display = "none";
+            }
+        }
+
+        function toggleFbChatDirectory() {
+            const panel = document.getElementById("lcp-fb-directory-panel");
+            if (!panel) return;
+            if (panel.style.display === "none") {
+                panel.style.display = "flex";
+                cargarFbConversaciones();
+            } else {
+                panel.style.display = "none";
+            }
+        }
+
+        function filtrarFbConversaciones(val) {
+            if (!val || val.trim() === '') {
+                renderFbDirectorio(fbConversacionesCache);
+                return;
+            }
+            const q = val.toLowerCase();
+            const filtradas = fbConversacionesCache.filter(c => 
+                (c.titulo && c.titulo.toLowerCase().includes(q)) ||
+                (c.subtitulo && c.subtitulo.toLowerCase().includes(q)) ||
+                (c.ultimoMensaje && c.ultimoMensaje.toLowerCase().includes(q))
+            );
+            renderFbDirectorio(filtradas);
+        }
+
+        async function abrirFbChat(convId, titulo) {
+            const dir = document.getElementById("lcp-fb-directory-panel");
+            if (dir) dir.style.display = "none";
+
+            const container = document.getElementById("lcp-fb-chat-windows");
+            if (!container) return;
+
+            let existing = document.getElementById(`fb-win-${convId}`);
+            if (existing) {
+                existing.classList.remove("minimized");
+                const inp = document.getElementById(`fb-input-${convId}`);
+                if (inp) inp.focus();
+                return;
+            }
+
+            const openWins = container.querySelectorAll(".lcp-fb-window");
+            if (openWins.length >= 2) {
+                openWins[0].remove();
+            }
+
+            const win = document.createElement("div");
+            win.className = "lcp-fb-window";
+            win.id = `fb-win-${convId}`;
+            win.setAttribute("data-conv", convId);
+
+            win.innerHTML = `
+                <div class="lcp-fb-window-header" onclick="toggleMinimizeFbWindow('${convId}')">
+                    <div class="lcp-fb-window-title-wrap">
+                        <span class="lcp-fb-window-status-dot"></span>
+                        <strong class="lcp-fb-window-title">${titulo || convId}</strong>
+                    </div>
+                    <div class="lcp-fb-window-controls">
+                        <button type="button" class="lcp-fb-btn-control" onclick="toggleMinimizeFbWindow('${convId}'); event.stopPropagation();" title="Minimizar">─</button>
+                        <button type="button" class="lcp-fb-btn-control" onclick="closeFbWindow('${convId}'); event.stopPropagation();" title="Cerrar">✕</button>
+                    </div>
+                </div>
+                <div class="lcp-fb-window-body" id="fb-body-${convId}">
+                    <div style="text-align: center; padding: 20px; font-size: 11px; color: #888;">Cargando mensajes...</div>
+                </div>
+                <div class="lcp-fb-window-footer">
+                    <input type="text" class="lcp-fb-input" id="fb-input-${convId}" placeholder="Escribí un mensaje..." onkeydown="handleFbKeyDown(event, '${convId}')" />
+                    <button type="button" class="lcp-fb-btn-send" onclick="sendFbMessage('${convId}')" title="Enviar">➤</button>
+                </div>
+            `;
+
+            container.appendChild(win);
+            fbVentanasAbiertas[convId] = { convId, titulo, minimizada: false };
+
+            if (typeof chatConnection !== "undefined" && chatConnection && chatConnection.state === "Connected") {
+                chatConnection.invoke("UnirseConversacion", convId).catch(() => {});
+            }
+
+            await cargarHistorialFbWindow(convId);
+
+            const inputEl = document.getElementById(`fb-input-${convId}`);
+            if (inputEl) inputEl.focus();
+        }
+
+        function toggleMinimizeFbWindow(convId) {
+            const win = document.getElementById(`fb-win-${convId}`);
+            if (win) {
+                win.classList.toggle("minimized");
+                if (fbVentanasAbiertas[convId]) {
+                    fbVentanasAbiertas[convId].minimizada = win.classList.contains("minimized");
+                }
+            }
+        }
+
+        function closeFbWindow(convId) {
+            const win = document.getElementById(`fb-win-${convId}`);
+            if (win) win.remove();
+            delete fbVentanasAbiertas[convId];
+        }
+
+        async function cargarHistorialFbWindow(convId) {
+            const body = document.getElementById(`fb-body-${convId}`);
+            if (!body) return;
+
+            try {
+                const resp = await fetch(`/Inbox/HistorialAjax?id=${encodeURIComponent(convId)}`);
+                if (resp.ok) {
+                    const msgs = await resp.json();
+                    body.innerHTML = "";
+                    if (!msgs || msgs.length === 0) {
+                        body.innerHTML = '<div style="text-align: center; padding: 20px; font-size: 11.5px; color: #888;">Iniciá la conversación enviando un mensaje...</div>';
+                    } else {
+                        msgs.forEach(m => appendFbBubble(convId, m));
+                        body.scrollTop = body.scrollHeight;
+                    }
+
+                    fetch(`/Notificaciones/MarcarMensajesLeidos?conversacionId=${encodeURIComponent(convId)}`, { method: 'POST' }).catch(() => {});
+                }
+            } catch (e) {
+                body.innerHTML = '<div style="text-align: center; color: #C0392B; padding: 10px; font-size: 11px;">Error al cargar mensajes.</div>';
+            }
+        }
+
+        function appendFbBubble(convId, m) {
+            const body = document.getElementById(`fb-body-${convId}`);
+            if (!body) return;
+
+            // Evitar mensajes duplicados si ya existen en el contenedor
+            if (m.id && body.querySelector(`#fb-msg-${m.id}`)) {
+                return;
+            }
+
+            const esMio = m.remitenteUsuarioId === currentUserIdNum;
+            const bubble = document.createElement("div");
+            if (m.id) {
+                bubble.id = `fb-msg-${m.id}`;
+            }
+
+            let bubbleClass = esMio ? "lcp-fb-msg-sent" : "lcp-fb-msg-recv";
+            if (m.esIncidenteRuta) bubbleClass = "lcp-fb-msg-incident";
+
+            bubble.className = `lcp-fb-msg ${bubbleClass}`;
+            const hora = m.horaFormateada || (m.fechaHoraEnvio ? new Date(m.fechaHoraEnvio).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '');
+
+            bubble.innerHTML = `
+                ${!esMio ? `<div style="font-size: 9.5px; font-weight: 700; opacity: 0.85; margin-bottom: 2px;">${m.remitenteNombre || 'Usuario'}</div>` : ''}
+                ${m.esIncidenteRuta ? '<div style="font-weight: 800; font-size: 10.5px; margin-bottom: 2px;">🚨 INCIDENTE EN RUTA</div>' : ''}
+                <div>${m.textoMensaje || ''}</div>
+                <div class="lcp-fb-msg-time">${hora}</div>
+            `;
+
+            body.appendChild(bubble);
+            body.scrollTop = body.scrollHeight;
+        }
+
+        function handleFbKeyDown(e, convId) {
+            if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                sendFbMessage(convId);
+            }
+        }
+
+        async function sendFbMessage(convId) {
+            const input = document.getElementById(`fb-input-${convId}`);
+            if (!input || !input.value.trim()) return;
+
+            const texto = input.value.trim();
+            input.value = "";
+            input.focus();
+
+            try {
+                const resp = await fetch('/Inbox/EnviarAjax', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        conversacionId: convId,
+                        textoMensaje: texto,
+                        esIncidenteRuta: false
+                    })
+                });
+
+                if (resp.ok) {
+                    const creado = await resp.json();
+                    appendFbBubble(convId, creado);
+                }
+            } catch (err) {
+                console.error("Excepción al enviar mensaje flotante", err);
+            }
+        }
+
+        window.handleFbMessageReceived = function(m) {
+            if (!m) return;
+            const convId = m.conversacionId;
+
+            const win = document.getElementById(`fb-win-${convId}`);
+            if (win) {
+                appendFbBubble(convId, m);
+                if (!win.classList.contains("minimized")) {
+                    fetch(`/Notificaciones/MarcarMensajesLeidos?conversacionId=${encodeURIComponent(convId)}`, { method: 'POST' }).catch(() => {});
+                }
+            } else {
+                cargarFbConversaciones();
+                if (typeof cargarNotificacionesMensajes === "function") {
+                    cargarNotificacionesMensajes();
+                }
+            }
+        };
+
+        document.addEventListener("DOMContentLoaded", function () {
+            cargarFbConversaciones();
+            setInterval(cargarFbConversaciones, 30000);
+            if (typeof iniciarChatHub === "function") {
+                iniciarChatHub(null);
+            }
+        });
+    </script>
+}
+
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

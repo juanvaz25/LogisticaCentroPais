@@ -1,0 +1,48 @@
+@inject NavigationManager Nav
+
+<nav class="mobile-bottom-nav">
+    <a href="/" class="nav-item @(IsActive("/") ? "active" : "")">
+        <i class="fa-solid fa-house"></i>
+        <span>Inicio</span>
+    </a>
+
+    <a href="/solicitudes" class="nav-item @(IsActive("/solicitudes") ? "active" : "")">
+        <i class="fa-solid fa-truck-ramp-box"></i>
+        <span>Operaciones</span>
+    </a>
+
+    <a href="/darsenas" class="nav-item @(IsActive("/darsenas") ? "active" : "")">
+        <i class="fa-solid fa-warehouse"></i>
+        <span>Dársenas</span>
+    </a>
+
+    <a href="/calendario" class="nav-item @(IsActive("/calendario") ? "active" : "")">
+        <i class="fa-solid fa-calendar-days"></i>
+        <span>Agenda</span>
+    </a>
+
+    <a href="/chat" class="nav-item @(IsActive("/chat") ? "active" : "")">
+        <i class="fa-solid fa-comments"></i>
+        <span>Chat</span>
+        <span class="nav-badge">1</span>
+    </a>
+</nav>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Nav.LocationChanged += (s, e) => StateHasChanged();
+    }
+
+    private bool IsActive(string path)
+    {
+        var current = new Uri(Nav.Uri).AbsolutePath.ToLowerInvariant();
+        var target = path.ToLowerInvariant();
+
+        if (target == "/")
+        {
+            return current == "/" || current == "/home";
+        }
+        return current.StartsWith(target);
+    }
+}

@@ -1,0 +1,631 @@
+@model List<TareaCalendarioDto>
+@using LCP.Shared.Constants
+@using LCP.Shared.Enums
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = "Calendario Operativo - Agenda y Tareas";
+    var usuarios = ViewBag.UsuariosInternos as List<UsuarioDto> ?? new();
+
+    var totalActividades = Model.Count;
+    var tareasPendientes = Model.Count(t => t.TipoActividad != "Reunion" && t.EstadoTarea != "Completada");
+    var reunionesPendientes = Model.Count(t => t.TipoActividad == "Reunion" && t.EstadoTarea != "Completada");
+    var completadas = Model.Count(t => t.EstadoTarea == "Completada");
+
+    bool puedeGestionar = User.IsInRole(Roles.Administrador);
+}
+
+<!-- CDN DE FULLCALENDAR V6 (Estilo Google Calendar) -->
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+
+<div class="page-header" style="margin-bottom: 16px;">
+    <div>
+        <h1 class="page-title" style="display: flex; align-items: center; gap: 10px;">
+            <span>📅</span>
+            <span>Calendario Operativo</span>
+        </h1>
+        <p class="page-subtitle">Agenda interactiva de tareas de depósito, reuniones y auditorías en tiempo real</p>
+    </div>
+
+    @if (puedeGestionar)
+    {
+        <div style="display: flex; gap: 8px;">
+            <button type="button" class="btn-lcp-primary" onclick="abrirModalNuevaActividad('Tarea')">
+                📌 + Cargar Tarea
+            </button>
+            <button type="button" class="btn-lcp-primary" style="background-color: #6366F1; border-color: #6366F1;" onclick="abrirModalNuevaActividad('Reunion')">
+                👥 + Cargar Reunión
+            </button>
+        </div>
+    }
+</div>
+
+<!-- CONTENEDOR PRINCIPAL CALENDARIO -->
+<div class="lcp-card" style="padding: 18px 20px; box-shadow: 0 4px 18px rgba(0,0,0,0.05); border-radius: 10px;">
+
+    <!-- BARRA SUPERIOR DE FILTROS Y LEYENDA -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; border-bottom: 1px solid #ECE7DE; padding-bottom: 14px;">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <span style="font-size: 12px; font-weight: 700; color: #192A33;">Filtrar vista:</span>
+            <button type="button" id="btnFiltroTodos" class="btn-lcp-primary btn-lcp-sm" style="padding: 4px 12px; font-size: 12px;" onclick="filtrarTipo('Todos')">
+                Todos (@totalActividades)
+            </button>
+            <button type="button" id="btnFiltroTareas" class="btn-lcp-outline btn-lcp-sm" style="padding: 4px 12px; font-size: 12px; border-color: #28536B; color: #28536B;" onclick="filtrarTipo('Tarea')">
+                📌 Tareas (@tareasPendientes)
+            </button>
+            <button type="button" id="btnFiltroReuniones" class="btn-lcp-outline btn-lcp-sm" style="padding: 4px 12px; font-size: 12px; border-color: #6366F1; color: #6366F1;" onclick="filtrarTipo('Reunion')">
+                👥 Reuniones (@reunionesPendientes)
+            </button>
+            <button type="button" id="btnFiltroCompletadas" class="btn-lcp-outline btn-lcp-sm" style="padding: 4px 12px; font-size: 12px; border-color: #10B981; color: #10B981;" onclick="filtrarTipo('Completada')">
+                ✓ Completadas (@completadas)
+            </button>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 14px; font-size: 12px; color: var(--lcp-text-muted);">
+            <div style="display: flex; align-items: center; gap: 5px;">
+                <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: #28536B;"></span>
+                <span>Tarea Operativa</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 5px;">
+                <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: #6366F1;"></span>
+                <span>Reunión</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 5px;">
+                <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: #10B981;"></span>
+                <span>Completada</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONTENEDOR DEL FULLCALENDAR -->
+    <div id="googleStyleCalendar" style="min-height: 640px;"></div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: CARGAR NUEVA ACTIVIDAD (TAREA O REUNIÓN)                          -->
+<!-- ========================================================================= -->
+<div id="modalCargarActividad" class="lcp-modal-backdrop" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(4px); z-index: 9999; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; overflow-y: auto;" onclick="if(event.target===this) cerrarModalActividad();">
+    <div class="lcp-modal" style="background: #FFFFFF; border-radius: 12px; max-width: 540px; width: 100%; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.4); overflow: hidden; position: relative; margin: auto;">
+        
+        <div style="padding: 16px 24px; background: #192A33; color: #FFFFFF; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span id="modalIconoTipo" style="font-size: 22px;">📌</span>
+                <h3 id="modalTituloTipo" style="margin: 0; font-size: 17px; font-weight: 700; color: #FFFFFF;">
+                    Nueva Actividad en Calendario
+                </h3>
+            </div>
+            <button type="button" onclick="cerrarModalActividad()" style="background: transparent; border: none; color: #FFF; font-size: 20px; cursor: pointer; line-height: 1;">✕</button>
+        </div>
+
+        <form asp-action="CargarActividad" method="post" style="padding: 20px 24px; margin: 0; overflow-y: auto; flex: 1; display: flex; flex-direction: column;">
+            @Html.AntiForgeryToken()
+
+            <!-- TIPO DE ACTIVIDAD (SELECTOR RADIO BOTONES GOOGLE CALENDAR STYLE) -->
+            <div style="margin-bottom: 18px;">
+                <label class="form-label" style="font-weight: 700; margin-bottom: 8px;">Tipo de evento:</label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <label id="optTipoTarea" style="border: 2px solid #28536B; background: #EBF3F7; border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                        <input type="radio" name="TipoActividad" value="Tarea" checked onchange="actualizarEstiloTipoModal('Tarea')" style="cursor: pointer;" />
+                        <div>
+                            <div style="font-weight: 800; color: #28536B; font-size: 13.5px;">📌 Tarea</div>
+                            <div style="font-size: 11px; color: var(--lcp-text-muted);">Depósito, patio, control</div>
+                        </div>
+                    </label>
+
+                    <label id="optTipoReunion" style="border: 1px solid #D1D5DB; background: #FFF; border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                        <input type="radio" name="TipoActividad" value="Reunion" onchange="actualizarEstiloTipoModal('Reunion')" style="cursor: pointer;" />
+                        <div>
+                            <div style="font-weight: 800; color: #6366F1; font-size: 13.5px;">👥 Reunión</div>
+                            <div style="font-size: 11px; color: var(--lcp-text-muted);">Auditoría, coordinación</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 14px;">
+                <label class="form-label">Título de la actividad *</label>
+                <input type="text" id="inputTitulo" name="Titulo" class="form-input" placeholder="Ej: Control físico de stock dársena A-02 / Reunión auditoría" required />
+            </div>
+
+            <div class="form-group" style="margin-bottom: 14px;">
+                <label class="form-label">Detalles / Descripción / Observaciones</label>
+                <textarea id="inputDetalle" name="Detalle" class="form-input" rows="2" placeholder="Ej: Revisión de precintos y balance térmico de dársena con el cliente."></textarea>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 14px;">
+                <label class="form-label">Fecha del evento *</label>
+                <input type="date" id="inputFecha" name="Fecha" class="form-input" required />
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px;">
+                <div class="form-group" style="margin: 0;">
+                    <label class="form-label">Hora Inicio *</label>
+                    <input type="time" id="inputHoraInicio" name="HoraInicio" class="form-input" value="09:00" required />
+                </div>
+                <div class="form-group" style="margin: 0;">
+                    <label class="form-label">Hora Fin *</label>
+                    <input type="time" id="inputHoraFin" name="HoraFin" class="form-input" value="10:00" required />
+                </div>
+            </div>
+
+            <!-- ASIGNACIÓN DE RESPONSABLE (OPERADORES O AUDITORES) -->
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label class="form-label">Responsable asignado (Operador o Auditor) *</label>
+                <select name="ResponsableUsuarioId" class="form-input" required style="font-weight: 600;">
+                    <option value="">-- Seleccionar Responsable --</option>
+                    
+                    @if (usuarios.Any(u => u.Rol == RolUsuario.Operador))
+                    {
+                        <optgroup label="👷 Operadores de Patio y Depósito">
+                            @foreach (var u in usuarios.Where(u => u.Rol == RolUsuario.Operador))
+                            {
+                                <option value="@u.Id">@u.NombreCompleto · Operador</option>
+                            }
+                        </optgroup>
+                    }
+
+                    @if (usuarios.Any(u => u.Rol == RolUsuario.Auditor))
+                    {
+                        <optgroup label="🛡️ Auditores Técnicos y Contables">
+                            @foreach (var u in usuarios.Where(u => u.Rol == RolUsuario.Auditor))
+                            {
+                                <option value="@u.Id">@u.NombreCompleto · Auditor</option>
+                            }
+                        </optgroup>
+                    }
+
+                    @if (usuarios.Any(u => u.Rol == RolUsuario.Administrador))
+                    {
+                        <optgroup label="👑 Administradores">
+                            @foreach (var u in usuarios.Where(u => u.Rol == RolUsuario.Administrador))
+                            {
+                                <option value="@u.Id">@u.NombreCompleto · Administrador</option>
+                            }
+                        </optgroup>
+                    }
+                </select>
+                <div style="font-size: 11px; color: var(--lcp-text-muted); margin-top: 4px;">
+                    Podés designar tanto a Operadores de depósito como a Auditores contables/técnicos.
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #ECE7DE; padding-top: 16px; margin-top: auto; position: sticky; bottom: 0; background: #FFFFFF; z-index: 2;">
+                <button type="button" class="btn-lcp-outline" onclick="cerrarModalActividad()">Cancelar</button>
+                <button type="submit" class="btn-lcp-primary" id="btnGuardarModal">
+                    Guardar en Calendario
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: DETALLE INTERACTIVO DE ACTIVIDAD (AL HACER CLIC EN UN EVENTO)    -->
+<!-- ========================================================================= -->
+<div id="modalDetalleActividad" class="lcp-modal-backdrop" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(4px); z-index: 9999; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; overflow-y: auto;" onclick="if(event.target===this) cerrarModalDetalle();">
+    <div class="lcp-modal" style="background: #FFFFFF; border-radius: 12px; max-width: 520px; width: 100%; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.4); overflow: hidden; position: relative; margin: auto;">
+        
+        <div id="mdaHeader" style="padding: 16px 24px; background: #28536B; color: #FFFFFF; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span id="mdaIcono" style="font-size: 22px;">📌</span>
+                <span id="mdaBadgeTipo" style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; background: rgba(255,255,255,0.2); padding: 3px 8px; border-radius: 4px;">
+                    TAREA
+                </span>
+            </div>
+            <button type="button" onclick="cerrarModalDetalle()" style="background: transparent; border: none; color: #FFF; font-size: 20px; cursor: pointer; line-height: 1;">✕</button>
+        </div>
+
+        <div style="padding: 20px 24px; overflow-y: auto; flex: 1; display: flex; flex-direction: column;">
+            <h2 id="mdaTitulo" style="margin: 0 0 10px; font-size: 18px; font-weight: 800; color: #192A33; line-height: 1.3;">
+                Título de la actividad
+            </h2>
+
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+                <span id="mdaBadgeEstado" class="badge-estado badge-encurso">Pendiente</span>
+            </div>
+
+            <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px 18px; margin-bottom: 16px;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                    <span style="font-size: 16px;">🗓️</span>
+                    <div>
+                        <div style="font-size: 11px; text-transform: uppercase; color: var(--lcp-text-muted); font-weight: 700;">Fecha y Horario:</div>
+                        <div id="mdaFechaHorario" style="font-size: 14px; font-weight: 700; color: #192A33;">-</div>
+                    </div>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 16px;">👤</span>
+                    <div>
+                        <div style="font-size: 11px; text-transform: uppercase; color: var(--lcp-text-muted); font-weight: 700;">Responsable Asignado:</div>
+                        <div id="mdaResponsable" style="font-size: 14px; font-weight: 700; color: #192A33;">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <div style="font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase; margin-bottom: 6px;">Detalle / Notas:</div>
+                <div id="mdaDetalle" style="font-size: 13.5px; color: #1E293B; line-height: 1.5; background: #FFF; border: 1px solid #E2E8F0; border-radius: 6px; padding: 10px 14px; min-height: 48px;">
+                    -
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #E2E8F0; padding-top: 16px; margin-top: auto; gap: 10px; flex-wrap: wrap; position: sticky; bottom: 0; background: #FFFFFF; z-index: 2;">
+                <div>
+                    @if (puedeGestionar)
+                    {
+                        <form id="formEliminarActividad" asp-action="EliminarActividad" method="post" style="margin: 0; display: inline-block;" onsubmit="return confirm('¿Seguro que deseas eliminar esta actividad del calendario?');">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" id="inputEliminarId" name="id" value="" />
+                            <button type="submit" class="btn-lcp-outline btn-lcp-sm" style="color: #9D2424; border-color: #F3C7C7; background: #FDEDEC; font-weight: 700;">
+                                🗑️ Eliminar
+                            </button>
+                        </form>
+                    }
+                </div>
+
+                <div style="display: flex; gap: 8px;">
+                    <button type="button" class="btn-lcp-outline btn-lcp-sm" onclick="cerrarModalDetalle()">Cerrar</button>
+                    
+                    @if (puedeGestionar)
+                    {
+                        <form id="formCompletarActividad" asp-action="CompletarActividad" method="post" style="margin: 0; display: inline-block;">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" id="inputCompletarId" name="id" value="" />
+                            <button type="submit" id="btnMarcarCompletada" class="btn-lcp-primary btn-lcp-sm" style="background-color: #10B981; border-color: #10B981; font-weight: 700;">
+                                ✓ Marcar como Completada
+                            </button>
+                        </form>
+                    }
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<style>
+    /* ESTILOS PERSONALIZADOS GOOGLE CALENDAR / LCP BRANDING */
+    .fc {
+        font-family: inherit;
+    }
+    .fc .fc-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+    .fc .fc-toolbar-title {
+        font-size: 1.35rem;
+        font-weight: 800;
+        color: #192A33;
+        text-transform: capitalize;
+    }
+    .fc .fc-button {
+        background-color: #FFFFFF;
+        border: 1px solid #D5CEBE;
+        color: #192A33;
+        font-weight: 700;
+        font-size: 13px;
+        border-radius: 6px;
+        padding: 6px 14px;
+        box-shadow: none;
+        transition: all 0.15s ease;
+    }
+    .fc .fc-button:hover {
+        background-color: #F4EFE6;
+        border-color: #B5AD9C;
+        color: #192A33;
+    }
+    .fc .fc-button-primary:not(:disabled).fc-button-active,
+    .fc .fc-button-primary:not(:disabled):active {
+        background-color: #192A33;
+        border-color: #192A33;
+        color: #FFFFFF;
+    }
+    .fc .fc-today-button {
+        background-color: #28536B;
+        border-color: #28536B;
+        color: #FFFFFF;
+    }
+    .fc .fc-today-button:hover {
+        background-color: #1B3B4D;
+        border-color: #1B3B4D;
+        color: #FFFFFF;
+    }
+    .fc-theme-standard td, .fc-theme-standard th {
+        border-color: #ECE7DE;
+    }
+    .fc-theme-standard .fc-scrollgrid {
+        border: 1px solid #D5CEBE;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .fc .fc-col-header-cell {
+        background-color: #F8F6F0;
+        padding: 8px 0;
+        font-size: 13px;
+        font-weight: 700;
+        color: #475569;
+    }
+    .fc .fc-daygrid-day-number {
+        font-size: 13px;
+        font-weight: 700;
+        color: #1E293B;
+        padding: 6px 8px;
+    }
+    .fc .fc-day-today {
+        background-color: #FFFDF5 !important;
+    }
+    .fc .fc-day-today .fc-daygrid-day-number {
+        background-color: #28536B;
+        color: #FFFFFF;
+        border-radius: 50%;
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+        text-align: center;
+        line-height: 24px;
+        margin: 4px;
+        padding: 0;
+    }
+    .fc-event {
+        cursor: pointer;
+        border-radius: 4px;
+        padding: 2px 6px;
+        font-size: 12px;
+        font-weight: 600;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        margin-bottom: 2px;
+        transition: transform 0.1s ease;
+    }
+    .fc-event:hover {
+        transform: translateY(-1px);
+        filter: brightness(1.08);
+    }
+</style>
+
+@section Scripts {
+    <script>
+        let calendar = null;
+        let filtroActual = 'Todos';
+
+        // Serializar eventos desde el modelo para carga inmediata garantizada
+        const eventosData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Select(t => {
+            bool esReunion = t.TipoActividad?.Equals("Reunion", StringComparison.OrdinalIgnoreCase) == true;
+            bool esCompletada = t.EstadoTarea == "Completada";
+
+            string colorFondo = esCompletada ? "#10B981" : (esReunion ? "#6366F1" : "#28536B");
+            string colorBorde = esCompletada ? "#059669" : (esReunion ? "#4F46E5" : "#1B3B4D");
+            string icono = esCompletada ? "✓ " : (esReunion ? "👥 " : "📌 ");
+
+            return new {
+                id = t.Id.ToString(),
+                title = $"{icono}{t.Titulo}",
+                start = $"{t.Fecha:yyyy-MM-dd}T{t.HoraInicio:HH:mm:ss}",
+                end = $"{t.Fecha:yyyy-MM-dd}T{t.HoraFin:HH:mm:ss}",
+                backgroundColor = colorFondo,
+                borderColor = colorBorde,
+                textColor = "#FFFFFF",
+                extendedProps = new {
+                    id = t.Id,
+                    titulo = t.Titulo,
+                    detalle = t.Detalle,
+                    tipo = t.TipoActividad ?? "Tarea",
+                    responsable = t.ResponsableNombre,
+                    responsableRol = t.ResponsableRol,
+                    responsableId = t.ResponsableUsuarioId,
+                    estado = t.EstadoTarea,
+                    horaInicio = t.HoraInicio.ToString("HH:mm"),
+                    horaFin = t.HoraFin.ToString("HH:mm"),
+                    fecha = t.Fecha.ToString("yyyy-MM-dd"),
+                    fechaFormateada = t.Fecha.ToString("dd/MM/yyyy")
+                }
+            };
+        })));
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const calendarEl = document.getElementById('googleStyleCalendar');
+
+            calendar = new FullCalendar.Calendar(calendarEl, {
+                // Toma automáticamente la fecha del sistema / navegador del cliente
+                initialDate: new Date(),
+                initialView: 'dayGridMonth',
+                locale: 'es',
+                firstDay: 1, // Lunes como primer día de la semana
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+                },
+                buttonText: {
+                    today: 'Hoy',
+                    month: 'Mes',
+                    week: 'Semana',
+                    day: 'Día',
+                    list: 'Agenda'
+                },
+                navLinks: true,
+                editable: false,
+                selectable: true,
+                nowIndicator: true,
+                dayMaxEvents: 3, // Permite "+X más" si hay muchos eventos en un día
+                events: function (fetchInfo, successCallback, failureCallback) {
+                    // Filtrar dinámicamente según el chip seleccionado
+                    if (filtroActual === 'Todos') {
+                        successCallback(eventosData);
+                    } else if (filtroActual === 'Completada') {
+                        successCallback(eventosData.filter(e => e.extendedProps.estado === 'Completada'));
+                    } else {
+                        successCallback(eventosData.filter(e => e.extendedProps.tipo === filtroActual && e.extendedProps.estado !== 'Completada'));
+                    }
+                },
+                // Al hacer clic en un día o franja horaria vacía -> Cargar Actividad
+                dateClick: function (info) {
+                    @if (puedeGestionar)
+                    {
+                        <text>
+                        abrirModalNuevaActividad('Tarea', info.dateStr.split('T')[0]);
+                        </text>
+                    }
+                },
+                // Al hacer clic en un evento existente -> Ver Detalle Interactivo
+                eventClick: function (info) {
+                    mostrarDetalleEvento(info.event);
+                }
+            });
+
+            calendar.render();
+        });
+
+        // =========================================================================
+        // FILTRADO POR TIPO / ESTADO
+        // =========================================================================
+        function filtrarTipo(tipo) {
+            filtroActual = tipo;
+
+            // Actualizar estilo visual de los botones de filtro
+            const botones = {
+                'Todos': document.getElementById('btnFiltroTodos'),
+                'Tarea': document.getElementById('btnFiltroTareas'),
+                'Reunion': document.getElementById('btnFiltroReuniones'),
+                'Completada': document.getElementById('btnFiltroCompletadas')
+            };
+
+            for (const key in botones) {
+                if (botones[key]) {
+                    if (key === tipo) {
+                        botones[key].className = 'btn-lcp-primary btn-lcp-sm';
+                    } else {
+                        botones[key].className = 'btn-lcp-outline btn-lcp-sm';
+                    }
+                }
+            }
+
+            if (calendar) {
+                calendar.refetchEvents();
+            }
+        }
+
+        // =========================================================================
+        // MODAL CREAR ACTIVIDAD
+        // =========================================================================
+        function abrirModalNuevaActividad(tipoPorDefecto, fechaPreseleccionada) {
+            const fechaInput = document.getElementById("inputFecha");
+            
+            if (fechaPreseleccionada) {
+                fechaInput.value = fechaPreseleccionada;
+            } else if (!fechaInput.value) {
+                // Fecha de hoy local
+                const hoy = new Date();
+                const anio = hoy.getFullYear();
+                const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+                const dia = String(hoy.getDate()).padStart(2, '0');
+                fechaInput.value = `${anio}-${mes}-${dia}`;
+            }
+
+            actualizarEstiloTipoModal(tipoPorDefecto || 'Tarea');
+            document.getElementById("modalCargarActividad").style.display = "flex";
+        }
+
+        function cerrarModalActividad() {
+            document.getElementById("modalCargarActividad").style.display = "none";
+        }
+
+        function actualizarEstiloTipoModal(tipo) {
+            const optTarea = document.getElementById("optTipoTarea");
+            const optReunion = document.getElementById("optTipoReunion");
+            const iconoHeader = document.getElementById("modalIconoTipo");
+            const tituloHeader = document.getElementById("modalTituloTipo");
+            const btnGuardar = document.getElementById("btnGuardarModal");
+
+            const radioInputs = document.querySelectorAll('input[name="TipoActividad"]');
+            radioInputs.forEach(r => {
+                if (r.value === tipo) r.checked = true;
+            });
+
+            if (tipo === 'Reunion') {
+                optReunion.style.borderColor = '#6366F1';
+                optReunion.style.background = '#EEF2FF';
+                optTarea.style.borderColor = '#D1D5DB';
+                optTarea.style.background = '#FFF';
+                iconoHeader.textContent = '👥';
+                tituloHeader.textContent = 'Nueva Reunión en Calendario';
+                btnGuardar.style.backgroundColor = '#6366F1';
+                btnGuardar.style.borderColor = '#6366F1';
+            } else {
+                optTarea.style.borderColor = '#28536B';
+                optTarea.style.background = '#EBF3F7';
+                optReunion.style.borderColor = '#D1D5DB';
+                optReunion.style.background = '#FFF';
+                iconoHeader.textContent = '📌';
+                tituloHeader.textContent = 'Nueva Tarea en Calendario';
+                btnGuardar.style.backgroundColor = '#162E3B';
+                btnGuardar.style.borderColor = '#162E3B';
+            }
+        }
+
+        // =========================================================================
+        // MODAL DETALLE DE ACTIVIDAD
+        // =========================================================================
+        function mostrarDetalleEvento(event) {
+            const p = event.extendedProps;
+            const esReunion = p.tipo === 'Reunion';
+            const esCompletada = p.estado === 'Completada';
+
+            const header = document.getElementById("mdaHeader");
+            const icono = document.getElementById("mdaIcono");
+            const badgeTipo = document.getElementById("mdaBadgeTipo");
+            const badgeEstado = document.getElementById("mdaBadgeEstado");
+
+            if (esCompletada) {
+                header.style.backgroundColor = '#10B981';
+                icono.textContent = '✅';
+                badgeTipo.textContent = esReunion ? 'REUNIÓN COMPLETADA' : 'TAREA COMPLETADA';
+                badgeEstado.className = 'badge-estado badge-completada';
+                badgeEstado.textContent = 'Completada';
+            } else if (esReunion) {
+                header.style.backgroundColor = '#6366F1';
+                icono.textContent = '👥';
+                badgeTipo.textContent = 'REUNIÓN DE COORDINACIÓN';
+                badgeEstado.className = 'badge-estado badge-encurso';
+                badgeEstado.textContent = 'Programada';
+            } else {
+                header.style.backgroundColor = '#28536B';
+                icono.textContent = '📌';
+                badgeTipo.textContent = 'TAREA OPERATIVA';
+                badgeEstado.className = 'badge-estado badge-turno';
+                badgeEstado.textContent = 'Pendiente';
+            }
+
+            document.getElementById("mdaTitulo").textContent = p.titulo;
+            document.getElementById("mdaFechaHorario").textContent = `${p.fechaFormateada} · De ${p.horaInicio} a ${p.horaFin} hs`;
+            
+            const rolStr = p.responsableRol ? ` (${p.responsableRol})` : '';
+            document.getElementById("mdaResponsable").textContent = `${p.responsable}${rolStr}`;
+            document.getElementById("mdaDetalle").textContent = p.detalle ? p.detalle : 'Sin notas adicionales.';
+
+            // Configurar botones de acción
+            const inputComp = document.getElementById("inputCompletarId");
+            const inputElim = document.getElementById("inputEliminarId");
+            const btnCompletar = document.getElementById("btnMarcarCompletada");
+
+            if (inputComp) inputComp.value = p.id;
+            if (inputElim) inputElim.value = p.id;
+
+            if (btnCompletar) {
+                if (esCompletada) {
+                    btnCompletar.style.display = 'none';
+                } else {
+                    btnCompletar.style.display = 'inline-block';
+                }
+            }
+
+            document.getElementById("modalDetalleActividad").style.display = "flex";
+        }
+
+        function cerrarModalDetalle() {
+            document.getElementById("modalDetalleActividad").style.display = "none";
+        }
+    </script>
+}

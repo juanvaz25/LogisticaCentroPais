@@ -1,0 +1,753 @@
+﻿@model List<ContratoAlquilerDarsenaDto>
+@using LCP.Shared.Enums
+@using System.Text.Json
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = "Mis Dársenas en Alquiler - Contratos y Solicitudes";
+    var darsenasDisponibles = ViewBag.DarsenasDisponibles as List<DarsenaDto> ?? new();
+    var tarifas = ViewBag.Tarifas as List<TarifaConfiguracionDto> ?? new();
+
+    var tarifaTrimestral = tarifas.FirstOrDefault(t => t.CodigoConcepto == "ALQUILER_TRIMESTRAL")?.ValorUnitario ?? 450000m;
+    var tarifaSemestral = tarifas.FirstOrDefault(t => t.CodigoConcepto == "ALQUILER_SEMESTRAL")?.ValorUnitario ?? 820000m;
+    var tarifaAnual = tarifas.FirstOrDefault(t => t.CodigoConcepto == "ALQUILER_ANUAL")?.ValorUnitario ?? 1500000m;
+
+    var jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+    var contratosJson = JsonSerializer.Serialize(Model ?? new List<ContratoAlquilerDarsenaDto>(), jsonOptions);
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Gestión y Alquiler de Dársenas</h1>
+        <p class="page-subtitle">Módulos de acopio y logística asignados a tu empresa bajo validación de auditoría técnica y fiscal</p>
+    </div>
+</div>
+
+<!-- MIS CONTRATOS Y SOLICITUDES -->
+<div class="lcp-card" style="margin-bottom: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div>
+            <h2 class="lcp-card-title" style="margin-bottom: 4px;">Mis Dársenas y Solicitudes de Alquiler</h2>
+            <p style="font-size: 13px; color: var(--lcp-text-muted); margin: 0;">
+                Estado del proceso: Solicitud inicial &rarr; Evaluación del Auditor &rarr; Pago de Factura &rarr; Habilitación definitiva para stock.
+            </p>
+        </div>
+        <a href="#formulario-solicitud" class="btn-lcp-primary btn-lcp-sm">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Nueva Solicitud de Dársena
+        </a>
+    </div>
+
+    <div class="lcp-table-container">
+        <table class="lcp-table">
+            <thead>
+                <tr>
+                    <th style="width: 130px;">Dársena</th>
+                    <th>Mercadería y Régimen</th>
+                    <th style="width: 190px;">Capacidad y Stock</th>
+                    <th style="width: 140px;">Costo Alquiler</th>
+                    <th style="width: 170px;">Estado</th>
+                    <th style="text-align: right; width: 220px;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Any())
+                {
+                    <tr>
+                        <td colspan="6" style="text-align: center; color: var(--lcp-text-muted); padding: 36px;">
+                            Tu empresa aún no tiene solicitudes ni dársenas alquiladas. Podés completar el formulario técnico abajo para solicitar una.
+                        </td>
+                    </tr>
+                }
+                @foreach (var c in Model)
+                {
+                    <tr>
+                        <td>
+                            <div style="font-weight: 800; font-size: 15px; color: #192A33;">@c.DarsenaCodigo</div>
+                            <div style="font-size: 11.5px; color: var(--lcp-text-muted);">Plan @c.PlanNombre</div>
+                        </td>
+                        <td>
+                            <div style="font-weight: 700; color: #192A33; max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="@c.MercaderiaAlmacenar">
+                                @(string.IsNullOrWhiteSpace(c.MercaderiaAlmacenar) ? "Carga General" : c.MercaderiaAlmacenar)
+                            </div>
+                            <div style="font-size: 12px; color: #28536B;">
+                                🌡️ @(string.IsNullOrWhiteSpace(c.TipoAlmacenamiento) ? "Ambiente Estándar" : c.TipoAlmacenamiento)
+                            </div>
+                        </td>
+                        <td>
+                            @if (c.Estado == EstadoContratoDarsena.Activo)
+                            {
+                                var pct = c.CapacidadMaximaM3 > 0 ? (int)(c.VolumenOcupadoM3 / c.CapacidadMaximaM3 * 100) : 0;
+                                <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 2px;">
+                                    <strong>@c.VolumenOcupadoM3.ToString("N1")</strong>
+                                    <span style="color: var(--lcp-text-muted);">/ @c.CapacidadMaximaM3.ToString("N0") m³</span>
+                                </div>
+                                <div style="background: #E5DFD5; border-radius: 4px; height: 6px; overflow: hidden;" title="@pct% ocupado">
+                                    <div style="background: @(pct >= 90 ? "#D9534F" : pct >= 70 ? "#F0AD4E" : "#2E7D32"); width: @(Math.Min(100, pct))%; height: 100%;"></div>
+                                </div>
+                                <div style="font-size: 10.5px; color: var(--lcp-text-muted); margin-top: 2px;">
+                                    @c.CapacidadMaximaPallets pal. máx (@pct% ocup.)
+                                </div>
+                            }
+                            else
+                            {
+                                <div style="font-size: 12px; font-weight: 600; color: #4A5568;">@c.CapacidadMaximaPallets pallets máx</div>
+                                <div style="font-size: 11px; color: var(--lcp-text-muted);">Capacidad: @c.CapacidadMaximaM3.ToString("N0") m³</div>
+                            }
+                        </td>
+                        <td>
+                            <div style="font-weight: 800; color: #192A33; font-size: 14px;">$ @c.MontoTotalContrato.ToString("N0")</div>
+                            <div style="font-size: 11px; color: var(--lcp-text-muted);">@c.PlanNombre</div>
+                        </td>
+                        <td>
+                            @if (c.Estado == EstadoContratoDarsena.Activo)
+                            {
+                                <span class="badge-estado" style="background: #E8F5E9; color: #1B5E20; border: 1px solid #A5D6A7; font-weight: 700; font-size: 11.5px; padding: 3px 8px; display: inline-block;">
+                                    🟢 Habilitada
+                                </span>
+                            }
+                            else if (c.Estado == EstadoContratoDarsena.FacturaCargadaPendienteHabilitacion)
+                            {
+                                <span class="badge-estado" style="background: #E8EAF6; color: #283593; border: 1px solid #C5CAE9; font-weight: 700; font-size: 11.5px; padding: 3px 8px; display: inline-block;">
+                                    📄 En Revisión
+                                </span>
+                            }
+                            else if (c.Estado == EstadoContratoDarsena.AprobadoPendientePago)
+                            {
+                                <span class="badge-estado" style="background: #E1F5FE; color: #0277BD; border: 1px solid #81D4FA; font-weight: 700; font-size: 11.5px; padding: 3px 8px; display: inline-block;">
+                                    💳 Pago Pendiente
+                                </span>
+                            }
+                            else if (c.Estado == EstadoContratoDarsena.PendienteRevision)
+                            {
+                                <span class="badge-estado" style="background: #FFF8E1; color: #B78103; border: 1px solid #FFE082; font-weight: 700; font-size: 11.5px; padding: 3px 8px; display: inline-block;">
+                                    ⏳ En Auditoría
+                                </span>
+                            }
+                            else if (c.Estado == EstadoContratoDarsena.Rechazado)
+                            {
+                                <span class="badge-estado" style="background: #FFEBEE; color: #C62828; border: 1px solid #EF9A9A; font-weight: 700; font-size: 11.5px; padding: 3px 8px; display: inline-block;">
+                                    ⛔ Rechazada
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="badge-estado" style="font-size: 11.5px; padding: 3px 8px; display: inline-block;">@c.EstadoNombre</span>
+                            }
+                        </td>
+                        <td style="text-align: right;">
+                            <div style="display: inline-flex; gap: 6px; align-items: center; justify-content: flex-end;">
+                                <button type="button" class="btn-lcp-outline btn-lcp-sm" style="font-weight: 700; font-size: 11px; padding: 4px 9px;" onclick="abrirFichaContratoPorId(@c.Id)" title="Abrir ficha técnica y comercial completa">
+                                    📋 Ficha
+                                </button>
+                                @if (c.Estado == EstadoContratoDarsena.Activo)
+                                {
+                                    <a asp-action="MiStock" asp-route-darsenaId="@c.DarsenaId" class="btn-lcp-outline btn-lcp-sm" style="font-size: 11px; padding: 4px 8px;" title="Ver stock e inventario actual">
+                                        📦 Stock
+                                    </a>
+                                    <a asp-controller="Solicitudes" asp-action="Nueva" asp-route-darsenaId="@c.DarsenaId" class="btn-lcp-primary btn-lcp-sm" style="font-size: 11px; padding: 4px 8px;" title="Crear orden de ingreso o egreso">
+                                        + Operar
+                                    </a>
+                                }
+                                else if (c.Estado == EstadoContratoDarsena.AprobadoPendientePago)
+                                {
+                                    <button type="button" class="btn-lcp-primary btn-lcp-sm" style="background-color: #0277BD; border-color: #0277BD; font-size: 11px; padding: 4px 8px; font-weight: 700;" onclick="abrirModalFactura(@c.Id, '@c.DarsenaCodigo', '@c.MontoTotalContrato.ToString("N0")')">
+                                        💳 Pagar
+                                    </button>
+                                }
+                                else if (!string.IsNullOrWhiteSpace(c.ComprobantePagoUrl))
+                                {
+                                    var compUrl = c.ComprobantePagoUrl.StartsWith("http") ? c.ComprobantePagoUrl : (c.ComprobantePagoUrl.StartsWith("/") ? c.ComprobantePagoUrl : "/" + c.ComprobantePagoUrl);
+                                    <a href="@compUrl" target="_blank" class="btn-lcp-outline btn-lcp-sm" style="font-size: 11px; padding: 4px 8px;" title="Ver comprobante de pago cargado">
+                                        📄 Factura
+                                    </a>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- FORMULARIO DE SOLICITUD DE ALQUILER CON REQUISITOS TÉCNICOS -->
+<div class="lcp-card" id="formulario-solicitud">
+    <div style="border-bottom: 1px solid var(--lcp-border); padding-bottom: 16px; margin-bottom: 20px;">
+        <h2 class="lcp-card-title" style="margin-bottom: 4px;">Formulario de Solicitud de Alquiler de Dársena</h2>
+        <p style="font-size: 13px; color: var(--lcp-text-muted); margin: 0;">
+            De acuerdo con los protocolos de seguridad de Logística Centro del País, todo almacenamiento requiere evaluación previa del Auditor Técnico para verificar compatibilidad de carga, cadena de frío y medidas de control.
+        </p>
+    </div>
+
+    <!-- TARJETAS DE TARIFAS DE PLANES -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 24px;">
+        <div style="background-color: #F4F0E8; border: 1px solid #DFDAD0; border-radius: 8px; padding: 18px; text-align: center;">
+            <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--lcp-text-muted);">Plan Trimestral</div>
+            <div style="font-size: 24px; font-weight: 800; color: #192A33; margin: 6px 0;">$ @tarifaTrimestral.ToString("N0")</div>
+            <div style="font-size: 12px; color: var(--lcp-text-muted);">3 meses de uso exclusivo y acopio</div>
+        </div>
+
+        <div style="background-color: #EBF2EC; border: 1px solid #C8DEC9; border-radius: 8px; padding: 18px; text-align: center;">
+            <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #21613E;">Plan Semestral (Ahorro)</div>
+            <div style="font-size: 24px; font-weight: 800; color: #192A33; margin: 6px 0;">$ @tarifaSemestral.ToString("N0")</div>
+            <div style="font-size: 12px; color: var(--lcp-text-muted);">6 meses de uso exclusivo y acopio</div>
+        </div>
+
+        <div style="background-color: #E8EEF3; border: 1px solid #C4D6E3; border-radius: 8px; padding: 18px; text-align: center;">
+            <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #1B5277;">Plan Anual (Máximo Beneficio)</div>
+            <div style="font-size: 24px; font-weight: 800; color: #192A33; margin: 6px 0;">$ @tarifaAnual.ToString("N0")</div>
+            <div style="font-size: 12px; color: var(--lcp-text-muted);">12 meses de uso exclusivo y acopio</div>
+        </div>
+    </div>
+
+    @if (!darsenasDisponibles.Any())
+    {
+        <div style="text-align: center; padding: 28px; color: var(--lcp-text-muted); background: #F8F6F0; border-radius: 8px; border: 1px dashed var(--lcp-border);">
+            <div style="font-size: 16px; font-weight: 600; color: #192A33; margin-bottom: 6px;">Todas las dársenas se encuentran ocupadas o en mantenimiento</div>
+            <p style="margin: 0; font-size: 13px;">No hay módulos vacantes en este momento en el nodo logístico. Comunicate con soporte o administración.</p>
+        </div>
+    }
+    else
+    {
+        <form asp-action="AlquilarDarsena" method="post" style="max-width: 850px;">
+            @Html.AntiForgeryToken()
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px;">
+                <div class="form-group">
+                    <label class="form-label" style="font-weight: 700;">1. Seleccione la Dársena Vacante <span style="color: #C62828;">*</span></label>
+                    <select name="darsenaId" class="form-input" required>
+                        <option value="">-- Elija una dársena disponible --</option>
+                        @foreach (var d in darsenasDisponibles)
+                        {
+                            <option value="@d.Id">@d.Codigo - Capacidad: @d.CapacidadMaximaPallets pallets (@d.CapacidadMaximaM3 m³)</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" style="font-weight: 700;">2. Plan de Duración Deseado <span style="color: #C62828;">*</span></label>
+                    <select name="plan" class="form-input" required>
+                        <option value="1">Trimestral (3 meses) - $ @tarifaTrimestral.ToString("N0")</option>
+                        <option value="2">Semestral (6 meses) - $ @tarifaSemestral.ToString("N0")</option>
+                        <option value="3">Anual (12 meses) - $ @tarifaAnual.ToString("N0")</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 18px; margin-bottom: 18px;">
+                <div class="form-group">
+                    <label class="form-label" style="font-weight: 700;">3. ¿Qué mercadería almacenará en la dársena? <span style="color: #C62828;">*</span></label>
+                    <input type="text" name="mercaderiaAlmacenar" class="form-input" placeholder="Ej: Harina y cereales en bolsas, tubos estructurales de acero, autopartes..." required />
+                    <span style="font-size: 12px; color: var(--lcp-text-muted);">Indique el tipo de carga, packaging o formato de bultos.</span>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" style="font-weight: 700;">4. Régimen Térmico / Almacenamiento <span style="color: #C62828;">*</span></label>
+                    <select name="tipoAlmacenamiento" class="form-input" required>
+                        <option value="Ambiente Seco / Carga General">Ambiente Seco / Carga General</option>
+                        <option value="Frío Refrigerado (2°C a 8°C)">Frío Refrigerado (2°C a 8°C)</option>
+                        <option value="Supercongelado (-18°C a -25°C)">Supercongelado (-18°C a -25°C)</option>
+                        <option value="Calor / Atmósfera Controlada">Calor / Atmósfera Controlada</option>
+                        <option value="Mercadería Peligrosa / Especial">Mercadería Peligrosa / Especial</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 22px;">
+                <label class="form-label" style="font-weight: 700;">5. Consideraciones Especiales / Requerimientos Técnicos</label>
+                <textarea name="consideracionesEspeciales" rows="3" class="form-input" placeholder="Especifique si requiere habilitación SENASA, control de humedad, ventilación reforzada, compatibilidad química, o precauciones de seguridad."></textarea>
+            </div>
+
+            <div style="background: #F4F7F9; border-left: 4px solid #1B5277; padding: 14px 18px; border-radius: 4px; margin-bottom: 22px;">
+                <div style="font-weight: 700; color: #192A33; font-size: 13px; margin-bottom: 4px;">ℹ️ Proceso de Adjudicación:</div>
+                <div style="font-size: 12px; color: #4A5568; line-height: 1.5;">
+                    1. Al enviar este formulario, el <strong>Auditor Técnico</strong> revisará la viabilidad de su mercadería.<br/>
+                    2. Una vez aprobada, se habilitará el botón para cargar su <strong>factura o comprobante de pago</strong>.<br/>
+                    3. Tras la carga del comprobante, la dársena quedará <strong>oficialmente activa</strong> y podrá ingresar stock y programar arribos.
+                </div>
+            </div>
+
+            <button type="submit" class="btn-lcp-primary" style="padding: 12px 28px; font-size: 14px; font-weight: 700;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                Enviar Solicitud al Auditor
+            </button>
+        </form>
+    }
+</div>
+
+<!-- MODAL PARA CARGAR FACTURA / COMPROBANTE DE PAGO -->
+<div id="modalFactura" class="lcp-modal-backdrop" style="display: none;">
+    <div class="lcp-modal" style="width: 92%; max-width: 520px;">
+        <div class="lcp-modal-header" style="background: #192A33; color: #FFFFFF; padding: 18px 24px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 20px;">💳</span>
+                <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: #FFF;">Subir Factura / Comprobante de Pago</h3>
+            </div>
+            <button type="button" class="lcp-modal-close" onclick="cerrarModalFactura()" style="color: #FFFFFF;">&times;</button>
+        </div>
+
+        <form asp-action="CargarFacturaContrato" method="post" enctype="multipart/form-data" style="padding: 24px;">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="contratoId" id="modalContratoId" value="" />
+
+            <div style="background: #E8F5E9; border: 1px solid #C8E6C9; border-radius: 6px; padding: 12px 16px; margin-bottom: 20px;">
+                <div style="font-size: 13px; font-weight: 700; color: #2E7D32;">Solicitud Aprobada por Auditoría Técnica</div>
+                <div style="font-size: 12px; color: #388E3C; margin-top: 2px;">
+                    Dársena: <strong id="modalDarsenaCodigo">#</strong> | Monto a abonar: <strong id="modalMonto">$ 0</strong>
+                </div>
+            </div>
+
+            <p style="font-size: 13px; color: #4A5568; margin-bottom: 16px; line-height: 1.5;">
+                Adjuntá la factura comercial oficial o el comprobante de transferencia bancaria para que el auditor confirme el pago y habilite la dársena para el stock.
+            </p>
+
+            <div class="form-group" style="margin-bottom: 22px;">
+                <label class="form-label" style="font-weight: 700;">Archivo de Factura / Comprobante (PDF o Imagen) <span style="color: #C62828;">*</span></label>
+                <input type="file" name="archivoFactura" class="form-input" accept=".pdf,image/png,image/jpeg,image/webp" required style="padding: 8px;" />
+                <span style="font-size: 11px; color: var(--lcp-text-muted);">Formatos aceptados: PDF, JPG, PNG (máx. 10 MB).</span>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 12px;">
+                <button type="button" onclick="cerrarModalFactura()" class="btn-lcp-outline">Cancelar</button>
+                <button type="submit" class="btn-lcp-primary">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    Confirmar y Enviar Factura
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL: FICHA DETALLADA DE CONTRATO / DÁRSENA DEL CLIENTE (CARD MODAL FLOTANTE) -->
+<div id="modalFichaContratoCliente" class="lcp-modal-backdrop" style="display: none;">
+    <div class="lcp-modal" style="max-width: 680px; width: 95%;">
+        <div class="lcp-modal-header" style="background: linear-gradient(135deg, #162E3B 0%, #28536B 100%); color: #FFF; padding: 18px 24px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span style="font-size: 26px;">🏢</span>
+                <div>
+                    <h3 id="mfcDarsenaTitulo" style="font-size: 18px; font-weight: 800; color: #FFF; margin: 0;">Ficha de Dársena Alquilada</h3>
+                    <div id="mfcDarsenaSubtitulo" style="font-size: 12px; color: #D5E1DF; margin-top: 2px;">Especificaciones Técnicas, Parámetros y Acciones</div>
+                </div>
+            </div>
+            <button type="button" class="lcp-modal-close" style="color: #FFF;" onclick="cerrarFichaContratoModal()">&times;</button>
+        </div>
+
+        <div class="lcp-modal-body" style="padding: 22px; max-height: calc(88vh - 140px); overflow-y: auto;">
+            <!-- BANNER DINÁMICO DE ESTADO Y DICTAMEN DE AUDITORÍA -->
+            <div id="mfcBannerEstado" style="border-radius: 8px; padding: 14px 16px; margin-bottom: 18px; font-size: 13px; line-height: 1.5;">
+                <!-- Dinámico -->
+            </div>
+
+            <!-- GRID PRINCIPAL DE INFORMACIÓN ORDENADA (2 COLUMNAS) -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 18px;">
+                <!-- COLUMNA 1: PARÁMETROS TÉCNICOS Y CAPACIDAD -->
+                <div style="background: #F8F6F0; border: 1px solid var(--lcp-card-border); border-radius: 8px; padding: 16px;">
+                    <div style="font-size: 12px; font-weight: 800; text-transform: uppercase; color: #28536B; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+                        <span>📦</span> Parámetros Técnicos
+                    </div>
+
+                    <div style="margin-bottom: 10px;">
+                        <span style="font-size: 11px; text-transform: uppercase; color: var(--lcp-text-muted); display: block;">Mercadería Declarada</span>
+                        <strong id="mfcMercaderia" style="font-size: 13.5px; color: #192A33;">-</strong>
+                    </div>
+
+                    <div style="margin-bottom: 10px;">
+                        <span style="font-size: 11px; text-transform: uppercase; color: var(--lcp-text-muted); display: block;">Régimen Térmico</span>
+                        <span id="mfcRegimen" style="font-weight: 600; font-size: 13px; color: #1B5277;">-</span>
+                    </div>
+
+                    <div style="margin-bottom: 12px;">
+                        <span style="font-size: 11px; text-transform: uppercase; color: var(--lcp-text-muted); display: block;">Requerimientos / Precauciones</span>
+                        <div id="mfcConsideraciones" style="font-size: 12px; font-weight: 600; color: #6D4C41; background: #FFF9E6; border: 1px solid #FFE082; border-radius: 4px; padding: 6px 10px; margin-top: 3px;">-</div>
+                    </div>
+
+                    <div style="padding-top: 10px; border-top: 1px solid #E5DFD5;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                            <span style="font-size: 12px; color: var(--lcp-text-muted);">Capacidad Máxima:</span>
+                            <strong id="mfcCapacidadTotal" style="font-size: 13px; color: #192A33;">-</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                            <span style="font-size: 12px; color: var(--lcp-text-muted);">Ocupación Actual:</span>
+                            <strong id="mfcOcupacionActual" style="font-size: 13px; color: #192A33;">-</strong>
+                        </div>
+                        <div style="background: #E5DFD5; border-radius: 4px; height: 8px; overflow: hidden; margin-top: 6px;">
+                            <div id="mfcBarraOcupacion" style="background: #2E7D32; width: 0%; height: 100%; transition: width 0.3s ease;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- COLUMNA 2: TÉRMINOS COMERCIALES Y VIGENCIA -->
+                <div style="background: #F8F6F0; border: 1px solid var(--lcp-card-border); border-radius: 8px; padding: 16px;">
+                    <div style="font-size: 12px; font-weight: 800; text-transform: uppercase; color: #28536B; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+                        <span>💼</span> Términos y Plazos
+                    </div>
+
+                    <div style="margin-bottom: 10px;">
+                        <span style="font-size: 11px; text-transform: uppercase; color: var(--lcp-text-muted); display: block;">Plan Contratado</span>
+                        <strong id="mfcPlan" style="font-size: 13.5px; color: #192A33;">-</strong>
+                    </div>
+
+                    <div style="margin-bottom: 10px;">
+                        <span style="font-size: 11px; text-transform: uppercase; color: var(--lcp-text-muted); display: block;">Monto de Alquiler</span>
+                        <strong id="mfcMonto" style="font-size: 16px; color: #1B5E20;">$ -</strong>
+                    </div>
+
+                    <div style="margin-bottom: 10px;">
+                        <span style="font-size: 11px; text-transform: uppercase; color: var(--lcp-text-muted); display: block;">Período de Vigencia</span>
+                        <div id="mfcVigencia" style="font-size: 13px; font-weight: 600; color: #192A33;">-</div>
+                    </div>
+
+                    <div style="padding-top: 10px; border-top: 1px solid #E5DFD5;">
+                        <div style="margin-bottom: 6px;">
+                            <span style="font-size: 11px; text-transform: uppercase; color: var(--lcp-text-muted); display: block;">Evaluación de Auditoría</span>
+                            <span id="mfcFechaAuditoria" style="font-size: 12px; color: #4A5568;">-</span>
+                        </div>
+                        <div>
+                            <span style="font-size: 11px; text-transform: uppercase; color: var(--lcp-text-muted); display: block;">Registro de Factura / Pago</span>
+                            <span id="mfcFechaPago" style="font-size: 12px; color: #4A5568;">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECCIÓN: FACTURA / COMPROBANTE DE PAGO -->
+            <div id="mfcSeccionFactura" style="background: #FFFFFF; border: 1px solid var(--lcp-card-border); border-radius: 8px; padding: 14px 16px;">
+                <!-- Dinámico -->
+            </div>
+        </div>
+
+        <!-- FOOTER: ACCIONES DENTRO DEL CARD -->
+        <div class="lcp-modal-footer" style="padding: 14px 24px; background: #F8F6F0; border-top: 1px solid var(--lcp-card-border); display: flex; justify-content: space-between; align-items: center;">
+            <button type="button" class="btn-lcp-outline btn-lcp-sm" onclick="cerrarFichaContratoModal()">
+                Cerrar
+            </button>
+            <div id="mfcAccionesFooter" style="display: flex; gap: 8px; align-items: center;">
+                <!-- Botones contextuales inyectados dinámicamente -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL ZOOM PARA PREVISUALIZAR IMAGEN DE COMPROBANTE -->
+<div id="modalZoomImagenFacturaDarsena" class="lcp-modal-backdrop" style="display: none;" onclick="if(event.target === this) cerrarZoomImagenFacturaDarsena();">
+    <div class="lcp-modal" style="max-width: 850px; width: 95%; max-height: 92vh; background: #0F172A; border: 1px solid #334155;">
+        <div class="lcp-modal-header" style="background: #1E293B; color: #FFF; border-bottom: 1px solid #334155; padding: 12px 20px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 20px;">🔍</span>
+                <span id="mzfCaptionDarsena" style="font-size: 15px; font-weight: 700; color: #F1F5F9;">Previsualización de Comprobante</span>
+            </div>
+            <button type="button" class="lcp-modal-close" style="color: #94A3B8;" onclick="cerrarZoomImagenFacturaDarsena()">&times;</button>
+        </div>
+        <div class="lcp-modal-body" style="padding: 16px; display: flex; align-items: center; justify-content: center; background: #0B1120; overflow: auto;">
+            <img id="mzfImagenGrandeDarsena" src="" alt="Comprobante" style="max-width: 100%; max-height: 75vh; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); object-fit: contain;" />
+        </div>
+        <div class="lcp-modal-footer" style="background: #1E293B; border-top: 1px solid #334155; padding: 10px 20px; display: flex; justify-content: space-between;">
+            <a id="mzfLinkDescargaDarsena" href="#" target="_blank" download class="btn-lcp-outline btn-lcp-sm" style="color: #E2E8F0; border-color: #475569;">
+                ⬇️ Descargar Original
+            </a>
+            <button type="button" class="btn-lcp-outline btn-lcp-sm" style="color: #E2E8F0; border-color: #475569;" onclick="cerrarZoomImagenFacturaDarsena()">
+                Cerrar
+            </button>
+        </div>
+    </div>
+</div>
+
+
+<script>
+    // Almacen de contratos del cliente serializado desde el servidor
+    const contratosRaw = @Html.Raw(contratosJson);
+    const contratosMap = new Map();
+    if (Array.isArray(contratosRaw)) {
+        contratosRaw.forEach(c => {
+            if (c && (c.id != null || c.Id != null)) {
+                contratosMap.set(Number(c.id ?? c.Id), c);
+            }
+        });
+    }
+
+    let contratoSeleccionadoActual = null;
+
+    // Normalizador que tolera camelCase y PascalCase
+    function normalizarContrato(c) {
+        if (!c) return null;
+        return {
+            id: Number(c.id ?? c.Id ?? 0),
+            darsenaId: Number(c.darsenaId ?? c.DarsenaId ?? 0),
+            darsenaCodigo: c.darsenaCodigo || c.DarsenaCodigo || 'D\u00e1rsena',
+            plan: Number(c.plan ?? c.Plan ?? 1),
+            planNombre: c.planNombre || c.PlanNombre || 'Trimestral',
+            fechaInicio: c.fechaInicio || c.FechaInicio || '',
+            fechaFin: c.fechaFin || c.FechaFin || '',
+            montoTotalContrato: Number(c.montoTotalContrato ?? c.MontoTotalContrato ?? 0),
+            estado: Number(c.estado ?? c.Estado ?? 0),
+            estadoNombre: c.estadoNombre || c.EstadoNombre || '',
+            capacidadMaximaPallets: Number(c.capacidadMaximaPallets ?? c.CapacidadMaximaPallets ?? 30),
+            capacidadMaximaM3: Number(c.capacidadMaximaM3 ?? c.CapacidadMaximaM3 ?? 120),
+            volumenOcupadoM3: Number(c.volumenOcupadoM3 ?? c.VolumenOcupadoM3 ?? 0),
+            volumenDisponibleM3: Number(c.volumenDisponibleM3 ?? c.VolumenDisponibleM3 ?? 0),
+            mercaderiaAlmacenar: c.mercaderiaAlmacenar || c.MercaderiaAlmacenar || 'Carga General',
+            tipoAlmacenamiento: c.tipoAlmacenamiento || c.TipoAlmacenamiento || 'Ambiente Seco / Carga General',
+            consideracionesEspeciales: c.consideracionesEspeciales || c.ConsideracionesEspeciales || '',
+            observacionAuditor: c.observacionAuditor || c.ObservacionAuditor || '',
+            comprobantePagoUrl: (c.comprobantePagoUrl || c.ComprobantePagoUrl || '').trim(),
+            fechaAprobacionAuditor: c.fechaAprobacionAuditor || c.FechaAprobacionAuditor || '',
+            fechaPagoFactura: c.fechaPagoFactura || c.FechaPagoFactura || ''
+        };
+    }
+
+    function resolverUrlDocumento(ruta) {
+        if (!ruta) return '';
+        ruta = ruta.trim();
+        if (ruta.startsWith('http://') || ruta.startsWith('https://')) return ruta;
+        if (ruta.startsWith('/')) return ruta;
+        return '/' + ruta;
+    }
+
+    function formatearFecha(fechaStr) {
+        if (!fechaStr) return '-';
+        try {
+            const d = new Date(fechaStr);
+            if (isNaN(d.getTime())) return fechaStr;
+            return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        } catch (e) {
+            return fechaStr;
+        }
+    }
+
+    function abrirFichaContratoPorId(id) {
+        const raw = contratosMap.get(Number(id));
+        if (!raw) {
+            console.warn('Contrato no encontrado con id', id);
+            return;
+        }
+        const c = normalizarContrato(raw);
+        contratoSeleccionadoActual = c;
+        renderFichaContratoModal(c);
+        document.getElementById('modalFichaContratoCliente').style.display = 'flex';
+    }
+
+    // Compatibilidad en caso de llamada externa
+    window.abrirFichaContratoModal = function(id) {
+        abrirFichaContratoPorId(id);
+    };
+
+    function renderFichaContratoModal(c) {
+        document.getElementById('mfcDarsenaTitulo').innerText = `D\u00e1rsena: ${c.darsenaCodigo}`;
+        document.getElementById('mfcDarsenaSubtitulo').innerText = `M\u00f3dulo de Almacenamiento #${c.darsenaId} \u2022 Plan ${c.planNombre}`;
+
+        // Banner Dinamico segun Estado
+        const banner = document.getElementById('mfcBannerEstado');
+        // Enum: PendienteRevision=1, Activo=2, Vencido=3, Cancelado=4, AprobadoPendientePago=5, Rechazado=6, FacturaCargadaPendienteHabilitacion=7
+        if (c.estado === 2) { // Activo
+            banner.style.background = '#E8F5E9';
+            banner.style.border = '1px solid #A5D6A7';
+            banner.style.color = '#1B5E20';
+            banner.innerHTML = `
+                <div style="font-weight: 800; font-size: 14px; margin-bottom: 2px;">\uD83D\uDFE2 D\u00e1rsena Habilitada y Activa</div>
+                <div>Tu contrato se encuentra en vigencia desde el <strong>${formatearFecha(c.fechaInicio)}</strong> hasta el <strong>${formatearFecha(c.fechaFin)}</strong>. El m\u00f3dulo est\u00e1 habilitado para recepciones y despachos de stock.</div>
+            `;
+        } else if (c.estado === 7) { // Factura cargada en revision
+            banner.style.background = '#E8EAF6';
+            banner.style.border = '1px solid #C5CAE9';
+            banner.style.color = '#283593';
+            banner.innerHTML = `
+                <div style="font-weight: 800; font-size: 14px; margin-bottom: 2px;">\uD83D\uDCC4 Factura / Comprobante Cargado</div>
+                <div>El comprobante ha sido registrado correctamente y est\u00e1 en proceso de validaci\u00f3n t\u00e9cnica y contable por el <strong>Auditor</strong>. Se habilitar\u00e1 inmediatamente tras su conformidad.</div>
+            `;
+        } else if (c.estado === 5) { // Aprobado pendiente pago
+            banner.style.background = '#E1F5FE';
+            banner.style.border = '1px solid #81D4FA';
+            banner.style.color = '#0277BD';
+            banner.innerHTML = `
+                <div style="font-weight: 800; font-size: 14px; margin-bottom: 2px;">\uD83D\uDCB3 Solicitud Aprobada por Auditor\u00eda T\u00e9cnica</div>
+                <div>Tu mercader\u00eda fue evaluada y cumple los est\u00e1ndares. Por favor adjunt\u00e1 la factura o comprobante de pago para la habilitaci\u00f3n definitiva.</div>
+                ${c.observacionAuditor ? `<div style="margin-top: 6px; font-weight: 600; color: #01579B;">Nota del Auditor: "${c.observacionAuditor}"</div>` : ''}
+            `;
+        } else if (c.estado === 1) { // Pendiente de revision
+            banner.style.background = '#FFF8E1';
+            banner.style.border = '1px solid #FFE082';
+            banner.style.color = '#B78103';
+            banner.innerHTML = `
+                <div style="font-weight: 800; font-size: 14px; margin-bottom: 2px;">\u23F3 Solicitud en Evaluaci\u00f3n T\u00e9cnica</div>
+                <div>El Auditor est\u00e1 revisando la compatibilidad de almacenamiento, r\u00e9gimen t\u00e9rmico y protocolos de control para adjudicar la d\u00e1rsena.</div>
+            `;
+        } else if (c.estado === 6) { // Rechazado
+            banner.style.background = '#FFEBEE';
+            banner.style.border = '1px solid #EF9A9A';
+            banner.style.color = '#C62828';
+            banner.innerHTML = `
+                <div style="font-weight: 800; font-size: 14px; margin-bottom: 2px;">\u26D4 Solicitud Rechazada por Auditor\u00eda</div>
+                <div>Motivo t\u00e9cnico: <strong>"${c.observacionAuditor || 'Requerimientos de carga no compatibles con las normas de seguridad del nodo.'}"</strong></div>
+            `;
+        } else {
+            banner.style.background = '#F3F4F6';
+            banner.style.border = '1px solid #E5E7EB';
+            banner.style.color = '#4B5563';
+            banner.innerHTML = `<div style="font-weight: 700;">Estado del Alquiler: ${c.estadoNombre}</div>`;
+        }
+
+        // Parametros Tecnicos
+        document.getElementById('mfcMercaderia').innerText = c.mercaderiaAlmacenar || 'Carga General';
+        document.getElementById('mfcRegimen').innerText = `\uD83C\uDF21\uFE0F ${c.tipoAlmacenamiento}`;
+        document.getElementById('mfcConsideraciones').innerText = c.consideracionesEspeciales ? `\u26A0\uFE0F ${c.consideracionesEspeciales}` : 'Ninguna especificaci\u00f3n requerida.';
+        document.getElementById('mfcCapacidadTotal').innerText = `${c.capacidadMaximaPallets} pallets (${c.capacidadMaximaM3} m\u00B3)`;
+
+        // Ocupacion
+        const pctOcup = c.capacidadMaximaM3 > 0 ? Math.min(100, Math.round((c.volumenOcupadoM3 / c.capacidadMaximaM3) * 100)) : 0;
+        if (c.estado === 2) {
+            document.getElementById('mfcOcupacionActual').innerText = `${c.volumenOcupadoM3.toFixed(1)} m\u00B3 (${pctOcup}%)`;
+            const barra = document.getElementById('mfcBarraOcupacion');
+            barra.style.width = `${pctOcup}%`;
+            barra.style.background = pctOcup >= 90 ? '#D9534F' : pctOcup >= 70 ? '#F0AD4E' : '#2E7D32';
+        } else {
+            document.getElementById('mfcOcupacionActual').innerText = '0.0 m\u00B3 (A\u00fan no habilitada)';
+            document.getElementById('mfcBarraOcupacion').style.width = '0%';
+        }
+
+        // Terminos Comerciales
+        document.getElementById('mfcPlan').innerText = `Plan ${c.planNombre}`;
+        document.getElementById('mfcMonto').innerText = `$ ${c.montoTotalContrato.toLocaleString('es-AR')}`;
+        document.getElementById('mfcVigencia').innerText = c.estado === 2 
+            ? `${formatearFecha(c.fechaInicio)} al ${formatearFecha(c.fechaFin)}`
+            : 'A definir al momento de la habilitaci\u00f3n';
+        document.getElementById('mfcFechaAuditoria').innerText = formatearFecha(c.fechaAprobacionAuditor) || (c.estado === 1 ? 'En evaluaci\u00f3n' : '-');
+        document.getElementById('mfcFechaPago').innerText = formatearFecha(c.fechaPagoFactura) || (c.estado === 5 ? 'Pendiente de pago' : '-');
+
+        // Seccion Factura / Comprobante
+        const secFactura = document.getElementById('mfcSeccionFactura');
+        if (c.comprobantePagoUrl) {
+            const urlFinal = resolverUrlDocumento(c.comprobantePagoUrl);
+            const esImagen = urlFinal.toLowerCase().match(/\.(jpg|jpeg|png|webp|gif)$/);
+            secFactura.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 22px;">${esImagen ? '\uD83D\uDDBC\uFE0F' : '\uD83D\uDCC4'}</span>
+                        <div>
+                            <div style="font-weight: 700; font-size: 13px; color: #192A33;">Factura o Comprobante Cargado</div>
+                            <div style="font-size: 11px; color: var(--lcp-text-muted);">Adjunto respaldatorio para auditor\u00eda</div>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        ${esImagen ? `
+                            <button type="button" class="btn-lcp-outline btn-lcp-sm" style="font-weight: 700; font-size: 11.5px; padding: 4px 10px;" onclick="abrirZoomImagenFacturaDarsena('${urlFinal}', 'Comprobante D\u00e1rsena ${c.darsenaCodigo}')">
+                                \uD83D\uDD0D Previsualizar
+                            </button>
+                        ` : ''}
+                        <a href="${urlFinal}" target="_blank" class="btn-lcp-outline btn-lcp-sm" style="font-weight: 700; font-size: 11.5px; padding: 4px 10px;">
+                            \uD83D\uDCC4 Abrir Archivo
+                        </a>
+                    </div>
+                </div>
+            `;
+            secFactura.style.display = 'block';
+        } else if (c.estado === 5) {
+            secFactura.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; background: #FFF9E6; border: 1px dashed #FFE082; padding: 10px 14px; border-radius: 6px;">
+                    <div>
+                        <div style="font-weight: 700; font-size: 12.5px; color: #7F6B4C;">Comprobante de pago pendiente</div>
+                        <div style="font-size: 11.5px; color: #8D6E63;">Sub\u00ed el archivo para que el Auditor active la d\u00e1rsena.</div>
+                    </div>
+                    <button type="button" class="btn-lcp-primary btn-lcp-sm" style="background-color: #0277BD; border-color: #0277BD; font-weight: 700;" onclick="subirPagoDesdeFicha()">
+                        \uD83D\uDCB3 Cargar Factura Ahora
+                    </button>
+                </div>
+            `;
+            secFactura.style.display = 'block';
+        } else {
+            secFactura.style.display = 'none';
+        }
+
+        // Acciones contextuales dentro del Footer del Card
+        const contAcciones = document.getElementById('mfcAccionesFooter');
+        let accionesHtml = '';
+
+        if (c.estado === 2) { // Activa
+            accionesHtml += `
+                <a href="/ClienteDarsenas/MiStock?darsenaId=${c.darsenaId}" class="btn-lcp-outline btn-lcp-sm" style="font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+                    <span>\uD83D\uDCE6</span> Ver Mi Stock
+                </a>
+                <a href="/Solicitudes/Nueva?darsenaId=${c.darsenaId}" class="btn-lcp-primary btn-lcp-sm" style="font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+                    <span>\uD83D\uDE9A</span> + Nueva Operaci\u00f3n
+                </a>
+            `;
+        } else if (c.estado === 5) { // Aprobada pendiente pago
+            accionesHtml += `
+                <button type="button" class="btn-lcp-primary btn-lcp-sm" style="background-color: #0277BD; border-color: #0277BD; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;" onclick="subirPagoDesdeFicha()">
+                    <span>\uD83D\uDCB3</span> Subir Factura / Pago
+                </button>
+            `;
+        }
+
+        if (c.comprobantePagoUrl) {
+            const urlFinal = resolverUrlDocumento(c.comprobantePagoUrl);
+            accionesHtml += `
+                <a href="${urlFinal}" target="_blank" class="btn-lcp-outline btn-lcp-sm" style="font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+                    <span>\uD83D\uDCC4</span> Ver Factura
+                </a>
+            `;
+        }
+
+        contAcciones.innerHTML = accionesHtml;
+    }
+
+    function cerrarFichaContratoModal() {
+        document.getElementById('modalFichaContratoCliente').style.display = 'none';
+    }
+
+    function subirPagoDesdeFicha() {
+        cerrarFichaContratoModal();
+        if (contratoSeleccionadoActual) {
+            abrirModalFactura(
+                contratoSeleccionadoActual.id,
+                contratoSeleccionadoActual.darsenaCodigo,
+                contratoSeleccionadoActual.montoTotalContrato.toLocaleString('es-AR')
+            );
+        }
+    }
+
+    function abrirModalFactura(contratoId, darsenaCodigo, monto) {
+        document.getElementById('modalContratoId').value = contratoId;
+        document.getElementById('modalDarsenaCodigo').innerText = darsenaCodigo;
+        document.getElementById('modalMonto').innerText = '$ ' + monto;
+        const modal = document.getElementById('modalFactura');
+        modal.style.display = 'flex';
+    }
+
+    function cerrarModalFactura() {
+        document.getElementById('modalFactura').style.display = 'none';
+    }
+
+    function abrirZoomImagenFacturaDarsena(url, caption) {
+        document.getElementById('mzfImagenGrandeDarsena').src = url;
+        document.getElementById('mzfCaptionDarsena').innerText = caption || 'Comprobante';
+        document.getElementById('mzfLinkDescargaDarsena').href = url;
+        document.getElementById('modalZoomImagenFacturaDarsena').style.display = 'flex';
+    }
+
+    function cerrarZoomImagenFacturaDarsena() {
+        document.getElementById('modalZoomImagenFacturaDarsena').style.display = 'none';
+    }
+
+    window.onclick = function(event) {
+        const modalFactura = document.getElementById('modalFactura');
+        if (event.target === modalFactura) {
+            cerrarModalFactura();
+        }
+        const modalFicha = document.getElementById('modalFichaContratoCliente');
+        if (event.target === modalFicha) {
+            cerrarFichaContratoModal();
+        }
+        const modalZoom = document.getElementById('modalZoomImagenFacturaDarsena');
+        if (event.target === modalZoom) {
+            cerrarZoomImagenFacturaDarsena();
+        }
+    };
+
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            cerrarFichaContratoModal();
+            cerrarModalFactura();
+            cerrarZoomImagenFacturaDarsena();
+        }
+    });
+</script>

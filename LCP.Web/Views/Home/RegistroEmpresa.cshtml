@@ -1,0 +1,91 @@
+@model RegistroEmpresaDto
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = "Solicitar Alta de Empresa - Logística Centro País";
+}
+
+<div style="max-width: 820px; margin: 40px auto; padding: 0 20px;">
+    <div style="margin-bottom: 24px;">
+        <a asp-action="Index" style="font-size: 13px; color: var(--lcp-primary); text-decoration: none; font-weight: 600;">← Volver al inicio</a>
+        <h1 style="font-size: 28px; font-weight: 800; color: #192A33; margin: 12px 0 6px;">Solicitud de alta de empresa</h1>
+        <p style="font-size: 14px; color: #5F6B73; margin: 0;">
+            Completá los datos de tu empresa, cooperativa o industria para operar en el nodo logístico de Santa Rosa.
+        </p>
+    </div>
+
+    @if (!ViewData.ModelState.IsValid)
+    {
+        <div style="background-color: #FBE8E8; border: 1px solid #F3C7C7; color: #9D2424; padding: 12px 18px; border-radius: 6px; margin-bottom: 20px; font-size: 14px;">
+            @Html.ValidationSummary(false)
+        </div>
+    }
+
+    <form asp-action="RegistroEmpresa" method="post">
+        @Html.AntiForgeryToken()
+
+        <div class="lcp-card">
+            <h2 class="lcp-card-title">Datos comerciales y fiscales</h2>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="form-group">
+                    <label class="form-label">Razón Social *</label>
+                    <input asp-for="RazonSocial" class="form-input" placeholder="Almacén El Molino S.A." required />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">CUIT (con guiones) *</label>
+                    <input asp-for="CUIT" class="form-input" placeholder="30-71234567-8" required />
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Rubro principal *</label>
+                <input asp-for="Rubro" class="form-input" placeholder="Alimentos, cereales, frío, insumos industriales..." required />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Domicilio fiscal *</label>
+                <input asp-for="Domicilio" class="form-input" placeholder="Av. Spinetto 1420" required />
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="form-group">
+                    <label class="form-label">Localidad *</label>
+                    <input asp-for="Localidad" class="form-input" placeholder="Santa Rosa" required />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Provincia *</label>
+                    <input asp-for="Provincia" class="form-input" placeholder="La Pampa" required />
+                </div>
+            </div>
+        </div>
+
+        <div class="lcp-card">
+            <h2 class="lcp-card-title">Cuenta de acceso y contacto</h2>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="form-group">
+                    <label class="form-label">Correo electrónico de contacto / login *</label>
+                    <input asp-for="EmailContacto" type="email" class="form-input" placeholder="contacto@molino.com" required />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Teléfono de contacto *</label>
+                    <input asp-for="TelefonoContacto" class="form-input" placeholder="2954-412345" required />
+                </div>
+            </div>
+
+            <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 16px 18px; margin-top: 14px; font-size: 13px; color: #475569; display: flex; align-items: flex-start; gap: 12px; line-height: 1.55;">
+                <span style="font-size: 20px; line-height: 1; flex-shrink: 0;">ℹ️</span>
+                <div>
+                    <strong style="color: #1E293B; display: block; font-size: 13.5px; margin-bottom: 4px;">Procedimiento de Habilitación y Credenciales:</strong>
+                    No requiere definir una contraseña en este formulario. Al enviar su solicitud, recibirá un correo electrónico de confirmación. Una vez que un administrador revise y apruebe el alta de su empresa, el sistema le enviará a su casilla un correo con su usuario y una <strong>contraseña generada automáticamente</strong> para su primer ingreso, momento en el cual se le requerirá establecer su contraseña definitiva.
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 60px;">
+            <button type="submit" class="btn-lcp-primary" style="padding: 14px 28px; font-size: 15px;">
+                Enviar solicitud de alta
+            </button>
+        </div>
+    </form>
+</div>

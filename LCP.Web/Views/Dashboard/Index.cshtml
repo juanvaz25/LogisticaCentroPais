@@ -1,0 +1,211 @@
+@using System.Security.Claims
+@using LCP.Shared.Constants
+@{
+    Layout = "_Layout";
+    var userName = User.Identity?.Name ?? "Usuario";
+    ViewData["Title"] = $"Hola, {userName}";
+    var darsenas = ViewBag.Darsenas as List<DarsenaDto> ?? new();
+    var tareasHoy = ViewBag.TareasHoy as List<TareaCalendarioDto> ?? new();
+    var solicitudes = ViewBag.Solicitudes as List<SolicitudOperacionDto> ?? new();
+    var kpisLiq = ViewBag.KpisLiquidaciones as KpisLiquidacionDto;
+
+    var completadas = tareasHoy.Count(t => t.EstadoTarea == "Completada");
+    var enCurso = tareasHoy.Count(t => t.EstadoTarea == "EnCurso");
+    var pendientes = tareasHoy.Count(t => t.EstadoTarea == "Pendiente");
+
+    var tareaSeleccionada = tareasHoy.FirstOrDefault(t => t.EstadoTarea == "EnCurso") ?? tareasHoy.FirstOrDefault();
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Hola, @userName</h1>
+        <p class="page-subtitle">Bienvenido a Logística Centro País · Nodo de Santa Rosa</p>
+    </div>
+
+    @if (User.IsInRole(Roles.Operador) || User.IsInRole(Roles.Administrador))
+    {
+        <div>
+            <a asp-controller="Calendario" asp-action="Index" class="btn-lcp-primary">
+                + Cargar actividad
+            </a>
+        </div>
+    }
+    else if (User.IsInRole(Roles.Cliente))
+    {
+        <div>
+            <a asp-controller="Solicitudes" asp-action="Nueva" class="btn-lcp-primary">
+                + Nueva Solicitud
+            </a>
+        </div>
+    }
+</div>
+
+@if (kpisLiq != null && (User.IsInRole(Roles.Auditor) || User.IsInRole(Roles.Administrador)))
+{
+    <!-- KPIS PARA AUDITOR / ADMINISTRADOR (PDF Página 10) -->
+    <div class="kpi-row">
+        <div class="kpi-card" style="border-left: 4px solid #C2821E;">
+            <div class="kpi-label">Pendiente de auditoría</div>
+            <div class="kpi-value" style="color: #946712;">$ @kpisLiq.MontoPendienteAuditoria.ToString("N0")</div>
+            <div style="font-size: 12px; color: var(--lcp-text-muted); margin-top: 4px;">@kpisLiq.CantidadPendientes comprobantes a auditar</div>
+        </div>
+        <div class="kpi-card" style="border-left: 4px solid #2B7A4B;">
+            <div class="kpi-label">Validado este mes</div>
+            <div class="kpi-value" style="color: #21613E;">$ @kpisLiq.MontoValidadoEsteMes.ToString("N0")</div>
+            <div style="font-size: 12px; color: var(--lcp-text-muted); margin-top: 4px;">@kpisLiq.CantidadValidadasEsteMes facturados firmes</div>
+        </div>
+        <div class="kpi-card" style="border-left: 4px solid #28536B;">
+            <div class="kpi-label">Total liquidado acumulado</div>
+            <div class="kpi-value">$ @kpisLiq.MontoTotalLiquidado.ToString("N0")</div>
+            <div style="font-size: 12px; color: var(--lcp-text-muted); margin-top: 4px;">@kpisLiq.CantidadTotalValidadas operaciones históricas</div>
+        </div>
+    </div>
+}
+
+<!-- SECCIÓN DASHBOARD DIVIDIDA: AGENDA DEL DÍA Y DETALLE DE ACTIVIDAD (PDF Página 7) -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+    <!-- AGENDA DEL DÍA -->
+    <div class="lcp-card" style="margin-bottom: 0;">
+        <h2 class="lcp-card-title">Agenda del día</h2>
+        <div style="font-size: 13px; color: var(--lcp-text-muted); margin-top: -10px; margin-bottom: 16px;">
+            Hoy · @tareasHoy.Count actividades, @completadas completadas, @enCurso en curso, @pendientes pendientes
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+            @if (!tareasHoy.Any())
+            {
+                <div style="font-size: 13px; color: var(--lcp-text-muted); padding: 12px; background: #EFECE6; border-radius: 6px;">
+                    No hay actividades programadas para el día de hoy.
+                </div>
+            }
+            @foreach (var t in tareasHoy)
+            {
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background-color: @(t.Id == tareaSeleccionada?.Id ? "#EAE5D9" : "#F4F0E8"); border: 1px solid @(t.Id == tareaSeleccionada?.Id ? "var(--lcp-primary)" : "#DFDAD0"); border-radius: 6px;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="font-weight: 700; font-size: 13px; color: var(--lcp-text-dark); min-width: 48px;">@t.HoraInicio.ToString("HH:mm")</span>
+                        <div>
+                            <div style="font-weight: 600; font-size: 14px; color: #192A33;">@t.Titulo</div>
+                            <div style="font-size: 12px; color: var(--lcp-text-muted);">@t.Detalle</div>
+                        </div>
+                    </div>
+                    <span class="badge-estado @(t.EstadoTarea == "Completada" ? "badge-completada" : t.EstadoTarea == "EnCurso" ? "badge-encurso" : "badge-pendiente")">
+                        @t.EstadoTarea
+                    </span>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- DETALLE DE ACTIVIDAD (PDF Página 7) -->
+    <div class="lcp-card" style="margin-bottom: 0;">
+        @if (tareaSeleccionada != null)
+        {
+            <h2 class="lcp-card-title" style="margin-bottom: 8px;">Detalle de actividad</h2>
+            <div style="font-size: 20px; font-weight: 800; color: #192A33; margin-bottom: 4px;">
+                @tareaSeleccionada.Titulo
+            </div>
+            <div style="font-size: 14px; color: var(--lcp-text-muted); margin-bottom: 24px;">
+                @tareaSeleccionada.Detalle
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 30px; background-color: #F3EFE7; padding: 16px; border-radius: 6px;">
+                <div>
+                    <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--lcp-text-muted);">Horario</div>
+                    <div style="font-size: 15px; font-weight: 700; color: #192A33; margin-top: 2px;">
+                        @tareaSeleccionada.HorarioFormateado
+                    </div>
+                </div>
+                <div>
+                    <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--lcp-text-muted);">Responsable asignado</div>
+                    <div style="font-size: 15px; font-weight: 700; color: #192A33; margin-top: 2px;">
+                        @tareaSeleccionada.ResponsableNombre
+                    </div>
+                </div>
+            </div>
+
+            @if (User.IsInRole(Roles.Operador) || User.IsInRole(Roles.Administrador))
+            {
+                <div style="display: flex; gap: 12px;">
+                    @if (tareaSeleccionada.EstadoTarea != "Completada")
+                    {
+                        <form asp-controller="Calendario" asp-action="CompletarActividad" method="post" style="margin: 0;">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@tareaSeleccionada.Id" />
+                            <input type="hidden" name="fecha" value="@tareaSeleccionada.Fecha.ToString("yyyy-MM-dd")" />
+                            <button type="submit" class="btn-lcp-primary">
+                                ✓ Marcar como completado
+                            </button>
+                        </form>
+                    }
+                    <a asp-controller="Calendario" asp-action="Index" class="btn-lcp-outline">
+                        Ver calendario completo
+                    </a>
+                </div>
+            }
+        }
+        else
+        {
+            <div style="text-align: center; padding: 40px 20px; color: var(--lcp-text-muted);">
+                No hay actividad seleccionada.
+            </div>
+        }
+    </div>
+</div>
+
+<!-- VISTA RÁPIDA DE DÁRSENAS EN TIEMPO REAL -->
+<div class="lcp-card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h2 class="lcp-card-title" style="margin: 0;">Estado de Dársenas (En Vivo)</h2>
+        @if (User.IsInRole(Roles.Operador) || User.IsInRole(Roles.Administrador) || User.IsInRole(Roles.Auditor))
+        {
+            <a asp-controller="Patio" asp-action="Darsenas" style="font-size: 13px; color: var(--lcp-primary); font-weight: 600; text-decoration: none;">
+                Ver tablero operativo de patio →
+            </a>
+        }
+    </div>
+
+    <div class="darsenas-grid" style="margin-bottom: 0;">
+        @foreach (var d in darsenas)
+        {
+            bool tieneInquilino = !string.IsNullOrEmpty(d.ClienteRazonSocial);
+            <div class="darsena-card" id="card-darsena-@d.Id">
+                <div class="darsena-header">
+                    <span class="darsena-name">@d.Codigo</span>
+                    <span class="badge-estado @(d.EstadoActual == EstadoDarsena.Ocupada ? "badge-ocupada" : d.EstadoActual == EstadoDarsena.Libre ? "badge-libre" : d.EstadoActual == EstadoDarsena.TurnoAsignado ? "badge-turno" : "badge-mantenimiento")">
+                        @(d.EstadoActual == EstadoDarsena.Libre ? "🟢 Libre" :
+                          d.EstadoActual == EstadoDarsena.Ocupada ? "🔴 Ocupada" :
+                          d.EstadoActual == EstadoDarsena.TurnoAsignado ? "🟡 Turno" : "⚪ Mantenimiento")
+                    </span>
+                </div>
+                <div style="font-size: 11px; font-weight: 700; color: #192A33; margin-bottom: 4px;">
+                    @(tieneInquilino ? $"🏢 {d.ClienteRazonSocial}" : "⚪ Disponible")
+                </div>
+                <div class="darsena-detail" style="font-size: 11px;">
+                    @(string.IsNullOrEmpty(d.DetalleOperacionActual) ? (tieneInquilino ? "Muelle libre para maniobras" : "Disponible") : d.DetalleOperacionActual)
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            iniciarPatioHub(function (darsenaActualizada) {
+                const card = document.getElementById(`card-darsena-${darsenaActualizada.id}`);
+                if (card) {
+                    const badge = card.querySelector(".badge-estado");
+                    const detail = card.querySelector(".darsena-detail");
+                    if (detail) detail.textContent = darsenaActualizada.detalleOperacionActual || "";
+                    if (badge) {
+                        badge.textContent = darsenaActualizada.estadoActual;
+                        badge.className = "badge-estado " +
+                            (darsenaActualizada.estadoActual === 3 ? "badge-ocupada" :
+                             darsenaActualizada.estadoActual === 1 ? "badge-libre" :
+                             darsenaActualizada.estadoActual === 2 ? "badge-turno" : "badge-mantenimiento");
+                    }
+                }
+            });
+        });
+    </script>
+}

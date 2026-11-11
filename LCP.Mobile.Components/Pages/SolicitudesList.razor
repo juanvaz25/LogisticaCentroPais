@@ -1,0 +1,184 @@
+@page "/solicitudes"
+@layout MobileLayout
+@inject IMobileApiClient ApiClient
+@inject NavigationManager Nav
+
+<div style="display: flex; flex-direction: column; gap: 12px; padding-bottom: 24px;">
+    <!-- Top Action & Search -->
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h2 style="font-size: 1.15rem; font-weight: 800; color: var(--lcp-navy);">Operaciones y Cargas</h2>
+            <div style="font-size: 0.72rem; color: var(--lcp-text-muted);">Seguimiento de Arribos y Despachos</div>
+        </div>
+        <a href="/solicitudes/nueva" class="btn-lcp-gold btn-lcp-sm" style="padding: 7px 12px; text-decoration: none;">
+            <i class="fa-solid fa-plus"></i>
+            <span>Nueva</span>
+        </a>
+    </div>
+
+    <!-- Search Input -->
+    <div style="position: relative;">
+        <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 14px; top: 13px; color: #94A3B8; font-size: 0.85rem;"></i>
+        <input type="text" @bind="SearchTerm" @bind:event="oninput" placeholder="Buscar por código, carga o cliente..." class="form-input-lcp" style="padding-left: 38px; padding-top: 10px; padding-bottom: 10px; font-size: 0.88rem;" />
+        @if (!string.IsNullOrWhiteSpace(SearchTerm))
+        {
+            <button @onclick="() => SearchTerm = string.Empty" style="position: absolute; right: 12px; top: 10px; background: none; border: none; color: #94A3B8; cursor: pointer;">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        }
+    </div>
+
+    <!-- Status Tabs (Horizontal Scroll) -->
+    <div style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: none;">
+        @foreach (var tab in TabOptions)
+        {
+            <button class="btn-lcp-outline btn-lcp-sm"
+                    style="@(ActiveTab == tab ? "background-color: var(--lcp-teal); color: white; border-color: var(--lcp-teal);" : "background-color: white; color: var(--lcp-text-muted);") font-size: 0.75rem; white-space: nowrap; border-radius: 20px; padding: 5px 12px;"
+                    @onclick="() => ActiveTab = tab">
+                @tab
+            </button>
+        }
+    </div>
+
+    <!-- Loading State -->
+    @if (IsLoading)
+    {
+        <div style="text-align: center; padding: 30px; color: var(--lcp-text-muted);">
+            <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 1.5rem; color: var(--lcp-teal); margin-bottom: 8px;"></i>
+            <div style="font-size: 0.82rem;">Cargando operaciones...</div>
+        </div>
+    }
+    else if (!FilteredSolicitudes.Any())
+    {
+        <div class="card-lcp" style="text-align: center; padding: 36px 16px;">
+            <i class="fa-solid fa-inbox" style="font-size: 2.2rem; color: #CBD5E1; margin-bottom: 8px;"></i>
+            <div style="font-weight: 700; color: var(--lcp-navy); font-size: 0.95rem;">No se encontraron solicitudes</div>
+            <p style="font-size: 0.78rem; color: var(--lcp-text-muted); margin-top: 4px;">Prueba cambiando el filtro o registra una nueva operación.</p>
+        </div>
+    }
+    else
+    {
+        <!-- List of Cards -->
+        @foreach (var sol in FilteredSolicitudes)
+        {
+            <div class="card-lcp" style="padding: 14px; cursor: pointer;" @onclick="() => VerDetalle(sol.Id)">
+                <div class="card-header-clean" style="margin-bottom: 8px; padding-bottom: 8px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-weight: 800; font-size: 0.85rem; color: var(--lcp-navy);">@sol.CodigoSolicitud</span>
+                        <span class="badge-pill" style="@(sol.TipoOperacion == TipoOperacionSolicitud.ArriboIngreso ? "background-color: #ECFDF5; color: #047857;" : "background-color: #EFF6FF; color: #1D4ED8;") font-size: 0.65rem;">
+                            @(sol.TipoOperacion == TipoOperacionSolicitud.ArriboIngreso ? "📥 Arribo" : "📤 Despacho")
+                        </span>
+                    </div>
+                    <span class="badge-pill @GetStatusClass(sol.Estado)">
+                        @sol.Estado.ToString()
+                    </span>
+                </div>
+
+                <div style="font-size: 0.88rem; font-weight: 700; color: var(--lcp-navy); margin-bottom: 4px;">
+                    @sol.DescripcionMercaderia
+                </div>
+
+                <div style="font-size: 0.76rem; color: var(--lcp-text-muted); margin-bottom: 8px;">
+                    <i class="fa-solid fa-building" style="margin-right: 4px; color: #94A3B8;"></i>@sol.ClienteRazonSocial
+                </div>
+
+                <!-- Route & Dársena Badges -->
+                <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; font-size: 0.72rem;">
+                    <div style="background-color: #F1F5F9; padding: 3px 8px; border-radius: 6px; color: var(--lcp-navy);">
+                        <i class="fa-solid fa-location-dot" style="color: var(--lcp-gold);"></i> @sol.CiudadOrigen <i class="fa-solid fa-arrow-right" style="font-size: 8px;"></i> @sol.CiudadDestino
+                    </div>
+                    <div style="background-color: #F1F5F9; padding: 3px 8px; border-radius: 6px; color: var(--lcp-navy);">
+                        <i class="fa-solid fa-warehouse" style="color: var(--lcp-teal);"></i> @sol.DarsenaCodigo
+                    </div>
+                    <div style="background-color: #F1F5F9; padding: 3px 8px; border-radius: 6px; color: var(--lcp-navy);">
+                        <i class="fa-solid fa-truck"></i> @(sol.ModalidadTransporte == ModalidadTransporte.FlotaLCP ? "Flota LCP" : "Chofer Propio")
+                    </div>
+                </div>
+
+                <!-- Footer with Weight, Volume, Time and Arrow -->
+                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #F8FAFC; padding-top: 8px; font-size: 0.72rem; color: #64748B;">
+                    <div>
+                        <span><strong>@sol.PesoTotalKg.ToString("N0")</strong> kg</span> • 
+                        <span><strong>@sol.VolumenTotalM3</strong> m³</span>
+                    </div>
+                    <div style="color: var(--lcp-teal); font-weight: 700; display: flex; align-items: center; gap: 4px;">
+                        <span>Ver solicitud</span>
+                        <i class="fa-solid fa-chevron-right" style="font-size: 9px;"></i>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private List<SolicitudOperacionDto> Solicitudes = new();
+    private string SearchTerm = string.Empty;
+    private string ActiveTab = "Todas";
+    private readonly string[] TabOptions = new[] { "Todas", "Pendientes", "Programadas", "En Curso", "Completadas" };
+    private bool IsLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarDatos();
+    }
+
+    private async Task CargarDatos()
+    {
+        IsLoading = true;
+        try
+        {
+            Solicitudes = await ApiClient.GetSolicitudesAsync();
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private IEnumerable<SolicitudOperacionDto> FilteredSolicitudes
+    {
+        get
+        {
+            var res = Solicitudes.AsEnumerable();
+
+            if (ActiveTab == "Pendientes")
+                res = res.Where(s => s.Estado == EstadoSolicitud.Pendiente);
+            else if (ActiveTab == "Programadas")
+                res = res.Where(s => s.Estado == EstadoSolicitud.Programada);
+            else if (ActiveTab == "En Curso")
+                res = res.Where(s => s.Estado == EstadoSolicitud.EnCurso);
+            else if (ActiveTab == "Completadas")
+                res = res.Where(s => s.Estado == EstadoSolicitud.Completada);
+
+            if (!string.IsNullOrWhiteSpace(SearchTerm))
+            {
+                var term = SearchTerm.Trim().ToLowerInvariant();
+                res = res.Where(s =>
+                    s.CodigoSolicitud.ToLowerInvariant().Contains(term) ||
+                    s.DescripcionMercaderia.ToLowerInvariant().Contains(term) ||
+                    s.ClienteRazonSocial.ToLowerInvariant().Contains(term) ||
+                    (s.CiudadOrigen != null && s.CiudadOrigen.ToLowerInvariant().Contains(term)) ||
+                    (s.CiudadDestino != null && s.CiudadDestino.ToLowerInvariant().Contains(term))
+                );
+            }
+
+            return res;
+        }
+    }
+
+    private void VerDetalle(int id)
+    {
+        Nav.NavigateTo($"/solicitudes/{id}");
+    }
+
+    private string GetStatusClass(EstadoSolicitud estado) => estado switch
+    {
+        EstadoSolicitud.Pendiente => "bg-pendiente",
+        EstadoSolicitud.Programada => "bg-programada",
+        EstadoSolicitud.EnCurso => "bg-encurso",
+        EstadoSolicitud.Completada => "bg-completada",
+        EstadoSolicitud.Cancelada => "bg-cancelada",
+        _ => "bg-pendiente"
+    };
+}

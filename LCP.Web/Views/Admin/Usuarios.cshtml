@@ -1,0 +1,481 @@
+@model List<UsuarioDto>
+@using LCP.Shared.Enums
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = "Personal Interno y Usuarios - Administrador";
+}
+
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+    <div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 26px;">👥</span>
+            <h1 class="page-title" style="margin: 0;">Personal Interno del Nodo</h1>
+        </div>
+        <p class="page-subtitle" style="margin-top: 6px;">
+            Gestión de dotación operativa, auditores y personal administrativo de Logística Centro País.
+        </p>
+    </div>
+
+    <div>
+        <a asp-action="NuevoPersonal" class="btn-lcp-primary" style="display: inline-flex; align-items: center; gap: 8px; text-decoration: none; padding: 10px 18px; font-weight: 800; box-shadow: 0 4px 14px rgba(40, 83, 107, 0.25);">
+            <span>➕</span> Nuevo Personal (Legajo RRHH)
+        </a>
+    </div>
+</div>
+
+<div class="lcp-card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+        <div>
+            <h2 class="lcp-card-title" style="margin: 0;">Padrón de Personal y Cuentas Activas</h2>
+            <p style="font-size: 13px; color: var(--lcp-text-muted); margin: 4px 0 0;">
+                Listado de colaboradores con legajo y credenciales para operar en las áreas funcionales de LCP.
+            </p>
+        </div>
+        <span class="badge-estado badge-encurso">@Model.Count colaborador(es)</span>
+    </div>
+
+    <div class="lcp-table-container">
+        <table class="lcp-table">
+            <thead>
+                <tr>
+                    <th>Personal & DNI</th>
+                    <th>Rol & Cargo</th>
+                    <th>Email Corporativo</th>
+                    <th>Verificación Email</th>
+                    <th>Estado Acceso</th>
+                    <th style="text-align: right; width: 240px;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var u in Model)
+                {
+                    var iniciales = (string.IsNullOrEmpty(u.Nombre) ? "U" : u.Nombre.Substring(0, 1)) + (string.IsNullOrEmpty(u.Apellido) ? "" : u.Apellido.Substring(0, 1));
+                    var jsonDto = System.Text.Json.JsonSerializer.Serialize(u);
+                    <tr>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <div style="width: 38px; height: 38px; border-radius: 50%; background: #28536B; color: #FFF; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; flex-shrink: 0;">
+                                    @iniciales
+                                </div>
+                                <div>
+                                    <div style="font-weight: 800; color: #192A33;">@u.NombreCompleto</div>
+                                    <div style="font-size: 11px; color: var(--lcp-text-muted); display: flex; gap: 8px; flex-wrap: wrap; margin-top: 2px;">
+                                        @if (!string.IsNullOrEmpty(u.Dni))
+                                        {
+                                            <span>🪪 DNI: @u.Dni</span>
+                                        }
+                                        <span>📱 @(string.IsNullOrEmpty(u.Telefono) ? "Sin tel." : u.Telefono)</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div>
+                                <span class="user-role-chip" style="background-color: #244B60; color: #FFF; font-size: 11px; padding: 3px 8px; border-radius: 4px;">
+                                    @u.RolNombre
+                                </span>
+                            </div>
+                            @if (!string.IsNullOrEmpty(u.PuestoCargo))
+                            {
+                                <div style="font-size: 11.5px; font-weight: 600; color: #4A5568; margin-top: 3px;">
+                                    @u.PuestoCargo
+                                </div>
+                            }
+                        </td>
+                        <td>
+                            <a href="mailto:@u.Email" style="color: #28536B; font-weight: 600; text-decoration: none; font-size: 13px;">@u.Email</a>
+                        </td>
+                        <td>
+                            @if (u.EmailConfirmado)
+                            {
+                                <span class="badge-estado badge-validada" style="font-size: 11px;" title="Casilla validada por el colaborador">
+                                    ✓ Verificado
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="badge-estado" style="background: #FFF3CD; color: #856404; border: 1px solid #FFEBAA; font-size: 11px;" title="Pendiente de confirmación telemática">
+                                    ⏳ Pendiente
+                                </span>
+                            }
+                        </td>
+                        <td>
+                            <span class="badge-estado @(u.Activo ? "badge-validada" : "badge-rechazada")" style="font-size: 11px;">
+                                @(u.Activo ? "✓ Habilitado" : "✕ Inactivo")
+                            </span>
+                        </td>
+                        <td style="text-align: right;">
+                            <div style="display: inline-flex; gap: 6px; align-items: center; justify-content: flex-end;">
+                                <button type="button" class="btn-lcp-primary btn-lcp-sm" style="display: inline-flex; align-items: center; gap: 4px; font-weight: 700; font-size: 11px; padding: 4px 8px;"
+                                        data-usuario='@Html.Raw(jsonDto)' onclick="abrirFichaDesdeData(this)">
+                                    <span>📋</span> Legajo
+                                </button>
+
+                                @if (!u.EmailConfirmado)
+                                {
+                                    <form asp-action="ReenviarConfirmacion" method="post" style="display: inline-block; margin: 0;">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@u.Id" />
+                                        <button type="submit" class="btn-lcp-outline btn-lcp-sm" title="Reenviar correo de confirmación con credenciales" style="font-size: 11px; padding: 4px 8px; font-weight: 700; color: #B45309; border-color: #FCD34D;">
+                                            ✉️ Reenviar
+                                        </button>
+                                    </form>
+                                }
+
+                                <form asp-action="ToggleActivo" method="post" style="display: inline-block; margin: 0;">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@u.Id" />
+                                    <button type="submit" class="btn-lcp-outline btn-lcp-sm" style="font-size: 11px; padding: 4px 8px; font-weight: 600; color: @(u.Activo ? "#C0392B" : "#1E663B"); border-color: @(u.Activo ? "#F3C7C7" : "#A5D6A7");">
+                                        @(u.Activo ? "Desactivar" : "Activar")
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- MODAL: FICHA DE LEGAJO DE PERSONAL -->
+<div id="modalFichaUsuario" class="lcp-modal-backdrop" style="display: none;">
+    <div class="lcp-modal" style="max-width: 680px; max-height: 90vh; overflow-y: auto;">
+        <div class="lcp-modal-header" style="background: linear-gradient(135deg, #162E3B 0%, #28536B 100%); color: #FFF; padding: 18px 24px; position: sticky; top: 0; z-index: 10;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span style="font-size: 28px;">🪪</span>
+                <div>
+                    <h3 id="mfuNombre" style="font-size: 18px; font-weight: 800; color: #FFF; margin: 0;">Legajo de Personal</h3>
+                    <div id="mfuPuestoSub" style="font-size: 12px; color: #D5E1DF; margin-top: 2px;">Perfil Integral y Documentación RRHH</div>
+                </div>
+            </div>
+            <button type="button" class="lcp-modal-close" style="color: #FFF; font-size: 26px;" onclick="cerrarFichaUsuarioModal()">&times;</button>
+        </div>
+
+        <div class="lcp-modal-body" style="padding: 22px;">
+            <!-- ESTADO TELEMÁTICO DE EMAIL -->
+            <div id="mfuEmailAlertBox" style="padding: 12px 16px; border-radius: 6px; margin-bottom: 18px; font-size: 12.5px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span id="mfuEmailStatusIcon" style="font-size: 18px;">✓</span>
+                    <div>
+                        <div id="mfuEmailStatusTitle" style="font-weight: 800;">-</div>
+                        <div id="mfuEmailStatusDesc" style="font-size: 11.5px; opacity: 0.9;">-</div>
+                    </div>
+                </div>
+                <div id="mfuReenviarContainer">
+                    <form asp-action="ReenviarConfirmacion" method="post" style="margin: 0;">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" id="mfuReenviarId" value="" />
+                        <button type="submit" class="btn-lcp-outline btn-lcp-sm" style="font-size: 11px; padding: 4px 10px; font-weight: 700; background: #FFF; border-color: #D97706; color: #B45309;">
+                            ✉️ Reenviar Verificación
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- DETALLE DE LEGAJO -->
+            <div style="background: #F8F6F0; border: 1px solid var(--lcp-card-border); border-radius: 8px; padding: 18px; font-size: 13px; line-height: 1.8;">
+                <div style="font-size: 11px; font-weight: 800; color: var(--lcp-text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; border-bottom: 1px solid #E5DFD5; padding-bottom: 6px;">
+                    Identificación & Datos Personales
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                    <div>
+                        <span style="color: var(--lcp-text-muted); display: block; font-size: 11px;">DNI / CUIL:</span>
+                        <strong id="mfuDni" style="color: #192A33;">-</strong>
+                    </div>
+                    <div>
+                        <span style="color: var(--lcp-text-muted); display: block; font-size: 11px;">Fecha de Nacimiento:</span>
+                        <strong id="mfuFechaNacimiento" style="color: #192A33;">-</strong>
+                    </div>
+                    <div>
+                        <span style="color: var(--lcp-text-muted); display: block; font-size: 11px;">Estado Civil:</span>
+                        <span id="mfuEstadoCivil">-</span>
+                    </div>
+                    <div>
+                        <span style="color: var(--lcp-text-muted); display: block; font-size: 11px;">Fecha de Alta en Sistema:</span>
+                        <span id="mfuFechaAlta">-</span>
+                    </div>
+                </div>
+
+                <div style="font-size: 11px; font-weight: 800; color: var(--lcp-text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin: 16px 0 10px; border-bottom: 1px solid #E5DFD5; padding-bottom: 6px;">
+                    Contacto y Radicación
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                    <div>
+                        <span style="color: var(--lcp-text-muted); display: block; font-size: 11px;">Email Corporativo:</span>
+                        <a id="mfuEmailLink" href="#" style="font-weight: 700; color: #28536B; text-decoration: none;">
+                            <span id="mfuEmail">-</span>
+                        </a>
+                    </div>
+                    <div>
+                        <span style="color: var(--lcp-text-muted); display: block; font-size: 11px;">Teléfono Celular:</span>
+                        <span id="mfuTelefono" style="font-weight: 600;">-</span>
+                    </div>
+                    <div style="grid-column: span 2;">
+                        <span style="color: var(--lcp-text-muted); display: block; font-size: 11px;">Domicilio Real:</span>
+                        <span id="mfuDomicilio">-</span>
+                    </div>
+                </div>
+
+                <div style="font-size: 11px; font-weight: 800; color: var(--lcp-text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin: 16px 0 10px; border-bottom: 1px solid #E5DFD5; padding-bottom: 6px;">
+                    Contacto de Emergencia
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 10px; margin-bottom: 12px;">
+                    <div>
+                        <span style="color: var(--lcp-text-muted); display: block; font-size: 11px;">Familiar / Referente:</span>
+                        <strong id="mfuContactoEmergenciaNombre">-</strong>
+                    </div>
+                    <div>
+                        <span style="color: var(--lcp-text-muted); display: block; font-size: 11px;">Teléfono Urgente:</span>
+                        <strong id="mfuContactoEmergenciaTelefono" style="color: #C0392B;">-</strong>
+                    </div>
+                </div>
+
+                <div style="font-size: 11px; font-weight: 800; color: var(--lcp-text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin: 16px 0 10px; border-bottom: 1px solid #E5DFD5; padding-bottom: 6px;">
+                    Perfil Laboral & Contratación
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                    <div>
+                        <span style="color: var(--lcp-text-muted); display: block; font-size: 11px;">Rol Funcional:</span>
+                        <span id="mfuRol" class="user-role-chip" style="background-color: #244B60; color: #FFF; font-weight: 700; padding: 2px 8px; border-radius: 4px;">-</span>
+                    </div>
+                    <div>
+                        <span style="color: var(--lcp-text-muted); display: block; font-size: 11px;">Puesto / Cargo:</span>
+                        <strong id="mfuPuestoCargo">-</strong>
+                    </div>
+                    <div>
+                        <span style="color: var(--lcp-text-muted); display: block; font-size: 11px;">Fecha de Ingreso:</span>
+                        <span id="mfuFechaIngreso">-</span>
+                    </div>
+                    <div>
+                        <span style="color: var(--lcp-text-muted); display: block; font-size: 11px;">Modalidad de Contrato:</span>
+                        <span id="mfuModalidadContratacion">-</span>
+                    </div>
+                </div>
+
+                <div id="mfuObservacionesBox" style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #DDD;">
+                    <span style="color: var(--lcp-text-muted); display: block; font-size: 11px;">Observaciones de Legajo:</span>
+                    <span id="mfuObservaciones" style="font-size: 12px; font-style: italic; color: #4A5568;">-</span>
+                </div>
+            </div>
+
+            <!-- DOCUMENTACIÓN RESPALDATORIA ADJUNTA -->
+            <div style="margin-top: 18px;">
+                <div style="font-size: 12px; font-weight: 800; color: var(--lcp-text-dark); margin-bottom: 8px;">
+                    📁 Documentación Digital Respaldatoria
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div id="mfuDniBox" style="border: 1px solid #D5E1DF; border-radius: 6px; padding: 12px; background: #FFFFFF; display: flex; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 20px;">🪪</span>
+                            <div>
+                                <div style="font-size: 12px; font-weight: 700;">Documento (DNI)</div>
+                                <div id="mfuDniDesc" style="font-size: 10.5px; color: var(--lcp-text-muted);">Sin adjunto</div>
+                            </div>
+                        </div>
+                        <a id="mfuDniLink" href="#" target="_blank" class="btn-lcp-outline btn-lcp-sm" style="font-size: 11px; padding: 3px 8px; text-decoration: none; display: none;">
+                            Ver Archivo ➔
+                        </a>
+                    </div>
+
+                    <div id="mfuCvBox" style="border: 1px solid #D5E1DF; border-radius: 6px; padding: 12px; background: #FFFFFF; display: flex; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 20px;">📄</span>
+                            <div>
+                                <div style="font-size: 12px; font-weight: 700;">Curriculum Vitae (CV)</div>
+                                <div id="mfuCvDesc" style="font-size: 10.5px; color: var(--lcp-text-muted);">Sin adjunto</div>
+                            </div>
+                        </div>
+                        <a id="mfuCvLink" href="#" target="_blank" class="btn-lcp-outline btn-lcp-sm" style="font-size: 11px; padding: 3px 8px; text-decoration: none; display: none;">
+                            Descargar CV ➔
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="lcp-modal-footer" style="padding: 14px 24px; background: #F8F6F0; border-top: 1px solid var(--lcp-card-border); display: flex; justify-content: space-between; align-items: center; position: sticky; bottom: 0;">
+            <button type="button" class="btn-lcp-outline btn-lcp-sm" onclick="cerrarFichaUsuarioModal()">Cerrar</button>
+            <form id="formToggleModal" asp-action="ToggleActivo" method="post" style="margin: 0;">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" id="mfuInputIdToggle" value="" />
+                <button type="submit" id="btnToggleEstadoModal" class="btn-lcp-primary btn-lcp-sm">
+                    Modificar Acceso
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <style>
+        .lcp-modal-backdrop {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(22, 46, 59, 0.65);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            backdrop-filter: blur(2px);
+        }
+        .lcp-modal {
+            background: #FFFFFF;
+            border-radius: 10px;
+            width: 90%;
+            box-shadow: 0 12px 36px rgba(0,0,0,0.28);
+            overflow: hidden;
+            animation: lcpModalFadeIn 0.2s ease-out;
+        }
+        @@keyframes lcpModalFadeIn {
+            from { opacity: 0; transform: translateY(-10px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .lcp-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .lcp-modal-close {
+            background: none; border: none; cursor: pointer; line-height: 1;
+        }
+    </style>
+
+    <script>
+        function abrirFichaDesdeData(btn) {
+            try {
+                const u = JSON.parse(btn.getAttribute("data-usuario"));
+                abrirFichaCompleta(u);
+            } catch (e) {
+                console.error("Error al parsear datos de usuario", e);
+            }
+        }
+
+        function abrirFichaCompleta(u) {
+            document.getElementById("mfuNombre").textContent = u.NombreCompleto || `${u.Nombre} ${u.Apellido}`;
+            document.getElementById("mfuPuestoSub").textContent = u.PuestoCargo ? `${u.PuestoCargo} · ${u.RolNombre}` : `Perfil y Credenciales · ${u.RolNombre}`;
+            document.getElementById("mfuRol").textContent = u.RolNombre;
+            document.getElementById("mfuPuestoCargo").textContent = u.PuestoCargo || u.RolNombre;
+            document.getElementById("mfuDni").textContent = u.Dni || "No cargado";
+            
+            // Fechas
+            document.getElementById("mfuFechaNacimiento").textContent = u.FechaNacimiento ? formatearFecha(u.FechaNacimiento) : "-";
+            document.getElementById("mfuFechaIngreso").textContent = u.FechaIngreso ? formatearFecha(u.FechaIngreso) : "-";
+            document.getElementById("mfuFechaAlta").textContent = u.FechaAlta ? formatearFecha(u.FechaAlta) : "-";
+
+            // Contacto y Domicilio
+            document.getElementById("mfuEmail").textContent = u.Email;
+            document.getElementById("mfuEmailLink").href = `mailto:${u.Email}`;
+            document.getElementById("mfuTelefono").textContent = u.Telefono || "-";
+            const dom = [u.Direccion, u.Localidad, u.Provincia].filter(Boolean).join(", ");
+            document.getElementById("mfuDomicilio").textContent = dom || "-";
+            document.getElementById("mfuEstadoCivil").textContent = u.EstadoCivil || "-";
+
+            // Emergencia
+            document.getElementById("mfuContactoEmergenciaNombre").textContent = u.ContactoEmergenciaNombre || "No informado";
+            document.getElementById("mfuContactoEmergenciaTelefono").textContent = u.ContactoEmergenciaTelefono || "-";
+
+            // Contratación y Observaciones
+            document.getElementById("mfuModalidadContratacion").textContent = u.ModalidadContratacion || "-";
+            document.getElementById("mfuObservaciones").textContent = u.ObservacionesLegajo || "Sin observaciones adicionales.";
+
+            // Documentos
+            const dniLink = document.getElementById("mfuDniLink");
+            const dniDesc = document.getElementById("mfuDniDesc");
+            if (u.DocumentoIdentidadUrl) {
+                dniLink.href = u.DocumentoIdentidadUrl;
+                dniLink.style.display = "inline-flex";
+                dniDesc.textContent = "Archivo disponible";
+                dniDesc.style.color = "#2ECC71";
+            } else {
+                dniLink.style.display = "none";
+                dniDesc.textContent = "Sin adjunto";
+                dniDesc.style.color = "var(--lcp-text-muted)";
+            }
+
+            const cvLink = document.getElementById("mfuCvLink");
+            const cvDesc = document.getElementById("mfuCvDesc");
+            if (u.CvArchivoUrl) {
+                cvLink.href = u.CvArchivoUrl;
+                cvLink.style.display = "inline-flex";
+                cvDesc.textContent = "Archivo disponible";
+                cvDesc.style.color = "#2ECC71";
+            } else {
+                cvLink.style.display = "none";
+                cvDesc.textContent = "Sin adjunto";
+                cvDesc.style.color = "var(--lcp-text-muted)";
+            }
+
+            // Estado telemático de Email
+            const emailBox = document.getElementById("mfuEmailAlertBox");
+            const statusIcon = document.getElementById("mfuEmailStatusIcon");
+            const statusTitle = document.getElementById("mfuEmailStatusTitle");
+            const statusDesc = document.getElementById("mfuEmailStatusDesc");
+            const reenviarCont = document.getElementById("mfuReenviarContainer");
+            const reenviarId = document.getElementById("mfuReenviarId");
+
+            if (u.EmailConfirmado) {
+                emailBox.style.backgroundColor = "#EBF8F0";
+                emailBox.style.border = "1px solid #A5D6A7";
+                emailBox.style.color = "#1E663B";
+                statusIcon.textContent = "✓";
+                statusTitle.textContent = "Casilla Verificada Telemáticamente";
+                statusDesc.textContent = "El colaborador ha confirmado la autenticidad de su dirección de correo.";
+                reenviarCont.style.display = "none";
+            } else {
+                emailBox.style.backgroundColor = "#FEF3C7";
+                emailBox.style.border = "1px solid #FCD34D";
+                emailBox.style.color = "#92400E";
+                statusIcon.textContent = "⏳";
+                statusTitle.textContent = "Confirmación de Correo Pendiente";
+                statusDesc.textContent = "El colaborador no ha pulsado el enlace de verificación enviado a su casilla.";
+                reenviarCont.style.display = "block";
+                reenviarId.value = u.Id;
+            }
+
+            // Toggle Activo
+            document.getElementById("mfuInputIdToggle").value = u.Id;
+            const btnToggle = document.getElementById("btnToggleEstadoModal");
+            if (u.Activo) {
+                btnToggle.textContent = "Desactivar Acceso";
+                btnToggle.style.backgroundColor = "#C0392B";
+                btnToggle.style.borderColor = "#C0392B";
+            } else {
+                btnToggle.textContent = "Habilitar Acceso";
+                btnToggle.style.backgroundColor = "#2B7A4B";
+                btnToggle.style.borderColor = "#2B7A4B";
+            }
+
+            document.getElementById("modalFichaUsuario").style.display = "flex";
+        }
+
+        function formatearFecha(fechaStr) {
+            if (!fechaStr) return "-";
+            try {
+                const f = new Date(fechaStr);
+                if (isNaN(f.getTime())) return fechaStr;
+                return f.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
+            } catch {
+                return fechaStr;
+            }
+        }
+
+        function cerrarFichaUsuarioModal() {
+            document.getElementById("modalFichaUsuario").style.display = "none";
+        }
+
+        document.addEventListener("keydown", function(e) {
+            if (e.key === "Escape") {
+                cerrarFichaUsuarioModal();
+            }
+        });
+        document.getElementById("modalFichaUsuario")?.addEventListener("click", function(e) {
+            if (e.target === this) cerrarFichaUsuarioModal();
+        });
+    </script>
+}

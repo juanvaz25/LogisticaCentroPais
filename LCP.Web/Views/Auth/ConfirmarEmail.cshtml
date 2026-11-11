@@ -1,0 +1,131 @@
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = "Confirmación de Correo Electrónico · LCP";
+    bool exito = ViewBag.Exito ?? false;
+    bool yaConfirmado = ViewBag.YaConfirmado ?? false;
+    string mensaje = ViewBag.Mensaje ?? "Resultado de la verificación telemática.";
+    string razonSocial = ViewBag.RazonSocial ?? "Empresa Cliente";
+}
+
+<div style="min-height: calc(100vh - 180px); display: flex; align-items: center; justify-content: center; padding: 40px 20px; background-color: #07090C;">
+    <div style="width: 100%; max-width: 580px; background: #0E1217; border: 1px solid #1E2732; border-radius: 8px; padding: 36px 32px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7); color: #FFFFFF;">
+        
+        <!-- Header Badge -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; border-bottom: 1px solid #1C2530; padding-bottom: 14px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="background: #FFFFFF; color: #07090C; font-weight: 900; font-size: 12px; padding: 3px 8px; border-radius: 3px; letter-spacing: 1px;">LCP</span>
+                <span style="font-weight: 700; font-size: 13px; color: #E2E8F0;">SEGURIDAD & IDENTIDAD TELEMÁTICA</span>
+            </div>
+            <span style="font-family: 'JetBrains Mono', Consolas, monospace; font-size: 11px; color: #64748B;">
+                36°37′S 64°17′W
+            </span>
+        </div>
+
+        @if (exito)
+        {
+            <div style="text-align: center; margin-bottom: 28px;">
+                <div style="display: inline-flex; align-items: center; justify-content: center; width: 68px; height: 68px; border-radius: 50%; background: rgba(16, 185, 129, 0.12); border: 2px solid #10B981; color: #10B981; font-size: 32px; margin-bottom: 16px; box-shadow: 0 0 24px rgba(16, 185, 129, 0.35);">
+                    ✓
+                </div>
+                <h1 style="font-size: 24px; font-weight: 800; color: #FFFFFF; letter-spacing: -0.5px; margin: 0 0 8px; line-height: 1.25;">
+                    @(yaConfirmado ? "¡Correo Ya Verificado Previamente!" : "¡Correo Electrónico Verificado con Éxito!")
+                </h1>
+                <div style="font-size: 15px; font-weight: 700; color: #38BDF8; margin-bottom: 4px;">
+                    @razonSocial
+                </div>
+                <div style="font-size: 12px; color: #94A3B8; font-family: 'JetBrains Mono', Consolas, monospace;">
+                    AUTENTICIDAD DE CASILLA CONFIRMADA
+                </div>
+            </div>
+
+            <!-- Notification details box -->
+            <div style="background-color: #141A22; border-left: 4px solid #10B981; border-radius: 0 6px 6px 0; padding: 18px 20px; margin-bottom: 26px;">
+                <div style="color: #6EE7B7; font-weight: 800; font-size: 13px; margin-bottom: 6px; letter-spacing: 0.2px;">
+                    ⚖️ SOLICITUD REMITIDA AL ADMINISTRADOR
+                </div>
+                <p style="color: #E2E8F0; font-size: 13.5px; line-height: 1.6; margin: 0;">
+                    @mensaje
+                </p>
+            </div>
+
+            <!-- Workflow timeline tracker -->
+            <div style="background: #090C10; border: 1px solid #1A232E; border-radius: 6px; padding: 20px 22px; margin-bottom: 28px;">
+                <div style="font-size: 11px; font-family: 'JetBrains Mono', Consolas, monospace; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px;">
+                    ESTADO DEL CIRCUITO DE ALTA
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 14px;">
+                    <!-- Step 1 -->
+                    <div style="display: flex; align-items: flex-start; gap: 12px;">
+                        <span style="display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #10B981; color: #07090C; font-size: 12px; font-weight: 900; flex-shrink: 0;">✓</span>
+                        <div>
+                            <div style="font-size: 13px; font-weight: 700; color: #F1F5F9;">1. Formulario de Alta Enviado</div>
+                            <div style="font-size: 12px; color: #64748B;">Datos de empresa, CUIT y contacto recibidos.</div>
+                        </div>
+                    </div>
+
+                    <!-- Step 2 -->
+                    <div style="display: flex; align-items: flex-start; gap: 12px;">
+                        <span style="display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #10B981; color: #07090C; font-size: 12px; font-weight: 900; flex-shrink: 0;">✓</span>
+                        <div>
+                            <div style="font-size: 13px; font-weight: 700; color: #10B981;">2. Email Confirmado por el Cliente</div>
+                            <div style="font-size: 12px; color: #94A3B8;">Comprobación de identidad completada sin casillas falsas.</div>
+                        </div>
+                    </div>
+
+                    <!-- Step 3 -->
+                    <div style="display: flex; align-items: flex-start; gap: 12px;">
+                        <span style="display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #2563EB; color: #FFFFFF; font-size: 12px; font-weight: 900; flex-shrink: 0; animation: pulse 2s infinite;">⏳</span>
+                        <div>
+                            <div style="font-size: 13px; font-weight: 700; color: #60A5FA;">3. Revisión del Administrador & Emisión de Credenciales</div>
+                            <div style="font-size: 12px; color: #94A3B8;">Ahora visible en la Bandeja de Aprobaciones. Recibirás tu contraseña en tu casilla.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 12px; justify-content: center;">
+                <a asp-controller="Home" asp-action="Index" class="btn-lcp-monochrome" style="padding: 12px 28px; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 4px; display: inline-block;">
+                    Volver al Inicio
+                </a>
+                <a asp-controller="Auth" asp-action="Login" class="btn-lcp-outline" style="padding: 12px 28px; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 4px; display: inline-block; color: #FFFFFF; border-color: #334155;">
+                    Ir al Inicio de Sesión ➔
+                </a>
+            </div>
+        }
+        else
+        {
+            <div style="text-align: center; margin-bottom: 28px;">
+                <div style="display: inline-flex; align-items: center; justify-content: center; width: 68px; height: 68px; border-radius: 50%; background: rgba(239, 68, 68, 0.12); border: 2px solid #EF4444; color: #EF4444; font-size: 30px; margin-bottom: 16px; box-shadow: 0 0 24px rgba(239, 68, 68, 0.35);">
+                    ✕
+                </div>
+                <h1 style="font-size: 24px; font-weight: 800; color: #FFFFFF; letter-spacing: -0.5px; margin: 0 0 8px; line-height: 1.25;">
+                    Enlace No Válido o Expirado
+                </h1>
+                <div style="font-size: 12px; color: #EF4444; font-family: 'JetBrains Mono', Consolas, monospace;">
+                    ERROR DE TOKEN DE CONFIRMACIÓN
+                </div>
+            </div>
+
+            <div style="background-color: #1F1515; border-left: 4px solid #EF4444; border-radius: 0 6px 6px 0; padding: 18px 20px; margin-bottom: 26px;">
+                <div style="color: #F87171; font-weight: 800; font-size: 13px; margin-bottom: 6px;">
+                    ⚠️ ATENCIÓN
+                </div>
+                <p style="color: #E2E8F0; font-size: 13.5px; line-height: 1.6; margin: 0;">
+                    @mensaje
+                </p>
+            </div>
+
+            <div style="text-align: center;">
+                <a asp-controller="Home" asp-action="RegistroEmpresa" class="btn-lcp-monochrome" style="padding: 12px 28px; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 4px; display: inline-block;">
+                    Volver a Solicitar Registro
+                </a>
+            </div>
+        }
+
+        <div style="margin-top: 30px; text-align: center; border-top: 1px solid #1C2530; padding-top: 18px; font-size: 11.5px; color: #64748B;">
+            LCP · Logística Centro País — Santa Rosa, La Pampa · Soporte: contacto@@lcp.com
+        </div>
+
+    </div>
+</div>

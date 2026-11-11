@@ -1,0 +1,148 @@
+@page "/inventario"
+@layout MobileLayout
+@inject IMobileApiClient ApiClient
+@inject NavigationManager Nav
+
+<div style="display: flex; flex-direction: column; gap: 12px; padding-bottom: 26px;">
+    <!-- Title -->
+    <div>
+        <h2 style="font-size: 1.15rem; font-weight: 800; color: var(--lcp-navy);">Inventario en Depósito</h2>
+        <div style="font-size: 0.72rem; color: var(--lcp-text-muted);">Stock de Mercaderías y Lotes Almacenados</div>
+    </div>
+
+    <!-- Search Input -->
+    <div style="position: relative;">
+        <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 14px; top: 13px; color: #94A3B8; font-size: 0.85rem;"></i>
+        <input type="text" @bind="SearchTerm" @bind:event="oninput" placeholder="Buscar por código de lote, producto o dársena..." class="form-input-lcp" style="padding-left: 38px; padding-top: 10px; padding-bottom: 10px; font-size: 0.88rem;" />
+        @if (!string.IsNullOrWhiteSpace(SearchTerm))
+        {
+            <button @onclick="() => SearchTerm = string.Empty" style="position: absolute; right: 12px; top: 10px; background: none; border: none; color: #94A3B8; cursor: pointer;">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        }
+    </div>
+
+    <!-- Aggregate Totals -->
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; background: white; padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--lcp-border);">
+        <div style="text-align: center;">
+            <div style="font-size: 1.1rem; font-weight: 800; color: var(--lcp-navy);">@FilteredLotes.Count()</div>
+            <div style="font-size: 0.65rem; color: #64748B; text-transform: uppercase;">Lotes</div>
+        </div>
+        <div style="text-align: center; border-left: 1px solid var(--lcp-border); border-right: 1px solid var(--lcp-border);">
+            <div style="font-size: 1.1rem; font-weight: 800; color: var(--lcp-teal);">@FilteredLotes.Sum(l => l.CantidadUnidades).ToString("N0")</div>
+            <div style="font-size: 0.65rem; color: #64748B; text-transform: uppercase;">Unidades</div>
+        </div>
+        <div style="text-align: center;">
+            <div style="font-size: 1.1rem; font-weight: 800; color: var(--lcp-gold);">@FilteredLotes.Sum(l => l.PesoKg).ToString("N0")</div>
+            <div style="font-size: 0.65rem; color: #64748B; text-transform: uppercase;">Kg Total</div>
+        </div>
+    </div>
+
+    <!-- Lotes List -->
+    @if (IsLoading)
+    {
+        <div style="text-align: center; padding: 40px; color: var(--lcp-text-muted);">
+            <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 1.6rem; color: var(--lcp-teal); margin-bottom: 8px;"></i>
+            <div style="font-size: 0.8rem;">Cargando inventario...</div>
+        </div>
+    }
+    else if (!FilteredLotes.Any())
+    {
+        <div class="card-lcp" style="text-align: center; padding: 36px 16px;">
+            <i class="fa-solid fa-boxes-stacked" style="font-size: 2.2rem; color: #CBD5E1; margin-bottom: 8px;"></i>
+            <div style="font-weight: 700; color: var(--lcp-navy); font-size: 0.95rem;">No hay lotes en inventario</div>
+            <p style="font-size: 0.78rem; color: var(--lcp-text-muted); margin-top: 4px;">Los lotes aparecen al completar la descarga de una solicitud de arribo.</p>
+        </div>
+    }
+    else
+    {
+        @foreach (var lote in FilteredLotes)
+        {
+            <div class="card-lcp" style="padding: 14px; border-left: 4px solid var(--lcp-teal);">
+                <div class="card-header-clean" style="margin-bottom: 8px; padding-bottom: 8px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-weight: 800; font-size: 0.85rem; color: var(--lcp-navy);">@lote.CodigoLote</span>
+                    </div>
+                    <span class="badge-pill" style="background-color: var(--lcp-gold-light); color: var(--lcp-gold); font-size: 0.68rem;">
+                        <i class="fa-solid fa-warehouse"></i> @lote.DarsenaCodigo
+                    </span>
+                </div>
+
+                <div style="font-size: 0.9rem; font-weight: 700; color: var(--lcp-navy); margin-bottom: 4px;">
+                    @lote.ProductoDescripcion
+                </div>
+
+                <div style="font-size: 0.76rem; color: var(--lcp-text-muted); margin-bottom: 10px;">
+                    <i class="fa-solid fa-building" style="margin-right: 4px; color: #94A3B8;"></i>@lote.ClienteRazonSocial
+                </div>
+
+                <!-- Grid specs -->
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; background: #F8FAFC; padding: 8px; border-radius: 8px; margin-bottom: 10px; text-align: center;">
+                    <div>
+                        <div style="font-size: 0.62rem; color: #64748B;">UNID.</div>
+                        <div style="font-size: 0.82rem; font-weight: 800; color: var(--lcp-navy);">@lote.CantidadUnidades</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.62rem; color: #64748B;">BULTOS</div>
+                        <div style="font-size: 0.82rem; font-weight: 800; color: var(--lcp-navy);">@lote.CantidadBultosCajas</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.62rem; color: #64748B;">PESO</div>
+                        <div style="font-size: 0.82rem; font-weight: 800; color: var(--lcp-navy);">@lote.PesoKg.ToString("N0") k</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.62rem; color: #64748B;">VOL.</div>
+                        <div style="font-size: 0.82rem; font-weight: 800; color: var(--lcp-navy);">@lote.VolumenM3 m³</div>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; color: #64748B; border-top: 1px solid #F8FAFC; padding-top: 8px;">
+                    <div>
+                        <i class="fa-solid fa-map-pin" style="color: var(--lcp-gold);"></i> @lote.UbicacionInternaDarsena
+                    </div>
+                    <div>
+                        <i class="fa-regular fa-calendar"></i> @lote.FechaIngreso.ToString("dd/MM/yyyy")
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private List<LoteInventarioDto> Lotes = new();
+    private string SearchTerm = string.Empty;
+    private bool IsLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        IsLoading = true;
+        try
+        {
+            Lotes = await ApiClient.GetInventarioAsync();
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private IEnumerable<LoteInventarioDto> FilteredLotes
+    {
+        get
+        {
+            var res = Lotes.AsEnumerable();
+            if (!string.IsNullOrWhiteSpace(SearchTerm))
+            {
+                var t = SearchTerm.Trim().ToLowerInvariant();
+                res = res.Where(l =>
+                    l.CodigoLote.ToLowerInvariant().Contains(t) ||
+                    l.ProductoDescripcion.ToLowerInvariant().Contains(t) ||
+                    l.DarsenaCodigo.ToLowerInvariant().Contains(t) ||
+                    l.ClienteRazonSocial.ToLowerInvariant().Contains(t)
+                );
+            }
+            return res;
+        }
+    }
+}

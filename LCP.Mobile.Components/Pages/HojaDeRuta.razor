@@ -1,0 +1,306 @@
+@page "/hoja-de-ruta"
+@page "/hoja-de-ruta/{Id:int}"
+@layout MobileLayout
+@inject IMobileApiClient ApiClient
+@inject NavigationManager Nav
+@inject UiNotificationService Notifier
+
+<div style="display: flex; flex-direction: column; gap: 14px; padding-bottom: 26px;">
+    <!-- Title -->
+    <div>
+        <h2 style="font-size: 1.15rem; font-weight: 800; color: var(--lcp-navy);">Hoja de Ruta - Conductor</h2>
+        <div style="font-size: 0.72rem; color: var(--lcp-text-muted);">Seguimiento de Hitos de Transporte Flota LCP</div>
+    </div>
+
+    @if (IsLoading)
+    {
+        <div style="text-align: center; padding: 40px; color: var(--lcp-text-muted);">
+            <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 1.6rem; color: var(--lcp-teal); margin-bottom: 8px;"></i>
+            <div style="font-size: 0.8rem;">Cargando viaje activo...</div>
+        </div>
+    }
+    else if (Viaje == null)
+    {
+        <div class="card-lcp" style="text-align: center; padding: 30px;">
+            <i class="fa-solid fa-truck" style="font-size: 2.2rem; color: #CBD5E1; margin-bottom: 10px;"></i>
+            <div style="font-weight: 700; color: var(--lcp-navy);">No tienes viajes asignados actualmente</div>
+            <p style="font-size: 0.78rem; color: var(--lcp-text-muted); margin-top: 4px;">Cuando el operador programe un viaje aparecerá aquí.</p>
+        </div>
+    }
+    else
+    {
+        <!-- Trip Info Card -->
+        <div class="card-lcp" style="padding: 16px; border-left: 4px solid var(--lcp-gold);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                <div>
+                    <span style="font-size: 0.68rem; color: #64748B; font-weight: 700;">VIAJE N° @Viaje.Id</span>
+                    <h3 style="font-size: 1.1rem; font-weight: 800; color: var(--lcp-navy);">@Viaje.CodigoSolicitud</h3>
+                </div>
+                <span class="badge-pill" style="background-color: #FEF3C7; color: #B45309;">
+                    @Viaje.PatenteCamion
+                </span>
+            </div>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; background: #F8FAFC; padding: 10px; border-radius: 8px; margin-bottom: 10px; font-size: 0.78rem;">
+                <div>
+                    <div style="font-size: 0.65rem; color: #64748B;">ORIGEN</div>
+                    <strong style="color: var(--lcp-navy);">@Viaje.Origen</strong>
+                </div>
+                <div style="color: var(--lcp-gold);"><i class="fa-solid fa-arrow-right"></i></div>
+                <div style="text-align: right;">
+                    <div style="font-size: 0.65rem; color: #64748B;">DESTINO</div>
+                    <strong style="color: var(--lcp-navy);">@Viaje.Destino</strong>
+                </div>
+            </div>
+
+            <div style="font-size: 0.75rem; color: #64748B;">
+                <i class="fa-solid fa-door-open" style="color: var(--lcp-teal); margin-right: 4px;"></i>
+                <span>Puerta: <strong>@Viaje.PuertaIngresoAsignada</strong></span>
+            </div>
+        </div>
+
+        <!-- Sequential Milestones Step Tracker -->
+        <div class="card-lcp" style="padding: 16px;">
+            <div class="card-header-clean" style="margin-bottom: 14px;">
+                <span style="font-weight: 700; font-size: 0.85rem; color: var(--lcp-navy);">
+                    <i class="fa-solid fa-list-check" style="color: var(--lcp-teal); margin-right: 6px;"></i>
+                    Hitos del Recorrido (1 al 5)
+                </span>
+                <span style="font-size: 0.72rem; color: var(--lcp-gold); font-weight: 700;">Paso @CurrentStep de 5</span>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 14px;">
+                <!-- Step 1 -->
+                <div style="display: flex; gap: 12px; align-items: flex-start;">
+                    <div style="width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 800; @(CurrentStep >= 1 ? "background: #10B981; color: white;" : "background: #E2E8F0; color: #64748B;")">
+                        @if (CurrentStep > 1) { <i class="fa-solid fa-check"></i> } else { <span>1</span> }
+                    </div>
+                    <div style="flex: 1;">
+                        <div style="font-weight: 700; font-size: 0.85rem; color: var(--lcp-navy);">Viaje Asignado y Aceptado</div>
+                        <div style="font-size: 0.7rem; color: #64748B;">Vehículo verificado y documentación lista</div>
+                    </div>
+                </div>
+
+                <!-- Step 2 -->
+                <div style="display: flex; gap: 12px; align-items: flex-start;">
+                    <div style="width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 800; @(CurrentStep >= 2 ? "background: #10B981; color: white;" : CurrentStep == 1 ? "background: #F59E0B; color: white;" : "background: #E2E8F0; color: #64748B;")">
+                        @if (CurrentStep > 2) { <i class="fa-solid fa-check"></i> } else { <span>2</span> }
+                    </div>
+                    <div style="flex: 1;">
+                        <div style="font-weight: 700; font-size: 0.85rem; color: var(--lcp-navy);">En Ruta hacia Origen</div>
+                        <div style="font-size: 0.7rem; color: #64748B;">Camión en desplazamiento para levantar carga</div>
+                    </div>
+                </div>
+
+                <!-- Step 3 -->
+                <div style="display: flex; gap: 12px; align-items: flex-start;">
+                    <div style="width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 800; @(CurrentStep >= 3 ? "background: #10B981; color: white;" : CurrentStep == 2 ? "background: #F59E0B; color: white;" : "background: #E2E8F0; color: #64748B;")">
+                        @if (CurrentStep > 3) { <i class="fa-solid fa-check"></i> } else { <span>3</span> }
+                    </div>
+                    <div style="flex: 1;">
+                        <div style="font-weight: 700; font-size: 0.85rem; color: var(--lcp-navy);">Carga en Origen Completada</div>
+                        <div style="font-size: 0.7rem; color: #64748B;">Mercadería estibada y precintos colocados</div>
+                    </div>
+                </div>
+
+                <!-- Step 4 -->
+                <div style="display: flex; gap: 12px; align-items: flex-start;">
+                    <div style="width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 800; @(CurrentStep >= 4 ? "background: #10B981; color: white;" : CurrentStep == 3 ? "background: #F59E0B; color: white;" : "background: #E2E8F0; color: #64748B;")">
+                        @if (CurrentStep > 4) { <i class="fa-solid fa-check"></i> } else { <span>4</span> }
+                    </div>
+                    <div style="flex: 1;">
+                        <div style="font-weight: 700; font-size: 0.85rem; color: var(--lcp-navy);">En Tránsito hacia Base LCP</div>
+                        <div style="font-size: 0.7rem; color: #64748B;">Ruta provincial hacia Santa Rosa</div>
+                    </div>
+                </div>
+
+                <!-- Step 5 -->
+                <div style="display: flex; gap: 12px; align-items: flex-start;">
+                    <div style="width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 800; @(CurrentStep >= 5 ? "background: #10B981; color: white;" : CurrentStep == 4 ? "background: #F59E0B; color: white;" : "background: #E2E8F0; color: #64748B;")">
+                        @if (CurrentStep >= 5) { <i class="fa-solid fa-check"></i> } else { <span>5</span> }
+                    </div>
+                    <div style="flex: 1;">
+                        <div style="font-weight: 700; font-size: 0.85rem; color: var(--lcp-navy);">En Predio Dársena LCP</div>
+                        <div style="font-size: 0.7rem; color: #64748B;">Arribado a balanza para descarga del operador</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Milestone Advance Button -->
+            <div style="margin-top: 18px;">
+                @if (CurrentStep < 5)
+                {
+                    <button class="btn-lcp-primary" @onclick="AvanzarPaso">
+                        <i class="fa-solid fa-forward-step"></i>
+                        <span>Confirmar Paso @(CurrentStep + 1): @GetNombrePaso(CurrentStep + 1)</span>
+                    </button>
+                }
+                else
+                {
+                    <div style="background: #ECFDF5; border: 1px solid #A7F3D0; color: #065F46; padding: 12px; border-radius: 10px; text-align: center; font-size: 0.85rem; font-weight: 700;">
+                        <i class="fa-solid fa-circle-check"></i>
+                        <span>¡Todos los hitos de viaje completados! El operador realizará la descarga en muelle.</span>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Incidents & Communication Buttons -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <button class="btn-lcp-outline" style="border-color: #FECACA; color: #DC2626;" @onclick="() => MostrarModalIncidente = true">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span>Reportar Demora</span>
+            </button>
+            <a href="/chat" class="btn-lcp-outline" style="text-decoration: none;">
+                <i class="fa-solid fa-comments" style="color: var(--lcp-teal);"></i>
+                <span>Chat Operativo</span>
+            </a>
+        </div>
+    }
+</div>
+
+<!-- Modal Reportar Incidente -->
+@if (MostrarModalIncidente)
+{
+    <div class="modal-overlay" @onclick="() => MostrarModalIncidente = false">
+        <div class="modal-content-mobile" @onclick:stopPropagation="true">
+            <div class="modal-handle-bar"></div>
+            <div class="modal-header-lcp">
+                <div>
+                    <h3 style="font-size: 1rem; font-weight: 800; color: #DC2626;">Reportar Incidente / Demora</h3>
+                    <div style="font-size: 0.72rem; color: var(--lcp-text-muted);">Notifica al operador y cliente al instante</div>
+                </div>
+                <button style="background: none; border: none; font-size: 1.2rem; color: #94A3B8; cursor: pointer;" @onclick="() => MostrarModalIncidente = false">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="modal-body-scroll">
+                <div class="form-group-lcp">
+                    <label class="form-label-lcp">Motivo de la Demora</label>
+                    <select class="form-select-lcp" @bind="TipoIncidenteTemp">
+                        <option value="Tránsito / Desvío en Ruta">Tránsito / Desvío en Ruta</option>
+                        <option value="Clima Adverso / Lluvia">Clima Adverso / Lluvia</option>
+                        <option value="Desperfecto Mecánico">Desperfecto Mecánico</option>
+                        <option value="Demora en Carga de Origen">Demora en Carga de Origen</option>
+                    </select>
+                </div>
+
+                <div class="form-group-lcp">
+                    <label class="form-label-lcp">Detalle para el Centro de Control</label>
+                    <textarea rows="3" class="form-textarea-lcp" placeholder="Describe brevemente la situación..." @bind="DetalleIncidenteTemp"></textarea>
+                </div>
+            </div>
+
+            <div class="modal-footer-lcp">
+                <button class="btn-lcp-outline" @onclick="() => MostrarModalIncidente = false">Cancelar</button>
+                <button class="btn-lcp-gold" style="background: #DC2626;" @onclick="EnviarIncidente">
+                    <i class="fa-solid fa-bullhorn"></i>
+                    <span>Enviar Notificación</span>
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private ViajeDto? Viaje;
+    private int CurrentStep = 3;
+    private bool IsLoading = true;
+    private bool MostrarModalIncidente = false;
+    private string TipoIncidenteTemp = "Tránsito / Desvío en Ruta";
+    private string DetalleIncidenteTemp = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarViaje();
+    }
+
+    private async Task CargarViaje()
+    {
+        IsLoading = true;
+        try
+        {
+            if (Id.HasValue)
+            {
+                Viaje = await ApiClient.GetViajeByIdAsync(Id.Value);
+            }
+            else
+            {
+                var viajes = await ApiClient.GetMisViajesAsync();
+                Viaje = viajes.FirstOrDefault();
+            }
+
+            if (Viaje != null)
+            {
+                CurrentStep = Viaje.EstadoViaje switch
+                {
+                    EstadoViaje.Asignado => 1,
+                    EstadoViaje.EnRuta => 3,
+                    EstadoViaje.EnPredioDarsena => 5,
+                    EstadoViaje.DescargadoCompletado => 5,
+                    _ => 3
+                };
+            }
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task AvanzarPaso()
+    {
+        if (CurrentStep < 5 && Viaje != null)
+        {
+            CurrentStep++;
+            var nuevoEstado = CurrentStep switch
+            {
+                1 => EstadoViaje.Asignado,
+                2 => EstadoViaje.EnRuta,
+                3 => EstadoViaje.EnRuta,
+                4 => EstadoViaje.EnRuta,
+                5 => EstadoViaje.EnPredioDarsena,
+                _ => EstadoViaje.EnRuta
+            };
+
+            await ApiClient.ActualizarEstadoViajeAsync(Viaje.Id, new ActualizarViajeRequestDto
+            {
+                EstadoViaje = nuevoEstado,
+                HitoAlcanzado = GetNombrePaso(CurrentStep),
+                Observaciones = $"Paso {CurrentStep} completado por conductor"
+            });
+
+            Notifier.Success($"Hito '{GetNombrePaso(CurrentStep)}' registrado correctamente.");
+        }
+    }
+
+    private async Task EnviarIncidente()
+    {
+        if (Viaje == null) return;
+        var msg = $"⚠️ INCIDENTE EN RUTA ({TipoIncidenteTemp}): {DetalleIncidenteTemp}";
+        await ApiClient.EnviarMensajeChatAsync(new EnviarMensajeDto
+        {
+            ConversacionId = $"solicitud_{Viaje.SolicitudOperacionId}",
+            TextoMensaje = msg,
+            EsIncidenteRuta = true,
+            SolicitudOperacionId = Viaje.SolicitudOperacionId
+        });
+
+        Notifier.Warning("Incidente notificado al operador y registrado en el chat operativo.");
+        MostrarModalIncidente = false;
+        DetalleIncidenteTemp = string.Empty;
+    }
+
+    private string GetNombrePaso(int paso) => paso switch
+    {
+        1 => "Viaje Asignado",
+        2 => "En Ruta hacia Origen",
+        3 => "Carga en Origen",
+        4 => "En Tránsito a LCP",
+        5 => "En Predio Dársena",
+        _ => "En Proceso"
+    };
+}

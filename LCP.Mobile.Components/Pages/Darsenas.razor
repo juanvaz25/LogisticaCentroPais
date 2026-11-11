@@ -1,0 +1,216 @@
+@page "/darsenas"
+@layout MobileLayout
+@inject IMobileApiClient ApiClient
+@inject NavigationManager Nav
+@inject UiNotificationService Notifier
+
+<div style="display: flex; flex-direction: column; gap: 14px; padding-bottom: 26px;">
+    <!-- Title & Summary -->
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h2 style="font-size: 1.15rem; font-weight: 800; color: var(--lcp-navy);">Dársenas de Carga y Descarga</h2>
+            <div style="font-size: 0.72rem; color: var(--lcp-text-muted);">Monitoreo y Muelles Operativos</div>
+        </div>
+        <button class="btn-lcp-outline btn-lcp-sm" @onclick="CargarDarsenas">
+            <i class="fa-solid fa-arrows-rotate"></i>
+        </button>
+    </div>
+
+    <!-- Quick Status Legend -->
+    <div style="display: flex; justify-content: space-between; background: white; padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--lcp-border); font-size: 0.72rem;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="width: 8px; height: 8px; border-radius: 50%; background-color: #10B981;"></span>
+            <span>Libre (@ListaDarsenas.Count(d => d.EstadoActual == EstadoDarsena.Libre))</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="width: 8px; height: 8px; border-radius: 50%; background-color: #F59E0B;"></span>
+            <span>Ocupada (@ListaDarsenas.Count(d => d.EstadoActual == EstadoDarsena.Ocupada))</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="width: 8px; height: 8px; border-radius: 50%; background-color: #3B82F6;"></span>
+            <span>Turno (@ListaDarsenas.Count(d => d.EstadoActual == EstadoDarsena.TurnoAsignado))</span>
+        </div>
+    </div>
+
+    <!-- Docks Grid / List -->
+    @if (IsLoading)
+    {
+        <div style="text-align: center; padding: 40px; color: var(--lcp-text-muted);">
+            <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 1.6rem; color: var(--lcp-teal); margin-bottom: 8px;"></i>
+            <div style="font-size: 0.8rem;">Cargando estado de dársenas...</div>
+        </div>
+    }
+    else
+    {
+        @foreach (var d in ListaDarsenas)
+        {
+            var pctOcupado = d.CapacidadMaximaM3 > 0 ? (int)Math.Min(100, Math.Round((d.VolumenOcupadoM3 / d.CapacidadMaximaM3) * 100)) : 0;
+            <div class="card-lcp" style="padding: 14px; border-left: 4px solid @GetDockColor(d.EstadoActual);">
+                <div class="card-header-clean" style="margin-bottom: 8px; padding-bottom: 8px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="width: 28px; height: 28px; border-radius: 8px; background-color: #F1F5F9; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.8rem; color: var(--lcp-navy);">
+                            @d.NumeroDarsena
+                        </div>
+                        <span style="font-weight: 800; font-size: 0.92rem; color: var(--lcp-navy);">@d.Codigo</span>
+                    </div>
+                    <span class="badge-pill" style="@GetDockBadgeStyle(d.EstadoActual)">
+                        @d.EstadoActual.ToString()
+                    </span>
+                </div>
+
+                <div style="font-size: 0.8rem; color: var(--lcp-text-muted); margin-bottom: 8px;">
+                    <i class="fa-solid fa-circle-info" style="color: #94A3B8; margin-right: 4px;"></i>
+                    <span>@(string.IsNullOrWhiteSpace(d.DetalleOperacionActual) ? "Sin actividad activa" : d.DetalleOperacionActual)</span>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(d.ClienteRazonSocial))
+                {
+                    <div style="font-size: 0.75rem; color: var(--lcp-teal); font-weight: 600; margin-bottom: 8px;">
+                        <i class="fa-solid fa-building" style="margin-right: 4px;"></i>@d.ClienteRazonSocial
+                    </div>
+                }
+
+                <!-- Capacity & Occupancy Bar -->
+                <div style="margin-bottom: 10px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: #64748B; margin-bottom: 4px;">
+                        <span>Ocupación: <strong>@d.VolumenOcupadoM3 m³</strong> / @d.CapacidadMaximaM3 m³</span>
+                        <span><strong>@pctOcupado%</strong></span>
+                    </div>
+                    <div style="height: 6px; background-color: #E2E8F0; border-radius: 3px; overflow: hidden;">
+                        <div style="height: 100%; width: @pctOcupado%; background-color: @(pctOcupado > 80 ? "#EF4444" : pctOcupado > 40 ? "#F59E0B" : "#10B981"); border-radius: 3px;"></div>
+                    </div>
+                </div>
+
+                <!-- Footer Actions -->
+                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #F8FAFC; padding-top: 8px;">
+                    <span style="font-size: 0.7rem; color: #64748B;">
+                        <i class="fa-solid fa-cubes"></i> @d.CapacidadMaximaPallets Pallets máx.
+                    </span>
+
+                    <button class="btn-lcp-outline btn-lcp-sm" style="padding: 4px 10px; font-size: 0.75rem;" @onclick="() => AbrirModalEstado(d)">
+                        <i class="fa-solid fa-gear"></i>
+                        <span>Cambiar Estado</span>
+                    </button>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+<!-- Modal Cambiar Estado Dársena -->
+@if (DarsenaSeleccionada != null)
+{
+    <div class="modal-overlay" @onclick="() => DarsenaSeleccionada = null">
+        <div class="modal-content-mobile" @onclick:stopPropagation="true">
+            <div class="modal-handle-bar"></div>
+            <div class="modal-header-lcp">
+                <div>
+                    <h3 style="font-size: 1rem; font-weight: 800; color: var(--lcp-navy);">@DarsenaSeleccionada.Codigo</h3>
+                    <div style="font-size: 0.72rem; color: var(--lcp-text-muted);">Actualizar disponibilidad de muelle</div>
+                </div>
+                <button style="background: none; border: none; font-size: 1.2rem; color: #94A3B8; cursor: pointer;" @onclick="() => DarsenaSeleccionada = null">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="modal-body-scroll">
+                <div class="form-group-lcp">
+                    <label class="form-label-lcp">Nuevo Estado</label>
+                    <select class="form-select-lcp" @bind="NuevoEstadoTemp">
+                        <option value="@EstadoDarsena.Libre">Libre / Disponible</option>
+                        <option value="@EstadoDarsena.TurnoAsignado">Turno Asignado</option>
+                        <option value="@EstadoDarsena.Ocupada">Ocupada (Camión en Operación)</option>
+                        <option value="@EstadoDarsena.Mantenimiento">Mantenimiento</option>
+                    </select>
+                </div>
+
+                <div class="form-group-lcp">
+                    <label class="form-label-lcp">Detalle de Operación o Motivo</label>
+                    <input type="text" class="form-input-lcp" placeholder="Ej: Disponible para próximo turno" @bind="DetalleTemp" />
+                </div>
+            </div>
+
+            <div class="modal-footer-lcp">
+                <button class="btn-lcp-outline" @onclick="() => DarsenaSeleccionada = null">Cancelar</button>
+                <button class="btn-lcp-primary" @onclick="GuardarEstadoDarsena">
+                    <i class="fa-solid fa-check"></i>
+                    <span>Actualizar Muelle</span>
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<DarsenaDto> ListaDarsenas = new();
+    private bool IsLoading = true;
+    private DarsenaDto? DarsenaSeleccionada;
+    private EstadoDarsena NuevoEstadoTemp;
+    private string DetalleTemp = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarDarsenas();
+    }
+
+    private async Task CargarDarsenas()
+    {
+        IsLoading = true;
+        try
+        {
+            ListaDarsenas = await ApiClient.GetDarsenasAsync();
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void AbrirModalEstado(DarsenaDto d)
+    {
+        DarsenaSeleccionada = d;
+        NuevoEstadoTemp = d.EstadoActual;
+        DetalleTemp = d.DetalleOperacionActual ?? "";
+    }
+
+    private async Task GuardarEstadoDarsena()
+    {
+        if (DarsenaSeleccionada == null) return;
+        var dto = new ActualizarEstadoDarsenaDto
+        {
+            DarsenaId = DarsenaSeleccionada.Id,
+            NuevoEstado = NuevoEstadoTemp,
+            DetalleOperacion = DetalleTemp
+        };
+
+        var ok = await ApiClient.ActualizarEstadoDarsenaAsync(dto);
+        if (ok)
+        {
+            Notifier.Success($"{DarsenaSeleccionada.Codigo} actualizada a {NuevoEstadoTemp}.");
+            DarsenaSeleccionada = null;
+            await CargarDarsenas();
+        }
+        else
+        {
+            Notifier.Error("No se pudo actualizar el estado de la dársena.");
+        }
+    }
+
+    private string GetDockColor(EstadoDarsena estado) => estado switch
+    {
+        EstadoDarsena.Libre => "#10B981",
+        EstadoDarsena.TurnoAsignado => "#3B82F6",
+        EstadoDarsena.Ocupada => "#F59E0B",
+        EstadoDarsena.Mantenimiento => "#94A3B8",
+        _ => "#10B981"
+    };
+
+    private string GetDockBadgeStyle(EstadoDarsena estado) => estado switch
+    {
+        EstadoDarsena.Libre => "background-color: #ECFDF5; color: #047857;",
+        EstadoDarsena.TurnoAsignado => "background-color: #EFF6FF; color: #1D4ED8;",
+        EstadoDarsena.Ocupada => "background-color: #FEF3C7; color: #B45309;",
+        EstadoDarsena.Mantenimiento => "background-color: #F1F5F9; color: #475569;",
+        _ => "background-color: #F1F5F9; color: #475569;"
+    };
+}

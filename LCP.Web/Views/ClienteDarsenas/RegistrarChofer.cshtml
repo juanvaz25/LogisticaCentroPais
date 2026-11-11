@@ -1,0 +1,235 @@
+@model PostulacionChoferDto
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = "Alta de Chofer Propio - Empresa Cliente";
+}
+
+<div style="max-width: 920px; margin: 0 auto; padding-bottom: 60px;">
+    <div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+        <div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                <a asp-action="MisChoferes" style="color: var(--lcp-primary); text-decoration: none; font-size: 13px; font-weight: 700;">
+                    ⬅ Volver al Padrón de Choferes
+                </a>
+                <span style="color: var(--lcp-text-muted);">/</span>
+                <span style="font-size: 13px; color: var(--lcp-text-muted);">Alta de Chofer Propio</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 26px;">🚛</span>
+                <h1 class="page-title" style="margin: 0;">Registro de Chofer y Camión Propio</h1>
+            </div>
+            <p class="page-subtitle" style="margin-top: 6px;">
+                Registrá los conductores y unidades de transporte de tu empresa para utilizarlos en los viajes simples directos hacia tu dársena alquilada.
+            </p>
+        </div>
+    </div>
+
+    <!-- BANNER EXPLICATIVO -->
+    <div class="lcp-card" style="background: linear-gradient(135deg, #1E462E 0%, #2B7A4B 100%); color: #FFFFFF; border: none; padding: 20px 24px; margin-bottom: 24px; box-shadow: 0 4px 18px rgba(30, 70, 46, 0.15);">
+        <div style="display: flex; gap: 16px; align-items: flex-start;">
+            <span style="font-size: 28px;">🏢</span>
+            <div>
+                <h3 style="font-size: 16px; font-weight: 800; color: #A5D6A7; margin: 0 0 6px;">
+                    Transporte Exclusivo de tu Empresa
+                </h3>
+                <p style="font-size: 13px; line-height: 1.6; color: #E0EBF0; margin: 0;">
+                    • El chofer y camión quedan vinculados <strong>exclusivamente a tu empresa</strong> en el sistema LCP.
+                    <br />• Se habilitan de forma <strong>inmediata y activa</strong> para que puedas seleccionarlos al solicitar ingresos o retiros.
+                    <br />• Los viajes con chofer propio se rigen por la modalidad de <strong>viaje simple directo</strong> hacia el predio de Santa Rosa.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <form asp-action="RegistrarChofer" method="post" enctype="multipart/form-data">
+        @Html.AntiForgeryToken()
+        <input type="hidden" asp-for="DeclaracionJuradaAceptada" value="true" />
+
+        <!-- 1. DATOS PERSONALES -->
+        <div class="lcp-card" style="margin-bottom: 22px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+                <span style="font-size: 20px;">👤</span>
+                <h2 class="lcp-card-title" style="margin: 0;">1. Datos Personales del Conductor</h2>
+            </div>
+            <p style="font-size: 13px; color: var(--lcp-text-muted); margin: 0 0 18px;">
+                Identificación oficial, CUIL y datos de contacto del chofer propio.
+            </p>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 14px;">
+                <div class="form-group">
+                    <label asp-for="Nombre" class="form-label">Nombre(s) *</label>
+                    <input asp-for="Nombre" class="form-input" required placeholder="Ej: Mario Andrés" />
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="Apellido" class="form-label">Apellido(s) *</label>
+                    <input asp-for="Apellido" class="form-input" required placeholder="Ej: Gómez" />
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 14px;">
+                <div class="form-group">
+                    <label asp-for="CUIL" class="form-label">CUIL (con guiones: XX-XXXXXXXX-X) *</label>
+                    <input asp-for="CUIL" class="form-input" required placeholder="Ej: 20-33456789-2" />
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="FechaNacimiento" class="form-label">Fecha de Nacimiento *</label>
+                    <input asp-for="FechaNacimiento" type="date" class="form-input" required />
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="form-group">
+                    <label asp-for="CelularWhatsApp" class="form-label">Celular / WhatsApp (con código de área) *</label>
+                    <input asp-for="CelularWhatsApp" class="form-input" required placeholder="Ej: 2954-551122" />
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="Email" class="form-label">Correo Electrónico de Contacto</label>
+                    <input asp-for="Email" type="email" class="form-input" placeholder="Ej: chofer@miempresa.com" />
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. DOMICILIO Y RADICACIÓN -->
+        <div class="lcp-card" style="margin-bottom: 22px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+                <span style="font-size: 20px;">📍</span>
+                <h2 class="lcp-card-title" style="margin: 0;">2. Domicilio y Radicación</h2>
+            </div>
+            <p style="font-size: 13px; color: var(--lcp-text-muted); margin: 0 0 18px;">
+                Ubicación residencial o base operativa de tu conductor.
+            </p>
+
+            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 16px;">
+                <div class="form-group">
+                    <label asp-for="Domicilio" class="form-label">Domicilio / Dirección Real *</label>
+                    <input asp-for="Domicilio" class="form-input" required placeholder="Ej: Av. Spinetto 1800" />
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="Localidad" class="form-label">Localidad *</label>
+                    <input asp-for="Localidad" class="form-input" required placeholder="Ej: Santa Rosa" />
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="Provincia" class="form-label">Provincia *</label>
+                    <input asp-for="Provincia" class="form-input" required placeholder="Ej: La Pampa" />
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. UNIDAD DE TRANSPORTE / CAMIÓN DE LA EMPRESA -->
+        <div class="lcp-card" style="margin-bottom: 22px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+                <span style="font-size: 20px;">🚚</span>
+                <h2 class="lcp-card-title" style="margin: 0;">3. Camión / Unidad de Carga de la Empresa</h2>
+            </div>
+            <p style="font-size: 13px; color: var(--lcp-text-muted); margin: 0 0 18px;">
+                Identificación de la unidad, capacidad máxima y volumétrica de transporte.
+            </p>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
+                <div class="form-group">
+                    <label asp-for="PatenteCamion" class="form-label">Patente de la Unidad (Chasis/Tractor) *</label>
+                    <input asp-for="PatenteCamion" class="form-input" required placeholder="Ej: AF 123 CD o AA 987 ZZ" style="font-weight: 800; font-family: monospace; text-transform: uppercase;" />
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="CapacidadCargaKg" class="form-label">Capacidad de Carga Máxima (Kilogramos) *</label>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input asp-for="CapacidadCargaKg" type="number" step="100" class="form-input" required />
+                        <span style="font-weight: 700; color: var(--lcp-text-muted);">kg</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="CapacidadVolumenM3" class="form-label">Capacidad Volumétrica (Metros Cúbicos) *</label>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input asp-for="CapacidadVolumenM3" type="number" step="1" class="form-input" required />
+                        <span style="font-weight: 700; color: var(--lcp-text-muted);">m³</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. DOCUMENTACIÓN DIGITAL RESPALDATORIA -->
+        <div class="lcp-card" style="margin-bottom: 24px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+                <span style="font-size: 20px;">📑</span>
+                <h2 class="lcp-card-title" style="margin: 0;">4. Documentación Digital Respaldatoria del Chofer y Unidad</h2>
+            </div>
+            <p style="font-size: 13px; color: var(--lcp-text-muted); margin: 0 0 18px;">
+                Copia digital de la licencia de conducir y póliza de seguro de la unidad propia.
+            </p>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                
+                <!-- Archivo Licencia / LINTI -->
+                <div style="border: 2px dashed #B8C7D1; border-radius: 8px; padding: 20px; background: #FAFBFB; text-align: center; transition: all 0.2s;" id="dropzoneLicencia">
+                    <div style="font-size: 32px; margin-bottom: 8px;">🪪</div>
+                    <div style="font-weight: 800; font-size: 14px; color: #192A33; margin-bottom: 4px;">
+                        Licencia Nacional de Conducir / LINTI
+                    </div>
+                    <p style="font-size: 12px; color: var(--lcp-text-muted); margin: 0 0 14px;">
+                        Formatos JPG, PNG o PDF (Habilitación vigente)
+                    </p>
+                    <input type="file" name="archivoLicencia" id="inputArchivoLicencia" accept="image/*,application/pdf" style="display: none;" onchange="actualizarInfoArchivo('inputArchivoLicencia', 'nombreArchivoLicencia')" />
+                    <button type="button" class="btn-lcp-outline btn-lcp-sm" onclick="document.getElementById('inputArchivoLicencia').click()" style="display: inline-flex; align-items: center; gap: 6px;">
+                        <span>📁</span> Seleccionar Licencia
+                    </button>
+                    <div id="nombreArchivoLicencia" style="font-size: 12px; font-weight: 700; color: #28536B; margin-top: 10px; word-break: break-all;">
+                        Ningún archivo seleccionado
+                    </div>
+                </div>
+
+                <!-- Archivo Seguro / ART -->
+                <div style="border: 2px dashed #B8C7D1; border-radius: 8px; padding: 20px; background: #FAFBFB; text-align: center; transition: all 0.2s;" id="dropzoneSeguro">
+                    <div style="font-size: 32px; margin-bottom: 8px;">🛡️</div>
+                    <div style="font-weight: 800; font-size: 14px; color: #192A33; margin-bottom: 4px;">
+                        Póliza de Seguro del Camión / ART
+                    </div>
+                    <p style="font-size: 12px; color: var(--lcp-text-muted); margin: 0 0 14px;">
+                        Formatos PDF o imagen (Comprobante de vigencia)
+                    </p>
+                    <input type="file" name="archivoSeguro" id="inputArchivoSeguro" accept=".pdf,image/*" style="display: none;" onchange="actualizarInfoArchivo('inputArchivoSeguro', 'nombreArchivoSeguro')" />
+                    <button type="button" class="btn-lcp-outline btn-lcp-sm" onclick="document.getElementById('inputArchivoSeguro').click()" style="display: inline-flex; align-items: center; gap: 6px;">
+                        <span>📁</span> Seleccionar Póliza
+                    </button>
+                    <div id="nombreArchivoSeguro" style="font-size: 12px; font-weight: 700; color: #28536B; margin-top: 10px; word-break: break-all;">
+                        Ningún archivo seleccionado
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- BOTONES DE ACCIÓN -->
+        <div style="display: flex; justify-content: flex-end; align-items: center; gap: 14px; margin-top: 24px;">
+            <a asp-action="MisChoferes" class="btn-lcp-outline" style="text-decoration: none; padding: 12px 22px;">
+                Cancelar
+            </a>
+            <button type="submit" class="btn-lcp-primary" style="display: inline-flex; align-items: center; gap: 10px; padding: 13px 28px; font-size: 14.5px; font-weight: 800; background-color: #2B7A4B; border-color: #2B7A4B; box-shadow: 0 4px 14px rgba(43, 122, 75, 0.25);">
+                <span>✓</span> Registrar Chofer Propio de Empresa
+            </button>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        function actualizarInfoArchivo(inputId, displayId) {
+            const input = document.getElementById(inputId);
+            const display = document.getElementById(displayId);
+            if (input && input.files && input.files[0]) {
+                const file = input.files[0];
+                const sizeKb = Math.round(file.size / 1024);
+                display.innerHTML = `<span style="color: #2ECC71;">✓</span> <strong>${file.name}</strong> (${sizeKb} KB)`;
+            } else {
+                display.textContent = "Ningún archivo seleccionado";
+            }
+        }
+    </script>
+}
+

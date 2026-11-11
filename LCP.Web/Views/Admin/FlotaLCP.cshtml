@@ -1,0 +1,516 @@
+@model List<ConductorViewModel>
+@{
+    ViewData["Title"] = "Flota Oficial LCP - Padrón de Choferes";
+    var totalChoferes = Model.Count;
+    var totalCapacidadKg = Model.Sum(c => c.CapacidadCargaKg);
+    var totalCapacidadM3 = Model.Sum(c => c.CapacidadVolumenM3);
+}
+
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+    <div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 26px;">🚛</span>
+            <h1 class="page-title" style="margin: 0;">Flota Oficial LCP · Choferes y Unidades</h1>
+        </div>
+        <p class="page-subtitle" style="margin-top: 6px;">
+            Padrón operativo de conductores de Logística Centro País asignables a las órdenes de flete y transporte de clientes.
+        </p>
+    </div>
+    <div style="display: flex; gap: 10px;">
+        <a asp-action="NuevoChoferFlota" class="btn-lcp-primary" style="display: inline-flex; align-items: center; gap: 8px;">
+            <span>➕</span> Dar de Alta Chofer en Flota LCP
+        </a>
+    </div>
+</div>
+
+<!-- KPIS SUMMARY DE FLOTA -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
+    <div class="lcp-card" style="padding: 16px; border-left: 4px solid var(--lcp-primary); margin: 0;">
+        <span style="font-size: 11px; font-weight: 700; color: var(--lcp-text-muted); text-transform: uppercase;">Conductores Oficiales</span>
+        <div style="font-size: 26px; font-weight: 800; color: var(--lcp-text-dark); margin-top: 4px;">
+            @totalChoferes
+        </div>
+        <span style="font-size: 12px; color: #2B7A4B; font-weight: 600;">100% Dotación LCP</span>
+    </div>
+
+    <div class="lcp-card" style="padding: 16px; border-left: 4px solid #C2821E; margin: 0;">
+        <span style="font-size: 11px; font-weight: 700; color: var(--lcp-text-muted); text-transform: uppercase;">Capacidad de Carga Total</span>
+        <div style="font-size: 26px; font-weight: 800; color: #C2821E; margin-top: 4px;">
+            @((totalCapacidadKg / 1000m).ToString("N1")) Tn
+        </div>
+        <span style="font-size: 12px; color: var(--lcp-text-muted);">@totalCapacidadKg.ToString("N0") kg combinados</span>
+    </div>
+
+    <div class="lcp-card" style="padding: 16px; border-left: 4px solid #28536B; margin: 0;">
+        <span style="font-size: 11px; font-weight: 700; color: var(--lcp-text-muted); text-transform: uppercase;">Volumen de Transporte</span>
+        <div style="font-size: 26px; font-weight: 800; color: #28536B; margin-top: 4px;">
+            @totalCapacidadM3.ToString("N0") m³
+        </div>
+        <span style="font-size: 12px; color: var(--lcp-text-muted);">Capacidad volumétrica flota</span>
+    </div>
+
+    <div class="lcp-card" style="padding: 16px; border-left: 4px solid #2B7A4B; margin: 0;">
+        <span style="font-size: 11px; font-weight: 700; color: var(--lcp-text-muted); text-transform: uppercase;">Base Operativa</span>
+        <div style="font-size: 20px; font-weight: 800; color: var(--lcp-text-dark); margin-top: 6px;">
+            Santa Rosa
+        </div>
+        <span style="font-size: 12px; color: var(--lcp-text-muted);">Calle San Martín 245</span>
+    </div>
+</div>
+
+<!-- LISTADO DE CHOFERES DE FLOTA -->
+<div class="lcp-card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+        <div>
+            <h2 class="lcp-card-title" style="margin: 0;">Padrón de Conductores y Camiones de Flota LCP</h2>
+            <p style="font-size: 13px; color: var(--lcp-text-muted); margin: 4px 0 0;">
+                Conductores oficiales de LCP asignables a servicios de transporte, con ficha técnica y legajo digital.
+            </p>
+        </div>
+        <span class="badge-estado badge-encurso">@Model.Count chofer(es) activo(s)</span>
+    </div>
+
+    @if (!Model.Any())
+    {
+        <div style="text-align: center; padding: 40px 20px; background-color: #F8F6F0; border-radius: 8px; border: 1px dashed #CCC5B7;">
+            <div style="font-size: 40px; margin-bottom: 10px;">🚛</div>
+            <h3 style="font-size: 16px; font-weight: 700; color: var(--lcp-text-dark); margin: 0 0 6px;">No hay choferes cargados en la Flota LCP</h3>
+            <p style="font-size: 13px; color: var(--lcp-text-muted); margin: 0 auto 16px; max-width: 480px;">
+                Como administrador, podés dar de alta a los choferes oficiales de Logística Centro País, solicitando todos sus datos personales, la unidad y su documentación respaldatoria.
+            </p>
+            <a asp-action="NuevoChoferFlota" class="btn-lcp-primary btn-lcp-sm">
+                ➕ Registrar Primer Chofer de Flota
+            </a>
+        </div>
+    }
+    else
+    {
+        <div class="lcp-table-container">
+            <table class="lcp-table">
+                <thead>
+                    <tr>
+                        <th>Conductor</th>
+                        <th>Camión / Patente</th>
+                        <th>Capacidad</th>
+                        <th>Radicación</th>
+                        <th>Documentación</th>
+                        <th>Cuenta Acceso</th>
+                        <th style="text-align: right; width: 170px;">Ficha Chofer</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in Model)
+                    {
+                        var iniciales = (string.IsNullOrEmpty(c.Nombre) ? "C" : c.Nombre.Substring(0, 1)) + (string.IsNullOrEmpty(c.Apellido) ? "" : c.Apellido.Substring(0, 1));
+                        <tr>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <div style="width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #28536B, #162E3B); color: #FFF; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                        @iniciales
+                                    </div>
+                                    <div>
+                                        <div style="font-weight: 800; color: var(--lcp-text-dark); font-size: 14px;">@c.NombreCompleto</div>
+                                        <span style="background-color: #EBF8F0; color: #1E663B; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 4px; display: inline-block;">
+                                            🚛 FLOTA OFICIAL LCP
+                                        </span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span style="background-color: #162E3B; color: #FFFFFF; font-family: monospace; font-size: 13px; font-weight: 800; padding: 4px 10px; border-radius: 4px; letter-spacing: 1px; display: inline-block; border: 1px solid #0B1920;">
+                                    @c.PatenteCamion
+                                </span>
+                            </td>
+                            <td>
+                                <div style="font-weight: 700; color: var(--lcp-text-dark); font-size: 13px;">@((c.CapacidadCargaKg / 1000m).ToString("N1")) Tn <span style="font-size: 11px; font-weight: normal; color: var(--lcp-text-muted);">(@c.CapacidadCargaKg.ToString("N0") kg)</span></div>
+                                <div style="font-size: 12px; color: #28536B; font-weight: 600;">@c.CapacidadVolumenM3.ToString("N1") m³ volumen</div>
+                            </td>
+                            <td>
+                                <div style="font-weight: 600; font-size: 13px;">@c.Localidad</div>
+                                <div style="font-size: 11px; color: var(--lcp-text-muted);">@c.Provincia</div>
+                            </td>
+                            <td>
+                                @if (c.DocumentosCount > 0)
+                                {
+                                    <span class="badge-estado badge-completado" style="font-size: 11px; padding: 3px 8px;">
+                                        ✓ @c.DocumentosCount doc(s) adjunto(s)
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="badge-estado badge-cancelado" style="font-size: 11px; padding: 3px 8px;">
+                                        ⚠️ Sin documentos
+                                    </span>
+                                }
+                            </td>
+                            <td>
+                                @if (c.UsuarioId.HasValue)
+                                {
+                                    <span style="color: #2B7A4B; font-weight: 700; font-size: 12px; display: inline-flex; align-items: center; gap: 5px;">
+                                        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #2ECC71;"></span>
+                                        Habilitado
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span style="color: #C2821E; font-weight: 700; font-size: 12px;">Sin usuario</span>
+                                }
+                            </td>
+                            <td style="text-align: right;">
+                                <button type="button" class="btn-lcp-primary btn-lcp-sm" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; padding: 6px 12px; font-size: 12px;"
+                                        onclick="abrirFichaModal(@c.Id, '@Html.Raw(c.NombreCompleto)', '@c.CUIL', '@c.FechaNacimiento.ToString("dd/MM/yyyy")', '@c.PatenteCamion', '@c.Email', '@c.CelularWhatsApp', '@Html.Raw(c.Domicilio)', '@Html.Raw(c.Localidad)', '@Html.Raw(c.Provincia)', '@c.CapacidadCargaKg.ToString("N0")', '@((c.CapacidadCargaKg / 1000m).ToString("N1"))', '@c.CapacidadVolumenM3.ToString("N1")', @(c.UsuarioId.HasValue ? "true" : "false"), @c.DocumentosCount)">
+                                    <span>📋</span> Ver Ficha y Legajo
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<!-- MODAL: FICHA INTEGRAL Y LEGAJO DEL CHOFER -->
+<div id="modalFichaChofer" class="lcp-modal-backdrop" style="display: none;">
+    <div class="lcp-modal" style="max-width: 820px; max-height: 90vh; display: flex; flex-direction: column;">
+        
+        <!-- HEADER DE LA FICHA -->
+        <div class="lcp-modal-header" style="background: linear-gradient(135deg, #162E3B 0%, #28536B 100%); color: #FFFFFF; padding: 18px 24px;">
+            <div style="display: flex; align-items: center; gap: 14px;">
+                <div id="modalChoferAvatar" style="width: 48px; height: 48px; border-radius: 50%; background: #C2821E; color: #FFF; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
+                    C
+                </div>
+                <div>
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <h3 id="modalChoferNombre" style="font-size: 18px; font-weight: 800; color: #FFFFFF; margin: 0;">Ficha del Conductor</h3>
+                        <span style="background-color: #2ECC71; color: #0C381E; font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 12px; text-transform: uppercase;">
+                            FLOTA OFICIAL LCP
+                        </span>
+                    </div>
+                    <div style="font-size: 12px; color: #D5E1DF; margin-top: 3px; display: flex; align-items: center; gap: 12px;">
+                        <span>📍 Base Operativa: Santa Rosa (La Pampa)</span>
+                        <span id="modalChoferEstadoUsuario" style="font-weight: 600;">✓ Cuenta Activa</span>
+                    </div>
+                </div>
+            </div>
+            <button type="button" class="lcp-modal-close" style="color: #FFFFFF; font-size: 26px;" onclick="cerrarFichaModal()">&times;</button>
+        </div>
+
+        <!-- CUERPO DE LA FICHA EN CARDS ORDENADAS -->
+        <div class="lcp-modal-body" style="padding: 22px; overflow-y: auto; flex: 1;">
+            
+            <!-- GRID DE DOS COLUMNAS: DATOS PERSONALES / CAMIÓN -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 20px;">
+                
+                <!-- CARD 1: DATOS PERSONALES Y CONTACTO -->
+                <div style="background: #FFFFFF; border: 1px solid var(--lcp-card-border); border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #EEE8DD;">
+                        <span style="font-size: 16px;">👤</span>
+                        <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: var(--lcp-text-dark);">Datos Personales y Contacto</h4>
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: var(--lcp-text-muted);">CUIL:</span>
+                            <span id="modalChoferCuil" style="font-weight: 800; font-family: monospace; background: #F8F6F0; padding: 2px 8px; border-radius: 4px; border: 1px solid #E5DFD5;">-</span>
+                        </div>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: var(--lcp-text-muted);">Fecha Nacimiento:</span>
+                            <span id="modalChoferNacimiento" style="font-weight: 600;">-</span>
+                        </div>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: var(--lcp-text-muted);">Celular WhatsApp:</span>
+                            <a id="modalChoferTelLink" href="#" target="_blank" style="font-weight: 700; color: #1E663B; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+                                <span>📱</span> <span id="modalChoferTel">-</span>
+                            </a>
+                        </div>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: var(--lcp-text-muted);">Email:</span>
+                            <a id="modalChoferEmailLink" href="#" style="font-weight: 600; color: #28536B; text-decoration: none;">
+                                <span id="modalChoferEmail">-</span>
+                            </a>
+                        </div>
+
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;">
+                            <span style="color: var(--lcp-text-muted); white-space: nowrap;">Domicilio:</span>
+                            <span id="modalChoferDomicilio" style="font-weight: 600; text-align: right;">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CARD 2: CAMIÓN Y CAPACIDADES OPERATIVAS -->
+                <div style="background: #FFFFFF; border: 1px solid var(--lcp-card-border); border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #EEE8DD;">
+                        <span style="font-size: 16px;">🚛</span>
+                        <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: var(--lcp-text-dark);">Unidad Asignada y Capacidad</h4>
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: var(--lcp-text-muted);">Patente Camión:</span>
+                            <span id="modalChoferPatente" style="background-color: #162E3B; color: #FFFFFF; font-family: monospace; font-size: 13px; font-weight: 800; padding: 3px 10px; border-radius: 4px; letter-spacing: 1px; border: 1px solid #000;">
+                                -
+                            </span>
+                        </div>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: var(--lcp-text-muted);">Capacidad Carga:</span>
+                            <div>
+                                <span id="modalChoferTn" style="font-weight: 800; color: #C2821E; font-size: 14px;">- Tn</span>
+                                <span style="font-size: 11px; color: var(--lcp-text-muted); margin-left: 4px;">(<span id="modalChoferCargaKg">-</span> kg)</span>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: var(--lcp-text-muted);">Capacidad Volumen:</span>
+                            <span style="font-weight: 800; color: #28536B; font-size: 14px;"><span id="modalChoferVolumen">-</span> m³</span>
+                        </div>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: var(--lcp-text-muted);">Modalidad:</span>
+                            <span style="font-weight: 700; color: #2B7A4B;">Flota Oficial Propia LCP</span>
+                        </div>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: var(--lcp-text-muted);">Estado para Asignación:</span>
+                            <span style="background: #EBF8F0; color: #1E663B; font-weight: 700; font-size: 11px; padding: 2px 8px; border-radius: 4px;">
+                                Disponible para Viajes LCP
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- CARD 3: LEGAJO DIGITAL Y DOCUMENTOS ADJUNTOS -->
+            <div style="background: #FFFFFF; border: 1px solid var(--lcp-card-border); border-radius: 8px; padding: 18px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid #EEE8DD;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 18px;">📄</span>
+                        <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: var(--lcp-text-dark);">Legajo Digital y Documentación Respaldatoria</h4>
+                    </div>
+                    <span id="badgeCantidadDocs" class="badge-estado badge-encurso" style="font-size: 11px;">0 docs</span>
+                </div>
+
+                <div id="contenedorDocsCargando" style="text-align: center; padding: 24px; color: var(--lcp-text-muted); font-size: 13px;">
+                    Cargando legajo digital...
+                </div>
+
+                <div id="contenedorDocsLista" style="display: none; flex-direction: column; gap: 10px;">
+                    <!-- Se carga dinámicamente vía fetch -->
+                </div>
+            </div>
+
+            <!-- CARD 4: ADJUNTAR NUEVO DOCUMENTO AL LEGAJO -->
+            <div style="background: #F8F6F0; border: 1px dashed #CCC5B7; border-radius: 8px; padding: 18px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                    <span style="font-size: 18px;">📎</span>
+                    <h4 style="margin: 0; font-size: 13px; font-weight: 700; color: var(--lcp-text-dark);">Adjuntar Nuevo Documento al Legajo del Chofer</h4>
+                </div>
+
+                <form asp-action="SubirDocumentoChofer" method="post" enctype="multipart/form-data" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)) auto; gap: 12px; align-items: flex-end;">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="conductorId" id="inputModalConductorId" value="" />
+
+                    <div>
+                        <label class="form-label" style="font-size: 11px; font-weight: 700;">Tipo de Documento:</label>
+                        <select name="tipoDocumento" class="form-input" style="font-size: 12px; padding: 7px 10px;" required>
+                            <option value="LicenciaConducirLINTI">Licencia / LINTI Cargas Generales</option>
+                            <option value="CedulaVerdeCamion">Cédula del Camión / Título</option>
+                            <option value="SeguroCamionART">Póliza de Seguro / ART</option>
+                            <option value="RTORevisionTecnica">RTO / VTV Verificación Técnica</option>
+                            <option value="ConstanciaAFIP">Constancia AFIP / Inscripción</option>
+                            <option value="OtroDocumento">Otro Certificado / Constancia</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="form-label" style="font-size: 11px; font-weight: 700;">Archivo (PDF o Imagen):</label>
+                        <input type="file" name="archivo" class="form-input" required accept=".pdf,image/*" style="font-size: 12px; padding: 5px;" />
+                    </div>
+
+                    <div>
+                        <button type="submit" class="btn-lcp-primary" style="height: 38px; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 0 16px;">
+                            <span>📤</span> Subir al Legajo
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+        </div>
+
+        <!-- FOOTER DEL MODAL -->
+        <div class="lcp-modal-footer" style="padding: 12px 24px; background: #F8F6F0; border-top: 1px solid var(--lcp-card-border); display: flex; justify-content: flex-end;">
+            <button type="button" class="btn-lcp-outline btn-lcp-sm" onclick="cerrarFichaModal()">
+                Cerrar Ficha
+            </button>
+        </div>
+
+    </div>
+</div>
+
+@section Scripts {
+    <style>
+        .lcp-modal-backdrop {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(22, 46, 59, 0.65);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            backdrop-filter: blur(2px);
+        }
+        .lcp-modal {
+            background: #FFFFFF;
+            border-radius: 10px;
+            width: 92%;
+            box-shadow: 0 12px 36px rgba(0,0,0,0.28);
+            overflow: hidden;
+            animation: lcpModalFadeIn 0.2s ease-out;
+        }
+        @@keyframes lcpModalFadeIn {
+            from { opacity: 0; transform: translateY(-10px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .lcp-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .lcp-modal-close {
+            background: none; border: none; cursor: pointer; line-height: 1;
+        }
+    </style>
+
+    <script>
+        async function abrirFichaModal(id, nombre, cuil, fechaNac, patente, email, tel, domicilio, localidad, provincia, cargaKg, tn, vol, tieneUsuario, cantDocs) {
+            // Iniciales
+            const parts = nombre.split(" ").filter(p => p.length > 0);
+            let iniciales = "C";
+            if (parts.length >= 2) {
+                iniciales = (parts[0][0] + parts[1][0]).toUpperCase();
+            } else if (parts.length === 1) {
+                iniciales = parts[0][0].toUpperCase();
+            }
+            document.getElementById("modalChoferAvatar").textContent = iniciales;
+
+            // Datos Generales
+            document.getElementById("modalChoferNombre").textContent = nombre;
+            document.getElementById("modalChoferCuil").textContent = cuil;
+            document.getElementById("modalChoferNacimiento").textContent = fechaNac || "-";
+            document.getElementById("modalChoferPatente").textContent = patente;
+            document.getElementById("modalChoferEmail").textContent = email;
+            document.getElementById("modalChoferEmailLink").href = `mailto:${email}`;
+            document.getElementById("modalChoferTel").textContent = tel;
+            
+            // Link de WhatsApp limpio
+            const cleanTel = tel.replace(/[^0-9]/g, '');
+            document.getElementById("modalChoferTelLink").href = cleanTel ? `https://wa.me/${cleanTel}` : '#';
+
+            document.getElementById("modalChoferDomicilio").textContent = `${domicilio}, ${localidad} (${provincia})`;
+            document.getElementById("modalChoferTn").textContent = `${tn} Tn`;
+            document.getElementById("modalChoferCargaKg").textContent = cargaKg;
+            document.getElementById("modalChoferVolumen").textContent = vol;
+            document.getElementById("inputModalConductorId").value = id;
+
+            // Estado de cuenta
+            const estadoSpan = document.getElementById("modalChoferEstadoUsuario");
+            if (tieneUsuario) {
+                estadoSpan.innerHTML = `<span style="color: #2ECC71;">✓ Cuenta Activa y Habilitada</span>`;
+            } else {
+                estadoSpan.innerHTML = `<span style="color: #F39C12;">⚠️ Sin usuario asociado</span>`;
+            }
+
+            document.getElementById("badgeCantidadDocs").textContent = `${cantDocs} doc(s)`;
+
+            // Mostrar Modal
+            const modal = document.getElementById("modalFichaChofer");
+            modal.style.display = "flex";
+
+            // Consultar Documentos
+            const cargando = document.getElementById("contenedorDocsCargando");
+            const lista = document.getElementById("contenedorDocsLista");
+            cargando.style.display = "block";
+            cargando.textContent = "Cargando legajo y documentos adjuntos...";
+            lista.style.display = "none";
+            lista.innerHTML = "";
+
+            try {
+                const response = await fetch(`/Admin/DocumentosChofer/${id}`);
+                if (response.ok) {
+                    const docs = await response.json();
+                    cargando.style.display = "none";
+                    lista.style.display = "flex";
+
+                    document.getElementById("badgeCantidadDocs").textContent = `${docs.length} doc(s)`;
+
+                    if (!docs || docs.length === 0) {
+                        lista.innerHTML = `
+                            <div style="background-color: #F8F6F0; border: 1px dashed #CCC5B7; border-radius: 6px; padding: 18px; text-align: center; color: var(--lcp-text-muted); font-size: 13px;">
+                                ⚠️ No hay documentos adjuntos en este legajo aún. Podés adjuntar la Licencia LINTI, Cédula Verde o Seguro con el formulario inferior.
+                            </div>
+                        `;
+                    } else {
+                        docs.forEach(d => {
+                            const item = document.createElement("div");
+                            item.style.cssText = "display: flex; justify-content: space-between; align-items: center; background: #FFFFFF; border: 1px solid #DDD7CD; border-radius: 6px; padding: 12px 16px; font-size: 13px; transition: all 0.2s;";
+                            
+                            let icono = "📄";
+                            let colorBadge = "#28536B";
+                            if (d.tipoDocumento.includes("Licencia")) {
+                                icono = "🪪";
+                                colorBadge = "#162E3B";
+                            } else if (d.tipoDocumento.includes("Cedula")) {
+                                icono = "🚛";
+                                colorBadge = "#C2821E";
+                            } else if (d.tipoDocumento.includes("Seguro")) {
+                                icono = "🛡️";
+                                colorBadge = "#2B7A4B";
+                            }
+
+                            item.innerHTML = `
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <span style="font-size: 24px;">${icono}</span>
+                                    <div>
+                                        <div style="font-weight: 800; color: #192A33; display: flex; align-items: center; gap: 8px;">
+                                            <span>${d.tipoDocumento}</span>
+                                            <span style="font-size: 10px; font-weight: 700; background: #EEE; color: ${colorBadge}; padding: 1px 6px; border-radius: 3px;">OFICIAL</span>
+                                        </div>
+                                        <div style="font-size: 11px; color: var(--lcp-text-muted); margin-top: 2px;">
+                                            📎 ${d.nombreArchivo}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <a href="${d.rutaUrl}" target="_blank" class="btn-lcp-outline btn-lcp-sm" style="text-decoration: none; font-size: 12px; padding: 5px 12px; display: inline-flex; align-items: center; gap: 6px; font-weight: 700;">
+                                        <span>👁️</span> Ver / Descargar
+                                    </a>
+                                </div>
+                            `;
+                            lista.appendChild(item);
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error(err);
+                cargando.textContent = "Error al consultar los documentos del chofer.";
+            }
+        }
+
+        function cerrarFichaModal() {
+            document.getElementById("modalFichaChofer").style.display = "none";
+        }
+
+        // Cerrar con Escape o clic fuera
+        document.addEventListener("keydown", function(e) {
+            if (e.key === "Escape") cerrarFichaModal();
+        });
+        document.getElementById("modalFichaChofer")?.addEventListener("click", function(e) {
+            if (e.target === this) cerrarFichaModal();
+        });
+    </script>
+}

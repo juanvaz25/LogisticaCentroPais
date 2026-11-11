@@ -1,0 +1,454 @@
+@model List<MensajeChatDto>
+@using System.Security.Claims
+@using LCP.Shared.Constants
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = "Inbox / Comunicaciones en vivo - Logística Centro País";
+    var conversaciones = ViewBag.Conversaciones as List<ConversacionResumenDto> ?? new();
+    var contactos = ViewBag.Contactos as List<UsuarioDto> ?? new();
+    var solicitudes = ViewBag.Solicitudes as List<SolicitudOperacionDto> ?? new();
+    var convActivaId = ViewBag.ConversacionActivaId as string ?? (conversaciones.FirstOrDefault()?.ConversacionId ?? "");
+    var convActiva = ViewBag.ConvActiva as ConversacionResumenDto;
+    var currentUserIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    int.TryParse(currentUserIdStr, out int currentUserId);
+
+    var activas = conversaciones.Where(c => !c.Finalizada).ToList();
+    var archivadas = conversaciones.Where(c => c.Finalizada).ToList();
+    var gruposActivos = activas.Where(c => c.ConversacionId.StartsWith("GRP-")).ToList();
+}
+
+<div class="page-header" style="margin-bottom: 16px;">
+    <div>
+        <h1 class="page-title">Centro de Comunicaciones</h1>
+        <p class="page-subtitle">Mensajería instantánea en tiempo real (SignalR) con grupos tripartitos y chats directos</p>
+    </div>
+
+    <div>
+        <button type="button" class="btn-lcp-primary" onclick="abrirModalNuevoChat()">
+            + Iniciar Conversación
+        </button>
+    </div>
+</div>
+
+<!-- CONTENEDOR DE CHAT (PDF Página 5) -->
+<div class="chat-container">
+    <!-- BARRA LATERAL DE CONVERSACIONES -->
+    <div class="chat-sidebar">
+        <div class="chat-sidebar-header">
+            <h2 style="font-size: 16px; font-weight: 700; margin: 0 0 10px;">Salas y Contactos</h2>
+            <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                <button type="button" id="tabTodos" class="tab-btn active" style="padding: 4px 8px; font-size: 11px;" onclick="filtrarCanales('todos')">Activos (@activas.Count)</button>
+                <button type="button" id="tabGrupos" class="tab-btn" style="padding: 4px 8px; font-size: 11px;" onclick="filtrarCanales('grupos')">👥 Grupos (@gruposActivos.Count)</button>
+                <button type="button" id="tabDirectos" class="tab-btn" style="padding: 4px 8px; font-size: 11px;" onclick="filtrarCanales('directos')">👤 Directos</button>
+                <button type="button" id="tabArchivados" class="tab-btn" style="padding: 4px 8px; font-size: 11px;" onclick="filtrarCanales('archivados')">📁 Archivados (@archivadas.Count)</button>
+            </div>
+        </div>
+
+        <div style="overflow-y: auto; flex-grow: 1;" id="listaConversaciones">
+            <div id="avisoVacioCanales" style="display: none; padding: 32px 18px; text-align: center; color: var(--lcp-text-muted); font-size: 13px;">
+                <span id="textoAvisoVacio">No hay conversaciones en esta sección.</span>
+            </div>
+
+            @foreach (var c in conversaciones)
+            {
+                bool esGrupo = c.ConversacionId.StartsWith("GRP-");
+                <a asp-action="Index" asp-route-conv="@c.ConversacionId" 
+                   class="chat-user-item item-canal @(c.ConversacionId == convActivaId ? "active" : "")"
+                   data-tipo="@(esGrupo ? "grupos" : "directos")"
+                   data-archivado="@(c.Finalizada ? "true" : "false")"
+                   style="@(c.Finalizada ? "background-color: #F8F5EE; opacity: 0.85;" : "")">
+                    <div class="chat-user-name">
+                        <span style="font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
+                            @(esGrupo ? (c.Finalizada ? "📁 " : "👥 ") : "👤 ") @c.Titulo
+                            @if (c.Finalizada)
+                            {
+                                <span class="badge-estado badge-cancelada" style="font-size: 9px; padding: 1px 5px;">🔒 Archivada</span>
+                            }
+                        </span>
+                        <span class="chat-time">@c.HoraUltimoMensaje</span>
+                    </div>
+                    <div style="font-size: 11px; color: var(--lcp-primary); font-weight: 600; margin-bottom: 2px;">
+                        @c.Subtitulo
+                    </div>
+                    <div class="chat-preview">@c.UltimoMensaje</div>
+                </a>
+            }
+        </div>
+    </div>
+
+    <!-- VENTANA PRINCIPAL DE CONVERSACIÓN (PDF Página 5) -->
+    <div class="chat-main">
+        <div class="chat-main-header">
+            <div>
+                <div style="font-weight: 700; font-size: 15px; color: #192A33; display: flex; align-items: center; gap: 8px;">
+                    @(convActiva?.Titulo ?? (conversaciones.Any() ? "Seleccioná una conversación" : "Sin conversaciones activas"))
+                    @if (convActiva?.Finalizada == true)
+                    {
+                        <span class="badge-estado badge-cancelada" style="font-size: 11px; padding: 2px 6px;">🔒 Finalizada (Solo lectura)</span>
+                    }
+                </div>
+                <div style="font-size: 12px; color: var(--lcp-text-muted);">
+                    <span style="color: @(convActiva?.Finalizada == true ? "#9D2424" : "#248C4E"); font-weight: 700;">
+                        @(convActiva?.Finalizada == true ? "🔒 Sala Cerrada y Archivada" : (convActiva != null ? "● SignalR Conectado" : "Bandeja de Entrada"))
+                    </span> · 
+                    <span>@(convActiva?.Subtitulo ?? "Canal de mensajería")</span>
+                </div>
+            </div>
+            <div>
+                @if (convActiva?.Finalizada != true)
+                {
+                    <button type="button" class="btn-lcp-outline btn-lcp-sm" style="color: #9D2424; border-color: #9D2424;" onclick="abrirModalIncidente()">
+                        🚨 Reportar incidente / demora en ruta
+                    </button>
+                }
+                else if (convActiva?.SolicitudId.HasValue == true)
+                {
+                    <a asp-controller="Solicitudes" asp-action="Detalle" asp-route-id="@convActiva.SolicitudId.Value" class="btn-lcp-outline btn-lcp-sm">
+                        📄 Ver Detalles de la Operación →
+                    </a>
+                }
+            </div>
+        </div>
+
+        <!-- MENSAJES HISTÓRICOS Y EN TIEMPO REAL -->
+        <div class="chat-messages" id="chatMessagesArea">
+            @if (!Model.Any())
+            {
+                <div id="avisoSinMensajes" style="text-align: center; color: var(--lcp-text-muted); font-size: 13px; padding: 40px 20px;">
+                    💬 Sala abierta. Escribí tu primer mensaje para coordinar la operación en tiempo real.
+                </div>
+            }
+            @foreach (var m in Model)
+            {
+                bool esMio = m.RemitenteUsuarioId == currentUserId;
+                <div class="chat-bubble @(m.EsIncidenteRuta ? "incident" : esMio ? "sent" : "received")">
+                    <div style="font-size: 11px; font-weight: 700; margin-bottom: 2px; opacity: 0.85;">
+                        @m.RemitenteNombre (@m.RemitenteRol) · @m.HoraFormateada
+                    </div>
+                    @if (m.EsIncidenteRuta)
+                    {
+                        <div style="font-weight: 700; margin-bottom: 4px; color: #9D2424;">🚨 REPORTE DE INCIDENTE EN RUTA:</div>
+                    }
+                    <div style="word-break: break-word;">@m.TextoMensaje</div>
+                </div>
+            }
+        </div>
+
+        @if (convActiva?.Finalizada == true)
+        {
+            <div style="padding: 16px 20px; background-color: #F4EFE6; border-top: 1px solid #DDD7CD; color: #5C5449; font-size: 13px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 20px;">🔒</span>
+                    <div>
+                        <strong>Esta sala de chat fue finalizada.</strong>
+                        <div style="color: var(--lcp-text-muted); font-size: 12px;">La operación asociada concluyó o fue cancelada. El historial se encuentra archivado en los detalles del pedido en modo solo lectura.</div>
+                    </div>
+                </div>
+                @if (convActiva?.SolicitudId.HasValue == true)
+                {
+                    <a asp-controller="Solicitudes" asp-action="Detalle" asp-route-id="@convActiva.SolicitudId.Value" class="btn-lcp-primary btn-lcp-sm">
+                        Ver Detalles del Pedido →
+                    </a>
+                }
+            </div>
+        }
+        else
+        {
+            <!-- ENTRADA DE MENSAJES DINÁMICA (AJAX + SIGNALR SIN RECARGA) -->
+            <div class="chat-input-area">
+                <input type="text" id="inputMensajeAjax" class="form-input" placeholder="Escribí un mensaje y presioná Enter..." autocomplete="off" onkeydown="capturarEnter(event)" />
+                <button type="button" class="btn-lcp-primary" id="btnEnviarMensaje" onclick="enviarMensajeTiempoReal(false)">
+                    Enviar
+                </button>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- MODAL INICIAR NUEVO CHAT O GRUPO -->
+<div id="modalNuevoChat" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; align-items: center; justify-content: center;">
+    <div style="background: #FAF8F5; border: 1px solid #DDD7CD; border-radius: 8px; max-width: 500px; width: 90%; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+        <h3 style="margin-top: 0; font-size: 18px; font-weight: 700; color: #192A33;">Iniciar Nueva Conversación</h3>
+
+        <div style="margin-bottom: 18px;">
+            <label class="form-label">Elegí una Sala Grupal Tripartita (Operación / Viaje):</label>
+            <select id="selectGrupoOperacion" class="form-input" onchange="seleccionarGrupoNuevo(this.value)">
+                <option value="">-- Seleccionar grupo de operación --</option>
+                @foreach (var s in solicitudes)
+                {
+                    <option value="GRP-SOL-@s.Id">
+                        Operación @s.CodigoSolicitud · @s.ClienteRazonSocial (@(s.ConductorNombreCompleto ?? "Chofer LCP") + Operador)
+                    </option>
+                }
+            </select>
+        </div>
+
+        <div style="border-top: 1px solid #E5DFD5; padding-top: 14px; margin-bottom: 18px;">
+            <label class="form-label">O elegí un Contacto Directo para chatear 1 a 1:</label>
+            <div style="max-height: 180px; overflow-y: auto;">
+                @foreach (var u in contactos.Where(u => u.Id != currentUserId))
+                {
+                    int min = Math.Min(currentUserId, u.Id);
+                    int max = Math.Max(currentUserId, u.Id);
+                    string directId = $"DIRECT-{min}-{max}";
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid #ECE7DE; cursor: pointer;"
+                         onclick="abrirDirectoNuevo('@directId')">
+                        <div>
+                            <div style="font-weight: 700; font-size: 13px; color: #192A33;">@u.NombreCompleto</div>
+                            <div style="font-size: 11px; color: var(--lcp-text-muted);">@u.Rol · @u.Email</div>
+                        </div>
+                        <button type="button" class="btn-lcp-outline btn-lcp-sm">Chatear</button>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end;">
+            <button type="button" class="btn-lcp-outline" onclick="cerrarModalNuevoChat()">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL REPORTAR INCIDENTE EN RUTA -->
+<div id="modalIncidente" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; align-items: center; justify-content: center;">
+    <div style="background: #FAF8F5; border: 1px solid #DDD7CD; border-radius: 8px; max-width: 460px; width: 90%; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+        <h3 style="margin-top: 0; font-size: 18px; font-weight: 700; color: #9D2424;">🚨 Reportar Incidente o Demora en Ruta</h3>
+        <p style="font-size: 13px; color: var(--lcp-text-muted); margin-top: -6px; margin-bottom: 16px;">
+            Este mensaje emitirá una alerta visual prioritaria a todo el equipo (Operador, Cliente y Chofer).
+        </p>
+
+        <div class="form-group">
+            <label class="form-label">Tipo de Contingencia:</label>
+            <select id="selectTipoIncidente" class="form-input">
+                <option value="Tránsito / Corte de Ruta">Tránsito pesado / Corte de ruta</option>
+                <option value="Desperfecto Mecánico">Desperfecto mecánico del camión</option>
+                <option value="Clima / Lluvia Intensa">Contingencia climática / Temporal</option>
+                <option value="Demora en Carga">Demora en carga o documentación</option>
+                <option value="Otro">Otro imprevisto</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Detalle del Incidente *</label>
+            <textarea id="textoIncidente" class="form-input" rows="3" placeholder="Ej: Demora de 45 minutos por corte en RN 5 a la altura de Chivilcoy." required></textarea>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+            <button type="button" class="btn-lcp-outline" onclick="cerrarModalIncidente()">Cancelar</button>
+            <button type="button" class="btn-lcp-primary" style="background-color: #9D2424; border-color: #9D2424;" onclick="confirmarReporteIncidente()">
+                Emitir Alerta Prioritaria
+            </button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const convActivaId = '@convActivaId';
+        const currentUserId = @currentUserId;
+
+        function scrollChatAbajo() {
+            const area = document.getElementById("chatMessagesArea");
+            if (area) area.scrollTop = area.scrollHeight;
+        }
+
+        function capturarEnter(e) {
+            if (e.key === "Enter") {
+                enviarMensajeTiempoReal(false);
+            }
+        }
+
+        async function enviarMensajeTiempoReal(esIncidente, textoForzado) {
+            const input = document.getElementById("inputMensajeAjax");
+            const texto = textoForzado || input.value.trim();
+
+            if (!texto) return;
+
+            const payload = {
+                conversacionId: convActivaId,
+                textoMensaje: texto,
+                esIncidenteRuta: esIncidente
+            };
+
+            // Inmediata respuesta visual (optimistic UI)
+            const area = document.getElementById("chatMessagesArea");
+            const avisoSin = document.getElementById("avisoSinMensajes");
+            if (avisoSin) avisoSin.remove();
+
+            const bubble = document.createElement("div");
+            bubble.className = "chat-bubble " + (esIncidente ? "incident" : "sent");
+            const hora = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            bubble.innerHTML = `
+                <div style="font-size: 11px; font-weight: 700; margin-bottom: 2px; opacity: 0.85;">
+                    Vos · ${hora}
+                </div>
+                ${esIncidente ? '<div style="font-weight: 700; margin-bottom: 4px; color: #9D2424;">🚨 REPORTE DE INCIDENTE EN RUTA:</div>' : ''}
+                <div style="word-break: break-word;">${texto}</div>
+            `;
+            area.appendChild(bubble);
+            scrollChatAbajo();
+
+            input.value = "";
+            input.focus();
+
+            try {
+                const response = await fetch('/Inbox/EnviarAjax', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const err = await response.json().catch(() => null);
+                    alert(err && err.mensaje ? err.mensaje : "No se pudo entregar el mensaje en la sala (puede encontrarse cerrada o finalizada).");
+                    window.location.reload();
+                    return;
+                }
+            } catch (err) {
+                console.error("Fallo de red en mensajería:", err);
+            }
+        }
+
+        function filtrarCanales(tipo) {
+            let visibles = 0;
+            const items = document.querySelectorAll(".item-canal");
+
+            items.forEach(item => {
+                const esArchivado = item.dataset.archivado === "true";
+                const tipoCanal = item.dataset.tipo;
+                let mostrar = false;
+
+                if (tipo === "archivados") {
+                    mostrar = esArchivado;
+                } else if (tipo === "todos") {
+                    mostrar = !esArchivado; // Solo activas, no se acumulan archivadas
+                } else if (tipo === "grupos") {
+                    mostrar = !esArchivado && tipoCanal === "grupos";
+                } else if (tipo === "directos") {
+                    mostrar = !esArchivado && tipoCanal === "directos";
+                }
+
+                if (mostrar) {
+                    item.style.display = "block";
+                    visibles++;
+                } else {
+                    item.style.display = "none";
+                }
+            });
+
+            const aviso = document.getElementById("avisoVacioCanales");
+            const textoAviso = document.getElementById("textoAvisoVacio");
+            if (aviso && textoAviso) {
+                if (visibles === 0) {
+                    aviso.style.display = "block";
+                    if (tipo === "archivados") {
+                        textoAviso.textContent = "📁 No hay salas archivadas. Cuando se complete o cancele una operación, su chat se archivará aquí automáticamente.";
+                    } else if (tipo === "grupos") {
+                        textoAviso.textContent = "👥 No hay grupos de operación activos.";
+                    } else if (tipo === "directos") {
+                        textoAviso.textContent = "👤 No hay chats directos activos.";
+                    } else {
+                        textoAviso.textContent = "No hay salas de chat activas.";
+                    }
+                } else {
+                    aviso.style.display = "none";
+                }
+            }
+
+            const btnTodos = document.getElementById("tabTodos");
+            const btnGrupos = document.getElementById("tabGrupos");
+            const btnDirectos = document.getElementById("tabDirectos");
+            const btnArchivados = document.getElementById("tabArchivados");
+
+            if (btnTodos) btnTodos.className = "tab-btn " + (tipo === "todos" ? "active" : "");
+            if (btnGrupos) btnGrupos.className = "tab-btn " + (tipo === "grupos" ? "active" : "");
+            if (btnDirectos) btnDirectos.className = "tab-btn " + (tipo === "directos" ? "active" : "");
+            if (btnArchivados) btnArchivados.className = "tab-btn " + (tipo === "archivados" ? "active" : "");
+        }
+
+        function abrirModalNuevoChat() {
+            document.getElementById("modalNuevoChat").style.display = "flex";
+        }
+        function cerrarModalNuevoChat() {
+            document.getElementById("modalNuevoChat").style.display = "none";
+        }
+
+        function seleccionarGrupoNuevo(val) {
+            if (val) {
+                window.location.href = `/Inbox?conv=${val}`;
+            }
+        }
+
+        function abrirDirectoNuevo(convId) {
+            window.location.href = `/Inbox?conv=${convId}`;
+        }
+
+        function abrirModalIncidente() {
+            document.getElementById("modalIncidente").style.display = "flex";
+        }
+        function cerrarModalIncidente() {
+            document.getElementById("modalIncidente").style.display = "none";
+        }
+
+        function confirmarReporteIncidente() {
+            const tipo = document.getElementById("selectTipoIncidente").value;
+            const detalle = document.getElementById("textoIncidente").value.trim();
+
+            if (!detalle) {
+                alert("Por favor detalle la causa del incidente.");
+                return;
+            }
+
+            const mensajeFinal = `[${tipo.toUpperCase()}]: ${detalle}`;
+            cerrarModalIncidente();
+            enviarMensajeTiempoReal(true, mensajeFinal);
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            scrollChatAbajo();
+
+            const esActivaFinalizada = @(convActiva?.Finalizada == true ? "true" : "false");
+            if (esActivaFinalizada) {
+                filtrarCanales('archivados');
+            } else {
+                filtrarCanales('todos');
+            }
+
+            // Iniciar conexión SignalR en vivo
+            iniciarChatHub(convActivaId, function (msg) {
+                // Solo renderizar si el mensaje no es del propio usuario (ya se renderizó optimisticamente)
+                if (msg.remitenteUsuarioId !== currentUserId && msg.conversacionId === convActivaId) {
+                    const area = document.getElementById("chatMessagesArea");
+                    const avisoSin = document.getElementById("avisoSinMensajes");
+                    if (avisoSin) avisoSin.remove();
+
+                    const div = document.createElement("div");
+                    div.className = "chat-bubble " + (msg.esIncidenteRuta ? "incident" : "received");
+                    div.innerHTML = `
+                        <div style="font-size: 11px; font-weight: 700; margin-bottom: 2px; opacity: 0.85;">
+                            ${msg.remitenteNombre} (${msg.remitenteRol}) · ${msg.horaFormateada || "Ahora"}
+                        </div>
+                        ${msg.esIncidenteRuta ? '<div style="font-weight: 700; margin-bottom: 4px; color: #9D2424;">🚨 REPORTE DE INCIDENTE:</div>' : ''}
+                        <div style="word-break: break-word;">${msg.textoMensaje}</div>
+                    `;
+                    area.appendChild(div);
+                    scrollChatAbajo();
+                }
+            }, function (incidente) {
+                // Alerta prioritaria global
+                const audio = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU...");
+                try { audio.play(); } catch(e){}
+
+                alert(`🚨 ALERTA OPERATIVA EN TIEMPO REAL:\n\n${incidente.remitenteNombre} (${incidente.remitenteRol}) reportó un incidente en ruta:\n\n"${incidente.textoMensaje}"`);
+            }, function (finalizadoInfo) {
+                if (finalizadoInfo && finalizadoInfo.conversacionId === convActivaId) {
+                    alert(`🔒 La operación asociada ha sido finalizada.\n\nLa sala de chat pasa a modo solo lectura y su historial se preserva en los detalles del pedido.`);
+                    window.location.reload();
+                }
+            });
+        });
+    </script>
+}

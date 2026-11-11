@@ -1,0 +1,758 @@
+@model CrearSolicitudDto
+@using LCP.Shared.Constants
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = "Nueva Solicitud de Operación - Logística Centro País";
+    var contratos = ViewBag.Contratos as List<ContratoAlquilerDarsenaDto> ?? new();
+    var choferes = ViewBag.ChoferesPropios as List<ConductorViewModel> ?? new();
+    var inventario = ViewBag.Inventario as List<LoteInventarioDto> ?? new();
+}
+
+<!-- Leaflet CSS & JS para Mapa Interactivo de Rutas -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+<div style="max-width: 900px; margin: 0 auto; padding-bottom: 60px;">
+    <div class="page-header">
+        <div>
+            <a asp-action="Index" style="font-size: 13px; color: var(--lcp-primary); font-weight: 600; text-decoration: none;">← Volver a solicitudes</a>
+            <h1 class="page-title" style="margin-top: 8px;">Nueva Solicitud de Operación</h1>
+            <p class="page-subtitle">Programación de ingreso o retiro con cálculo automático de distancias y selección de stock</p>
+        </div>
+    </div>
+
+    @if (!ViewData.ModelState.IsValid)
+    {
+        <div style="background-color: #FBE8E8; border: 1px solid #F3C7C7; color: #9D2424; padding: 14px 18px; border-radius: 6px; margin-bottom: 20px; font-size: 14px;">
+            @Html.ValidationSummary(false)
+        </div>
+    }
+
+    @if (!contratos.Any())
+    {
+        <div style="background-color: #FFF3CD; border: 1px solid #FFEEBA; color: #856404; padding: 18px 22px; border-radius: 8px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+            <div>
+                <div style="font-weight: 800; font-size: 15px; margin-bottom: 4px;">⚠️ Requisito Operativo: Dársena Alquilada Requerida</div>
+                <div style="font-size: 13px; line-height: 1.4;">
+                    Para cargar stock o programar arribos e ingresos al predio LCP, es obligatorio contar con al menos una dársena en alquiler activa y habilitada con factura paga.
+                </div>
+            </div>
+            <a asp-controller="ClienteDarsenas" asp-action="MisContratos" class="btn-lcp-primary btn-lcp-sm" style="white-space: nowrap; text-decoration: none;">
+                Solicitar Alquiler de Dársena →
+            </a>
+        </div>
+    }
+
+    <form asp-action="Nueva" method="post" id="formNuevaSolicitud">
+        @Html.AntiForgeryToken()
+        <input asp-for="ClienteEmpresaId" type="hidden" />
+
+        <!-- 1. DÁRSENA Y TIPO DE OPERACIÓN -->
+        <div class="lcp-card">
+            <h2 class="lcp-card-title">1. Dársena y Tipo de Movimiento</h2>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                <div class="form-group">
+                    <label class="form-label">Dársena Alquilada *</label>
+                    <select asp-for="DarsenaId" id="selectDarsena" class="form-input" required onchange="onDarsenaChange()">
+                        <option value="">-- Seleccione dársena asignada --</option>
+                        @foreach (var c in contratos)
+                        {
+                            <option value="@c.DarsenaId"
+                                    data-capacidad="@c.CapacidadMaximaM3"
+                                    data-ocupado="@c.VolumenOcupadoM3"
+                                    data-disponible="@c.VolumenDisponibleM3"
+                                    data-llena="@(c.EstaLlena ? "true" : "false")"
+                                    data-codigo="@c.DarsenaCodigo">
+                                @c.DarsenaCodigo (Plan @c.PlanNombre - Disp: @c.VolumenDisponibleM3.ToString("N1") m³ / @c.CapacidadMaximaM3.ToString("N0") m³@(c.EstaLlena ? " [COMPLETA]" : ""))
+                            </option>
+                        }
+                    </select>
+                    <div id="bannerCapacidadDarsena" style="margin-top: 10px; display: none;"></div>
+                    @if (!contratos.Any())
+                    {
+                        <span style="font-size: 12px; color: #9D2424; display: block; margin-top: 4px;">
+                            ⚠️ No poseés contratos activos de dársenas. <a asp-controller="ClienteDarsenas" asp-action="MisContratos">Alquilar una dársena aquí</a>.
+                        </span>
+                    }
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Tipo de Movimiento *</label>
+                    <select asp-for="TipoOperacion" id="selectTipoOperacion" class="form-input" required onchange="actualizarModoOperacion()">
+                        <option value="1">📥 Arribo / Ingreso (Envío mercadería a guardar en LCP)</option>
+                        <option value="2">📤 Despacho / Retiro (Retiro mercadería de mi stock guardado)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- AVISO DEL OPERADOR -->
+            <div style="background: #EBF3F8; border-left: 4px solid #28536B; padding: 12px 16px; border-radius: 4px; font-size: 13px; color: #192A33;">
+                ℹ️ <strong>Asignación por Operador:</strong> Vos indicás la fecha y hora en que sale tu camión o solicitás el retiro. El <strong>Operador del nodo LCP</strong> confirmará el turno oficial en muelle y te avisará de inmediato.
+            </div>
+        </div>
+
+        <!-- 2. DETALLE DE LA MERCADERÍA (STOCK O NUEVO INGRESO) -->
+        <div class="lcp-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h2 class="lcp-card-title" id="tituloCarga" style="margin: 0;">2. Mercadería a Ingresar</h2>
+                <span id="badgeTipoCarga" class="badge-estado badge-encurso" style="font-size: 11px;">Nuevo Ingreso</span>
+            </div>
+
+            <!-- SECCIÓN RETIRO DE STOCK (Solo visible si Despacho / Retiro) -->
+            <div id="seccionStockRetiro" style="display: none; background: #FAF6ED; border: 1px solid #E2D9C8; border-radius: 8px; padding: 18px; margin-bottom: 20px;">
+                <div style="font-weight: 700; color: #192A33; margin-bottom: 6px; font-size: 14px;">
+                    📦 Seleccioná el producto de tu stock almacenado en la dársena:
+                </div>
+                <p style="font-size: 12px; color: var(--lcp-text-muted); margin-bottom: 14px;">
+                    Elegí el lote disponible y la cantidad a despachar. El sistema descontará automáticamente el stock al completar la salida.
+                </p>
+
+                <div class="form-group">
+                    <label class="form-label">Producto en Stock *</label>
+                    <select asp-for="LoteInventarioId" id="selectLoteStock" class="form-input" onchange="seleccionarLoteStock()">
+                        <option value="">-- Seleccionar producto de stock guardado --</option>
+                        @foreach (var l in inventario)
+                        {
+                            <option value="@l.Id" 
+                                    data-darsena="@l.DarsenaId"
+                                    data-producto="@l.ProductoDescripcion"
+                                    data-codigo="@l.CodigoLote"
+                                    data-unidades="@l.CantidadUnidades"
+                                    data-bultos="@l.CantidadBultosCajas"
+                                    data-peso="@l.PesoKg"
+                                    data-volumen="@l.VolumenM3">
+                                [@l.DarsenaCodigo] @l.ProductoDescripcion (Lote: @l.CodigoLote) - Disp: @l.CantidadUnidades u. (@l.PesoKg.ToString("N0") kg / @l.VolumenM3.ToString("N2") m³)
+                            </option>
+                        }
+                    </select>
+                </div>
+
+                <div id="panelLoteSeleccionado" style="display: none; margin-top: 14px; background: #FFFFFF; border: 1px solid #D5CEBE; border-radius: 6px; padding: 14px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div>
+                            <label class="form-label">Cantidad de unidades a retirar *</label>
+                            <input asp-for="CantidadRetirada" id="inputCantidadRetirada" type="number" min="1" class="form-input" placeholder="Ej: 20" oninput="calcularProrrateoStock()" />
+                            <span id="ayudaStockMaximo" style="font-size: 11px; color: var(--lcp-text-muted); display: block; margin-top: 3px;"></span>
+                        </div>
+                        <div>
+                            <label class="form-label">Stock restante proyectado</label>
+                            <input id="inputStockRestante" type="text" class="form-input" readonly style="background-color: #F8F6F0; font-weight: 700; color: #2B7A4B;" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CAMPOS GENERALES DE CARGA -->
+            <div class="form-group">
+                <label class="form-label">Descripción de la Mercadería / Bultos *</label>
+                <input asp-for="DescripcionMercaderia" id="inputDescripcion" class="form-input" placeholder="Ej: 24 pallets de harina de trigo 000 en bolsas de 25 kg" required />
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="form-group">
+                    <label class="form-label">Peso Total Estimado (kg) *</label>
+                    <input asp-for="PesoTotalKg" id="inputPeso" type="number" step="any" min="0.01" class="form-input" placeholder="1200" required />
+                    <span asp-validation-for="PesoTotalKg" style="font-size: 11px; color: #9D2424; display: block; margin-top: 3px;"></span>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Volumen Estimado (m³) *</label>
+                    <input asp-for="VolumenTotalM3" id="inputVolumen" type="number" step="any" min="0.001" class="form-input" placeholder="4.5" required oninput="validarCapacidadDarsena()" />
+                    <span asp-validation-for="VolumenTotalM3" style="font-size: 11px; color: #9D2424; display: block; margin-top: 3px;"></span>
+                    <span id="errorVolumenExcedido" style="font-size: 12px; color: #9D2424; font-weight: 600; display: none; margin-top: 4px;"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. RUTA, CIUDADES Y MAPA INTERACTIVO (SANTA ROSA COMO PIVOTE FIJO) -->
+        <div class="lcp-card">
+            <h2 class="lcp-card-title">3. Ruta y Cálculo de Distancia</h2>
+            <p style="font-size: 13px; color: var(--lcp-text-muted); margin-top: -10px; margin-bottom: 16px;">
+                El nodo logístico central está ubicado en <strong>Santa Rosa, La Pampa</strong>. Seleccioná la ciudad de origen o destino en Argentina para trazar la ruta y calcular los kilómetros automáticamente.
+            </p>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                <!-- ORIGEN -->
+                <div class="form-group">
+                    <label class="form-label">Punto de Origen *</label>
+                    <!-- Si Arribo: selector de ciudades; Si Despacho: Fijo Santa Rosa -->
+                    <div id="contenedorOrigenArribo">
+                        <select id="selectCiudadOrigen" class="form-input" onchange="actualizarRutaYDistancia()">
+                            <!-- Ciudades Argentinas cargadas por JS -->
+                        </select>
+                    </div>
+                    <div id="contenedorOrigenFijo" style="display: none;">
+                        <input type="text" class="form-input" value="Santa Rosa, La Pampa (Predio Central LCP)" readonly style="background-color: #F8F6F0; font-weight: 700; color: #192A33;" />
+                    </div>
+                    <input type="hidden" asp-for="CiudadOrigen" id="hiddenCiudadOrigen" />
+                </div>
+
+                <!-- DESTINO -->
+                <div class="form-group">
+                    <label class="form-label">Punto de Destino *</label>
+                    <!-- Si Arribo: Fijo Santa Rosa; Si Despacho: selector de ciudades -->
+                    <div id="contenedorDestinoFijo">
+                        <input type="text" class="form-input" value="Santa Rosa, La Pampa (Predio Central LCP)" readonly style="background-color: #F8F6F0; font-weight: 700; color: #192A33;" />
+                    </div>
+                    <div id="contenedorDestinoDespacho" style="display: none;">
+                        <select id="selectCiudadDestino" class="form-input" onchange="actualizarRutaYDistancia()">
+                            <!-- Ciudades Argentinas cargadas por JS -->
+                        </select>
+                    </div>
+                    <input type="hidden" asp-for="CiudadDestino" id="hiddenCiudadDestino" />
+                </div>
+            </div>
+
+            <!-- FECHA DE SALIDA, DISTANCIA Y ESTIMACIÓN DE LLEGADA -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 16px; margin-bottom: 18px;">
+                <div class="form-group">
+                    <label class="form-label" id="labelFechaSalida">Fecha y hora de salida desde tu origen *</label>
+                    <input asp-for="FechaSalidaCliente" id="inputFechaSalida" type="datetime-local" class="form-input" required oninput="calcularEstimacionLlegada()" />
+                    <span style="font-size: 11px; color: var(--lcp-text-muted); display: block; margin-top: 3px;">
+                        Momento en que parte el camión desde el origen.
+                    </span>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Distancia de Ruta (Kilómetros)</label>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input asp-for="DistanciaEstimadaKm" id="inputDistanciaKm" type="number" step="1" class="form-input" style="font-weight: 800; font-size: 16px; color: #192A33;" readonly />
+                        <span style="font-weight: 700; color: var(--lcp-text-muted);">km</span>
+                    </div>
+                    <span id="ayudaDobleViaje" style="font-size: 11px; color: #946712; font-weight: 700; display: block; margin-top: 3px;">
+                        🔁 Flota LCP: Doble viaje (Ida y Vuelta a Base LCP).
+                    </span>
+                </div>
+
+                <div class="form-group" style="background-color: #F4EFE6; border: 1px solid #DDD7CD; border-radius: 6px; padding: 10px 14px;">
+                    <label class="form-label" style="color: #28536B; font-weight: 800; margin-bottom: 2px;">
+                        ⏱️ Estimación Automática de Llegada:
+                    </label>
+                    <div id="displayEstimacionLlegada" style="font-size: 13.5px; font-weight: 800; color: #1E663B; margin-top: 4px;">
+                        Calculando según velocidad de transporte...
+                    </div>
+                    <span id="detalleEstimacionHoras" style="font-size: 11px; color: #667085; display: block; margin-top: 2px;">
+                        Cálculo vial estimado a 70 km/h promedio en camión.
+                    </span>
+                </div>
+            </div>
+
+            <!-- MAPA INTERACTIVO LEAFLET -->
+            <div style="border-radius: 8px; overflow: hidden; border: 1px solid #CCC5B7; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);">
+                <div id="mapaRuta" style="height: 320px; width: 100%; background-color: #ECE7DE;"></div>
+            </div>
+            <div id="resumenRutaTexto" style="margin-top: 8px; font-size: 12px; color: var(--lcp-text-muted); text-align: right;">
+                Ruta trazada sobre OpenStreetMap · Pivot: Santa Rosa, La Pampa
+            </div>
+        </div>
+
+        <!-- 4. MODALIDAD DE TRANSPORTE DUAL -->
+        <div class="lcp-card">
+            <h2 class="lcp-card-title">4. Modalidad de Transporte</h2>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                <label style="border: 1px solid #CCC5B7; background-color: #F8F6F0; border-radius: 6px; padding: 16px; cursor: pointer; display: flex; gap: 12px; align-items: flex-start;">
+                    <input type="radio" asp-for="ModalidadTransporte" value="2" id="modFlota" checked onchange="toggleModalidad()" style="margin-top: 4px;" />
+                    <div>
+                        <div style="font-weight: 700; color: #192A33; display: flex; align-items: center; gap: 6px;">
+                            <span>🔁</span> Flota LCP — Doble Viaje (Ida y Vuelta)
+                        </div>
+                        <div style="font-size: 12px; color: var(--lcp-text-muted); margin-top: 3px; line-height: 1.4;">
+                            LCP despacha un camión oficial desde la Base Central en Santa Rosa cargado con tus productos almacenados en dársena, los entrega en destino y el camión regresa a la base (doble tramo de recorrido).
+                        </div>
+                    </div>
+                </label>
+
+                <label style="border: 1px solid #CCC5B7; background-color: #F8F6F0; border-radius: 6px; padding: 16px; cursor: pointer; display: flex; gap: 12px; align-items: flex-start;">
+                    <input type="radio" asp-for="ModalidadTransporte" value="1" id="modPropio" onchange="toggleModalidad()" style="margin-top: 4px;" />
+                    <div>
+                        <div style="font-weight: 700; color: #192A33; display: flex; align-items: center; gap: 6px;">
+                            <span>➡️</span> Chofer Propio — Viaje Simple Directo
+                        </div>
+                        <div style="font-size: 12px; color: var(--lcp-text-muted); margin-top: 3px; line-height: 1.4;">
+                            Tu empresa utiliza sus propios camiones. Traslado directo desde tu establecimiento hacia la dársena en Santa Rosa (un solo tramo).
+                        </div>
+                    </div>
+                </label>
+            </div>
+
+            <!-- SELECCIONAR CHOFER PROPIO -->
+            <div id="seccionChoferPropio" style="display: none; margin-bottom: 10px;">
+                <label class="form-label">Chofer propio de tu padrón asignado al viaje:</label>
+                <select asp-for="ConductorAsignadoId" class="form-input">
+                    <option value="">-- Seleccionar chofer de mi empresa --</option>
+                    @foreach (var ch in choferes)
+                    {
+                        <option value="@ch.Id">@ch.NombreCompleto - Patente: @ch.PatenteCamion (@ch.CapacidadCargaKg.ToString("N0") kg)</option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 14px; margin-top: 20px;">
+            <button type="submit" id="btnSubmitSolicitud" class="btn-lcp-primary" style="padding: 14px 32px; font-size: 15px; font-weight: 700; @(!contratos.Any() ? "opacity: 0.5; cursor: not-allowed;" : "")" @(!contratos.Any() ? "disabled" : "")>
+                ✓ Enviar Solicitud de Operación
+            </button>
+            <a asp-action="Index" class="btn-lcp-outline" style="padding: 14px 24px;">Cancelar</a>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        // MATRIZ DE CIUDADES DE ARGENTINA (Distancias calculadas por carretera hacia Santa Rosa, La Pampa)
+        const SANTA_ROSA = {
+            nombre: "Santa Rosa, La Pampa (Predio Central LCP)",
+            lat: -36.6204,
+            lng: -64.2906
+        };
+
+        const CIUDADES_ARGENTINA = [
+            { nombre: "Buenos Aires (CABA)", km: 615, lat: -34.6037, lng: -58.3816 },
+            { nombre: "General Pico, La Pampa", km: 135, lat: -35.6566, lng: -63.7568 },
+            { nombre: "Bahía Blanca, Buenos Aires", km: 330, lat: -38.7183, lng: -62.2663 },
+            { nombre: "Córdoba Capital", km: 610, lat: -31.4201, lng: -64.1888 },
+            { nombre: "Río Cuarto, Córdoba", km: 410, lat: -33.1232, lng: -64.3499 },
+            { nombre: "Rosario, Santa Fe", km: 590, lat: -32.9468, lng: -60.6393 },
+            { nombre: "Neuquén Capital", km: 520, lat: -38.9516, lng: -68.0591 },
+            { nombre: "Mendoza Capital", km: 580, lat: -32.8895, lng: -68.8458 },
+            { nombre: "San Rafael, Mendoza", km: 490, lat: -34.6177, lng: -68.3301 },
+            { nombre: "San Carlos de Bariloche, Río Negro", km: 920, lat: -41.1335, lng: -71.3103 },
+            { nombre: "Mar del Plata, Buenos Aires", km: 690, lat: -38.0055, lng: -57.5562 },
+            { nombre: "San Luis Capital", km: 460, lat: -33.2950, lng: -66.3356 },
+            { nombre: "Trelew, Chubut", km: 780, lat: -43.2490, lng: -65.3051 },
+            { nombre: "Viedma, Río Negro", km: 510, lat: -40.8135, lng: -62.9967 },
+            { nombre: "Santa Fe Capital", km: 660, lat: -31.6333, lng: -60.7000 },
+            { nombre: "San Miguel de Tucumán", km: 1180, lat: -26.8083, lng: -65.2176 },
+            { nombre: "Salta Capital", km: 1350, lat: -24.7859, lng: -65.4117 },
+            { nombre: "Corrientes Capital", km: 1120, lat: -27.4692, lng: -58.8306 },
+            { nombre: "Comodoro Rivadavia, Chubut", km: 1160, lat: -45.8647, lng: -67.4966 },
+            { nombre: "Río Gallegos, Santa Cruz", km: 1950, lat: -51.6226, lng: -69.2181 }
+        ];
+
+        let map = null;
+        let rutaPolyline = null;
+        let markerSantaRosa = null;
+        let markerCiudad = null;
+
+        let loteSeleccionadoActual = null;
+
+        function poblarSelectoresCiudades() {
+            const selOrigen = document.getElementById("selectCiudadOrigen");
+            const selDestino = document.getElementById("selectCiudadDestino");
+
+            selOrigen.innerHTML = "";
+            selDestino.innerHTML = "";
+
+            CIUDADES_ARGENTINA.forEach((c, idx) => {
+                const optO = document.createElement("option");
+                optO.value = c.nombre;
+                optO.textContent = `${c.nombre} (${c.km} km)`;
+                optO.dataset.km = c.km;
+                optO.dataset.lat = c.lat;
+                optO.dataset.lng = c.lng;
+                selOrigen.appendChild(optO);
+
+                const optD = document.createElement("option");
+                optD.value = c.nombre;
+                optD.textContent = `${c.nombre} (${c.km} km)`;
+                optD.dataset.km = c.km;
+                optD.dataset.lat = c.lat;
+                optD.dataset.lng = c.lng;
+                selDestino.appendChild(optD);
+            });
+        }
+
+        function inicializarMapa() {
+            if (map !== null) return;
+
+            map = L.map('mapaRuta').setView([SANTA_ROSA.lat, SANTA_ROSA.lng], 6);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 18
+            }).addTo(map);
+
+            // Marcador Fijo en Santa Rosa
+            markerSantaRosa = L.marker([SANTA_ROSA.lat, SANTA_ROSA.lng]).addTo(map)
+                .bindPopup(`<b>Nodo Central LCP</b><br>Santa Rosa, La Pampa`)
+                .openPopup();
+        }
+
+        function actualizarModoOperacion() {
+            const tipo = document.getElementById("selectTipoOperacion").value; // 1 = Arribo, 2 = Despacho
+            const esArribo = (tipo === "1");
+
+            const seccionStock = document.getElementById("seccionStockRetiro");
+            const tituloCarga = document.getElementById("tituloCarga");
+            const badgeTipo = document.getElementById("badgeTipoCarga");
+            const labelFecha = document.getElementById("labelFechaSalida");
+
+            const origenArribo = document.getElementById("contenedorOrigenArribo");
+            const origenFijo = document.getElementById("contenedorOrigenFijo");
+            const destinoFijo = document.getElementById("contenedorDestinoFijo");
+            const destinoDespacho = document.getElementById("contenedorDestinoDespacho");
+
+            if (esArribo) {
+                // Arribo: el cliente envía a LCP
+                tituloCarga.textContent = "2. Mercadería a Ingresar";
+                badgeTipo.textContent = "Nuevo Ingreso";
+                badgeTipo.className = "badge-estado badge-encurso";
+                seccionStock.style.display = "none";
+                labelFecha.textContent = "Fecha y hora de salida desde tu origen *";
+
+                origenArribo.style.display = "block";
+                origenFijo.style.display = "none";
+                destinoFijo.style.display = "block";
+                destinoDespacho.style.display = "none";
+
+                document.getElementById("hiddenCiudadDestino").value = SANTA_ROSA.nombre;
+                document.getElementById("hiddenCiudadOrigen").value = document.getElementById("selectCiudadOrigen").value;
+            } else {
+                // Despacho: sale de LCP hacia el destino del cliente
+                tituloCarga.textContent = "2. Selección de Productos en Stock a Retirar";
+                badgeTipo.textContent = "Retiro de Stock";
+                badgeTipo.className = "badge-estado badge-ocupada";
+                seccionStock.style.display = "block";
+                labelFecha.textContent = "Fecha solicitada para retiro/despacho en dársena *";
+
+                origenArribo.style.display = "none";
+                origenFijo.style.display = "block";
+                destinoFijo.style.display = "none";
+                destinoDespacho.style.display = "block";
+
+                document.getElementById("hiddenCiudadOrigen").value = SANTA_ROSA.nombre;
+                document.getElementById("hiddenCiudadDestino").value = document.getElementById("selectCiudadDestino").value;
+
+                filtrarStockPorDarsena();
+            }
+
+            actualizarRutaYDistancia();
+            validarCapacidadDarsena();
+        }
+
+        function onDarsenaChange() {
+            filtrarStockPorDarsena();
+            validarCapacidadDarsena();
+        }
+
+        function validarCapacidadDarsena() {
+            const selectD = document.getElementById("selectDarsena");
+            const selectTipo = document.getElementById("selectTipoOperacion");
+            const inputVol = document.getElementById("inputVolumen");
+            const banner = document.getElementById("bannerCapacidadDarsena");
+            const errVol = document.getElementById("errorVolumenExcedido");
+            const btnSubmit = document.getElementById("btnSubmitSolicitud");
+
+            if (!selectD || !selectTipo || !banner || !btnSubmit) return;
+
+            const opt = selectD.options[selectD.selectedIndex];
+            const esArribo = (selectTipo.value === "1");
+
+            if (!esArribo || !opt || !opt.value) {
+                banner.style.display = "none";
+                if (errVol) errVol.style.display = "none";
+                btnSubmit.disabled = false;
+                btnSubmit.title = "";
+                return;
+            }
+
+            const capacidad = parseFloat(opt.dataset.capacidad) || 120;
+            const ocupado = parseFloat(opt.dataset.ocupado) || 0;
+            const disponible = parseFloat(opt.dataset.disponible) || Math.max(0, capacidad - ocupado);
+            const estaLlena = (opt.dataset.llena === "true") || (ocupado >= capacidad);
+            const codigo = opt.dataset.codigo || "Dársena";
+
+            const volSolicitado = parseFloat(inputVol.value) || 0;
+
+            if (estaLlena) {
+                banner.style.display = "block";
+                banner.innerHTML = `
+                    <div style="background-color: #FBE8E8; border: 1px solid #F3C7C7; color: #9D2424; padding: 12px 14px; border-radius: 6px; font-size: 13px;">
+                        <strong>⛔ Dársena Completa al 100%:</strong> La ${codigo} ya no dispone de capacidad de almacenamiento (${ocupado.toFixed(1)} m³ ocupados de ${capacidad.toFixed(0)} m³ totales). No es posible realizar solicitudes de ingreso hasta despachar mercadería existente.
+                    </div>
+                `;
+                if (errVol) {
+                    errVol.textContent = "Dársena al 100% de capacidad. No se admiten nuevos ingresos.";
+                    errVol.style.display = "block";
+                }
+                btnSubmit.disabled = true;
+                btnSubmit.title = "La dársena seleccionada ya se encuentra en su capacidad máxima.";
+                return;
+            }
+
+            if (volSolicitado > disponible) {
+                const excedente = (volSolicitado - disponible).toFixed(2);
+                banner.style.display = "block";
+                banner.innerHTML = `
+                    <div style="background-color: #FBE8E8; border: 1px solid #F3C7C7; color: #9D2424; padding: 12px 14px; border-radius: 6px; font-size: 13px;">
+                        <strong>⛔ Capacidad de Dársena Superada:</strong> El volumen a ingresar (${volSolicitado.toFixed(2)} m³) supera el espacio libre disponible en ${codigo} (quedan <strong>${disponible.toFixed(2)} m³ disponibles</strong> de ${capacidad.toFixed(0)} m³). Supera el límite por ${excedente} m³.
+                    </div>
+                `;
+                if (errVol) {
+                    errVol.textContent = `Supera el límite de espacio de la dársena (máx. ${disponible.toFixed(2)} m³ disponibles).`;
+                    errVol.style.display = "block";
+                }
+                btnSubmit.disabled = true;
+                btnSubmit.title = "El volumen ingresado excede el espacio libre de la dársena.";
+                return;
+            }
+
+            banner.style.display = "block";
+            const restanteProyectado = Math.max(0, disponible - volSolicitado).toFixed(2);
+            banner.innerHTML = `
+                <div style="background-color: #EBF8F0; border: 1px solid #C3E6D0; color: #1E663B; padding: 10px 14px; border-radius: 6px; font-size: 13px;">
+                    📊 <strong>Capacidad en ${codigo}:</strong> ${ocupado.toFixed(1)} m³ ocupados · <strong>${disponible.toFixed(2)} m³ disponibles</strong> de ${capacidad.toFixed(0)} m³ totales.
+                    ${volSolicitado > 0 ? ` (Luego de este ingreso restarán <strong>${restanteProyectado} m³</strong>).` : ''}
+                </div>
+            `;
+            if (errVol) errVol.style.display = "none";
+            btnSubmit.disabled = false;
+            btnSubmit.title = "";
+        }
+
+        function filtrarStockPorDarsena() {
+            const darsenaId = document.getElementById("selectDarsena").value;
+            const selectLote = document.getElementById("selectLoteStock");
+
+            for (let i = 0; i < selectLote.options.length; i++) {
+                const opt = selectLote.options[i];
+                if (!opt.value) continue;
+                if (!darsenaId || opt.dataset.darsena === darsenaId) {
+                    opt.style.display = "";
+                } else {
+                    opt.style.display = "none";
+                }
+            }
+        }
+
+        function seleccionarLoteStock() {
+            const sel = document.getElementById("selectLoteStock");
+            const opt = sel.options[sel.selectedIndex];
+            const panel = document.getElementById("panelLoteSeleccionado");
+
+            if (!opt || !opt.value) {
+                panel.style.display = "none";
+                loteSeleccionadoActual = null;
+                return;
+            }
+
+            loteSeleccionadoActual = {
+                id: opt.value,
+                producto: opt.dataset.producto,
+                codigo: opt.dataset.codigo,
+                unidades: parseInt(opt.dataset.unidades) || 1,
+                bultos: parseInt(opt.dataset.bultos) || 1,
+                peso: parseFloat(opt.dataset.peso) || 0,
+                volumen: parseFloat(opt.dataset.volumen) || 0
+            };
+
+            panel.style.display = "block";
+            const inputCant = document.getElementById("inputCantidadRetirada");
+            inputCant.max = loteSeleccionadoActual.unidades;
+            inputCant.value = Math.min(10, loteSeleccionadoActual.unidades);
+
+            document.getElementById("ayudaStockMaximo").textContent = `Stock disponible en dársena: ${loteSeleccionadoActual.unidades} unidades.`;
+
+            calcularProrrateoStock();
+        }
+
+        function calcularProrrateoStock() {
+            if (!loteSeleccionadoActual) return;
+
+            const cant = parseInt(document.getElementById("inputCantidadRetirada").value) || 0;
+            const restante = Math.max(0, loteSeleccionadoActual.unidades - cant);
+
+            document.getElementById("inputStockRestante").value = `${restante} unidades restantes`;
+
+            // Calcular prorrateo de peso y volumen
+            const proporcion = loteSeleccionadoActual.unidades > 0 ? (cant / loteSeleccionadoActual.unidades) : 1;
+            const pesoEstimado = (loteSeleccionadoActual.peso * proporcion).toFixed(1);
+            const volEstimado = (loteSeleccionadoActual.volumen * proporcion).toFixed(2);
+
+            document.getElementById("inputPeso").value = pesoEstimado;
+            document.getElementById("inputVolumen").value = volEstimado;
+            document.getElementById("inputDescripcion").value = `Retiro de ${cant} unidades de ${loteSeleccionadoActual.producto} (Lote: ${loteSeleccionadoActual.codigo})`;
+        }
+
+        function actualizarRutaYDistancia() {
+            const tipo = document.getElementById("selectTipoOperacion").value;
+            const esArribo = (tipo === "1");
+
+            let ciudad = null;
+            if (esArribo) {
+                const sel = document.getElementById("selectCiudadOrigen");
+                const opt = sel.options[sel.selectedIndex];
+                if (opt) {
+                    ciudad = { nombre: opt.value, km: opt.dataset.km, lat: parseFloat(opt.dataset.lat), lng: parseFloat(opt.dataset.lng) };
+                    document.getElementById("hiddenCiudadOrigen").value = opt.value;
+                }
+            } else {
+                const sel = document.getElementById("selectCiudadDestino");
+                const opt = sel.options[sel.selectedIndex];
+                if (opt) {
+                    ciudad = { nombre: opt.value, km: opt.dataset.km, lat: parseFloat(opt.dataset.lat), lng: parseFloat(opt.dataset.lng) };
+                    document.getElementById("hiddenCiudadDestino").value = opt.value;
+                }
+            }
+
+            if (!ciudad) return;
+
+            const esPropio = document.getElementById("modPropio").checked;
+            const kmUnTramo = parseFloat(ciudad.km) || 0;
+            const kmTotal = esPropio ? kmUnTramo : (kmUnTramo * 2);
+
+            document.getElementById("inputDistanciaKm").value = kmTotal;
+
+            const ayudaDoble = document.getElementById("ayudaDobleViaje");
+            if (ayudaDoble) {
+                if (esPropio) {
+                    ayudaDoble.textContent = `➡️ Viaje Simple: ${kmUnTramo} km directos de origen a LCP.`;
+                    ayudaDoble.style.color = "#1E663B";
+                } else {
+                    ayudaDoble.textContent = `🔁 Doble Viaje Flota LCP: ${kmUnTramo} km ida + ${kmUnTramo} km vuelta = ${kmTotal} km totales.`;
+                    ayudaDoble.style.color = "#946712";
+                }
+            }
+
+            // Actualizar Marcadores y Polyline en Leaflet
+            if (map) {
+                if (markerCiudad) map.removeLayer(markerCiudad);
+                if (rutaPolyline) map.removeLayer(rutaPolyline);
+
+                const latlngs = [
+                    [SANTA_ROSA.lat, SANTA_ROSA.lng],
+                    [ciudad.lat, ciudad.lng]
+                ];
+
+                markerCiudad = L.marker([ciudad.lat, ciudad.lng]).addTo(map)
+                    .bindPopup(`<b>${ciudad.nombre}</b><br>Distancia un tramo: ${kmUnTramo} km${!esPropio ? `<br><b>Doble viaje Flota LCP:</b> ${kmTotal} km` : ''}`)
+                    .openPopup();
+
+                rutaPolyline = L.polyline(latlngs, {
+                    color: esPropio ? '#2B7A4B' : '#28536B',
+                    weight: 5,
+                    opacity: 0.85,
+                    dashArray: esPropio ? null : '10, 8'
+                }).addTo(map);
+
+                map.fitBounds(L.latLngBounds(latlngs), { padding: [50, 50] });
+
+                document.getElementById("resumenRutaTexto").textContent = esPropio
+                    ? `Ruta Directa Chofer Propio: ${ciudad.nombre} ➔ Base LCP Santa Rosa · ${kmUnTramo} km`
+                    : `Circuito Doble Viaje Flota LCP: Base LCP Santa Rosa ➔ ${ciudad.nombre} (Carga) ➔ Base LCP Santa Rosa · ${kmTotal} km (${kmUnTramo} km x 2)`;
+            }
+
+            calcularEstimacionLlegada();
+        }
+
+        function calcularEstimacionLlegada() {
+            const fechaInput = document.getElementById("inputFechaSalida").value;
+            const kmInput = parseFloat(document.getElementById("inputDistanciaKm").value) || 0;
+            const esPropio = document.getElementById("modPropio").checked;
+            const display = document.getElementById("displayEstimacionLlegada");
+            const detalle = document.getElementById("detalleEstimacionHoras");
+
+            if (!display || !detalle) return;
+
+            if (!fechaInput || kmInput <= 0) {
+                display.textContent = "Definí fecha de salida y localidad de ruta";
+                detalle.textContent = "Cálculo vial estimado a 70 km/h promedio en camión.";
+                return;
+            }
+
+            const kmTramo = esPropio ? kmInput : Math.round(kmInput / 2);
+            const horasUnTramo = Math.max(0.5, kmTramo / 70.0);
+            const fechaSalida = new Date(fechaInput);
+
+            if (isNaN(fechaSalida.getTime())) return;
+
+            if (esPropio) {
+                // Chofer propio: Tramo simple directo Origen -> Predio LCP
+                const fechaLlegadaLCP = new Date(fechaSalida.getTime() + (horasUnTramo * 3600 * 1000));
+                const formatoLlegada = fechaLlegadaLCP.toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
+                display.innerHTML = `🏁 Llegada estimada a LCP: <span style="color: #1E663B;">${formatoLlegada} hs</span>`;
+                detalle.textContent = `Viaje simple (${kmTramo} km · aprox. ${horasUnTramo.toFixed(1)} hs en carretera)`;
+            } else {
+                // Flota LCP: Doble viaje (Ida a destino + Descarga/Carga + Vuelta a LCP)
+                const fechaLlegadaDestino = new Date(fechaSalida.getTime() + (horasUnTramo * 3600 * 1000));
+                const fechaRetornoLCP = new Date(fechaSalida.getTime() + (((horasUnTramo * 2) + 2) * 3600 * 1000));
+                const formatoDestino = fechaLlegadaDestino.toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
+                const formatoRetorno = fechaRetornoLCP.toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
+                display.innerHTML = `📍 Llegada a destino: <strong>${formatoDestino} hs</strong><br/>🔁 Retorno a Base LCP: <span style="color: #946712;">${formatoRetorno} hs</span>`;
+                detalle.textContent = `Circuito doble (${kmTramo} km ida + ${kmTramo} km vuelta + 2hs operación muelle)`;
+            }
+        }
+
+        function toggleModalidad() {
+            const esPropio = document.getElementById("modPropio").checked;
+            document.getElementById("seccionChoferPropio").style.display = esPropio ? "block" : "none";
+            actualizarRutaYDistancia();
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            poblarSelectoresCiudades();
+            inicializarMapa();
+
+            const darsenaPrevia = '@Model.DarsenaId';
+            if (darsenaPrevia && darsenaPrevia !== '0') {
+                const selD = document.getElementById("selectDarsena");
+                if (selD) selD.value = darsenaPrevia;
+            }
+
+            const tipoPrevio = '@((int)Model.TipoOperacion)';
+            if (tipoPrevio) {
+                const selT = document.getElementById("selectTipoOperacion");
+                if (selT) selT.value = tipoPrevio;
+            }
+
+            actualizarModoOperacion();
+            filtrarStockPorDarsena();
+
+            const lotePrevio = '@(Model.LoteInventarioId?.ToString() ?? "")';
+            if (lotePrevio) {
+                const selL = document.getElementById("selectLoteStock");
+                if (selL) {
+                    selL.value = lotePrevio;
+                    seleccionarLoteStock();
+                }
+            }
+
+            toggleModalidad();
+            validarCapacidadDarsena();
+
+            const form = document.getElementById("formNuevaSolicitud");
+            if (form) {
+                form.addEventListener("submit", function (e) {
+                    const tipo = document.getElementById("selectTipoOperacion").value;
+                    if (tipo === "1") {
+                        const selOrig = document.getElementById("selectCiudadOrigen");
+                        if (selOrig && selOrig.value) document.getElementById("hiddenCiudadOrigen").value = selOrig.value;
+                        document.getElementById("hiddenCiudadDestino").value = "Santa Rosa, La Pampa (Predio Central LCP)";
+
+                        // Validación estricta de capacidad antes del envío
+                        const selectD = document.getElementById("selectDarsena");
+                        const opt = selectD.options[selectD.selectedIndex];
+                        if (opt && opt.value) {
+                            const capacidad = parseFloat(opt.dataset.capacidad) || 120;
+                            const ocupado = parseFloat(opt.dataset.ocupado) || 0;
+                            const disponible = parseFloat(opt.dataset.disponible) || Math.max(0, capacidad - ocupado);
+                            const estaLlena = (opt.dataset.llena === "true") || (ocupado >= capacidad);
+                            const vol = parseFloat(document.getElementById("inputVolumen").value) || 0;
+
+                            if (estaLlena || vol > disponible) {
+                                e.preventDefault();
+                                alert("No es posible procesar la solicitud: el volumen supera la capacidad disponible en la dársena o la misma ya está al 100%.");
+                                return false;
+                            }
+                        }
+                    } else {
+                        document.getElementById("hiddenCiudadOrigen").value = "Santa Rosa, La Pampa (Predio Central LCP)";
+                        const selDest = document.getElementById("selectCiudadDestino");
+                        if (selDest && selDest.value) document.getElementById("hiddenCiudadDestino").value = selDest.value;
+                    }
+                });
+            }
+        });
+    </script>
+}

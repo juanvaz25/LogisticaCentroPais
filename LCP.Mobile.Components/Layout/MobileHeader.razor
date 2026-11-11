@@ -1,0 +1,76 @@
+@inject NavigationManager Nav
+@inject ITokenStorage TokenStorage
+
+<header class="mobile-header">
+    <div class="header-brand">
+        @if (!IsRootPage)
+        {
+            <button class="header-btn" @onclick="GoBack" title="Volver">
+                <i class="fa-solid fa-arrow-left"></i>
+            </button>
+        }
+        else
+        {
+            <div style="width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg, #C2821E, #28536B); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.95rem; color: white;">
+                LCP
+            </div>
+        }
+        <div>
+            <div class="header-title">@Title</div>
+            <div style="font-size: 0.65rem; color: #94A3B8; display: flex; align-items: center; gap: 5px;">
+                <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background-color: #10B981;"></span>
+                <span>Centro Logístico Pampeano</span>
+            </div>
+        </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 8px;">
+        @if (CurrentUser != null)
+        {
+            <span class="header-badge @GetRoleBadgeClass(CurrentUser.Rol)">
+                @CurrentUser.Rol.ToString()
+            </span>
+            <a href="/perfil" class="header-btn" title="Mi Perfil">
+                <i class="fa-solid fa-user"></i>
+            </a>
+        }
+        else
+        {
+            <a href="/login" class="header-btn" title="Iniciar Sesión">
+                <i class="fa-solid fa-right-to-bracket"></i>
+            </a>
+        }
+    </div>
+</header>
+
+@code {
+    [Parameter] public string Title { get; set; } = "Logística Centro País";
+
+    private UsuarioDto? CurrentUser;
+    private bool IsRootPage => Nav.Uri.EndsWith("/") || Nav.Uri.EndsWith("/home") || Nav.Uri.EndsWith("/login");
+
+    protected override async Task OnInitializedAsync()
+    {
+        CurrentUser = await TokenStorage.GetUserAsync();
+        Nav.LocationChanged += async (s, e) =>
+        {
+            CurrentUser = await TokenStorage.GetUserAsync();
+            StateHasChanged();
+        };
+    }
+
+    private void GoBack()
+    {
+        Nav.NavigateTo("/");
+    }
+
+    private string GetRoleBadgeClass(RolUsuario rol) => rol switch
+    {
+        RolUsuario.Administrador => "badge-admin",
+        RolUsuario.Operador => "badge-operador",
+        RolUsuario.Auditor => "badge-auditor",
+        RolUsuario.Cliente => "badge-cliente",
+        RolUsuario.Conductor => "badge-conductor",
+        _ => "badge-operador"
+    };
+}

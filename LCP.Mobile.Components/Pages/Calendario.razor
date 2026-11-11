@@ -1,0 +1,274 @@
+@page "/calendario"
+@layout MobileLayout
+@inject IMobileApiClient ApiClient
+@inject ITokenStorage TokenStorage
+@inject UiNotificationService Notifier
+
+<div style="display: flex; flex-direction: column; gap: 14px; padding-bottom: 26px;">
+    <!-- Header with Date Navigator -->
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h2 style="font-size: 1.15rem; font-weight: 800; color: var(--lcp-navy);">Agenda y Calendario</h2>
+            <div style="font-size: 0.72rem; color: var(--lcp-text-muted);">Actividades, Turnos y Tareas Operativas</div>
+        </div>
+
+        @if (CurrentUser?.Rol == RolUsuario.Administrador)
+        {
+            <button class="btn-lcp-gold btn-lcp-sm" @onclick="() => MostrarModalCrear = true">
+                <i class="fa-solid fa-plus"></i>
+                <span>Crear</span>
+            </button>
+        }
+    </div>
+
+    <!-- Date Strip / Navigator -->
+    <div style="background: white; border-radius: var(--radius-md); border: 1px solid var(--lcp-border); padding: 10px 14px; display: flex; align-items: center; justify-content: space-between;">
+        <button class="header-btn" style="background: #F1F5F9; color: var(--lcp-navy);" @onclick="DiaAnterior">
+            <i class="fa-solid fa-chevron-left"></i>
+        </button>
+
+        <div style="text-align: center;">
+            <div style="font-weight: 800; font-size: 0.95rem; color: var(--lcp-navy);">
+                @FechaSeleccionada.ToString("dddd, dd MMMM", new System.Globalization.CultureInfo("es-AR"))
+            </div>
+            <div style="font-size: 0.7rem; color: var(--lcp-text-muted);">
+                @(FechaSeleccionada.Date == DateTime.Today ? "Hoy" : FechaSeleccionada.ToString("yyyy"))
+            </div>
+        </div>
+
+        <button class="header-btn" style="background: #F1F5F9; color: var(--lcp-navy);" @onclick="DiaSiguiente">
+            <i class="fa-solid fa-chevron-right"></i>
+        </button>
+    </div>
+
+    <!-- Filter by Activity Type (Tareas vs Reuniones) -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+        <button class="btn-lcp-outline btn-lcp-sm"
+                style="@(FiltroTipo == "Todos" ? "background: var(--lcp-teal); color: white; border-color: var(--lcp-teal);" : "")"
+                @onclick='() => FiltroTipo = "Todos"'>
+            Todas (@Tareas.Count)
+        </button>
+        <button class="btn-lcp-outline btn-lcp-sm"
+                style="@(FiltroTipo == "Tarea" ? "background: var(--lcp-gold); color: white; border-color: var(--lcp-gold);" : "")"
+                @onclick='() => FiltroTipo = "Tarea"'>
+            📌 Tareas (@Tareas.Count(t => t.TipoActividad == "Tarea"))
+        </button>
+    </div>
+
+    <!-- Task List -->
+    @if (IsLoading)
+    {
+        <div style="text-align: center; padding: 40px; color: var(--lcp-text-muted);">
+            <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 1.6rem; color: var(--lcp-teal); margin-bottom: 8px;"></i>
+            <div style="font-size: 0.8rem;">Cargando actividades...</div>
+        </div>
+    }
+    else if (!TareasFiltradas.Any())
+    {
+        <div class="card-lcp" style="text-align: center; padding: 36px 16px;">
+            <i class="fa-solid fa-calendar-check" style="font-size: 2.2rem; color: #CBD5E1; margin-bottom: 8px;"></i>
+            <div style="font-weight: 700; color: var(--lcp-navy); font-size: 0.95rem;">No hay actividades programadas</div>
+            <p style="font-size: 0.78rem; color: var(--lcp-text-muted); margin-top: 4px;">La jornada se encuentra libre de tareas asignadas.</p>
+        </div>
+    }
+    else
+    {
+        @foreach (var tarea in TareasFiltradas)
+        {
+            <div class="card-lcp" style="padding: 14px; border-left: 4px solid @(tarea.TipoActividad == "Reunion" ? "#8B5CF6" : "#C2821E"); opacity: @(tarea.EstadoTarea == "Completada" ? "0.65" : "1");">
+                <div class="card-header-clean" style="margin-bottom: 8px; padding-bottom: 8px;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="font-size: 0.75rem;">@(tarea.TipoActividad == "Reunion" ? "👥 Reunión" : "📌 Tarea")</span>
+                        <span class="badge-pill" style="background: #F1F5F9; color: #475569; font-size: 0.68rem;">
+                            <i class="fa-regular fa-clock"></i> @tarea.HorarioFormateado
+                        </span>
+                    </div>
+                    <span class="badge-pill" style="@(tarea.EstadoTarea == "Completada" ? "background: #D1FAE5; color: #065F46;" : "background: #FEF3C7; color: #92400E;")">
+                        @tarea.EstadoTarea
+                    </span>
+                </div>
+
+                <div style="font-weight: 800; font-size: 0.92rem; color: var(--lcp-navy); margin-bottom: 4px; @(tarea.EstadoTarea == "Completada" ? "text-decoration: line-through;" : "")">
+                    @tarea.Titulo
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(tarea.Detalle))
+                {
+                    <div style="font-size: 0.76rem; color: var(--lcp-text-muted); margin-bottom: 8px;">
+                        @tarea.Detalle
+                    </div>
+                }
+
+                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #F8FAFC; padding-top: 8px; font-size: 0.72rem;">
+                    <div style="color: #64748B;">
+                        <i class="fa-solid fa-user-check" style="color: var(--lcp-teal);"></i> @tarea.ResponsableNombre (@tarea.ResponsableRol)
+                    </div>
+
+                    @if (tarea.EstadoTarea != "Completada")
+                    {
+                        <button class="btn-lcp-outline btn-lcp-sm" style="padding: 4px 10px; font-size: 0.72rem; color: #10B981; border-color: #A7F3D0;" @onclick="() => CompletarTarea(tarea.Id)">
+                            <i class="fa-solid fa-check"></i>
+                            <span>Completar</span>
+                        </button>
+                    }
+                </div>
+            </div>
+        }
+    }
+</div>
+
+<!-- Modal Crear Actividad (Administrador) -->
+@if (MostrarModalCrear)
+{
+    <div class="modal-overlay" @onclick="() => MostrarModalCrear = false">
+        <div class="modal-content-mobile" @onclick:stopPropagation="true">
+            <div class="modal-handle-bar"></div>
+            <div class="modal-header-lcp">
+                <div>
+                    <h3 style="font-size: 1rem; font-weight: 800; color: var(--lcp-navy);">Nueva Actividad</h3>
+                    <div style="font-size: 0.72rem; color: var(--lcp-text-muted);">Asignar tarea a Operador o Auditor</div>
+                </div>
+                <button style="background: none; border: none; font-size: 1.2rem; color: #94A3B8; cursor: pointer;" @onclick="() => MostrarModalCrear = false">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="modal-body-scroll">
+                <div class="form-group-lcp">
+                    <label class="form-label-lcp">Tipo de Actividad</label>
+                    <select class="form-select-lcp" @bind="NuevaTarea.TipoActividad">
+                        <option value="Tarea">📌 Tarea Operativa</option>
+                        <option value="Reunion">👥 Reunión de Coordinación</option>
+                    </select>
+                </div>
+
+                <div class="form-group-lcp">
+                    <label class="form-label-lcp">Título de la Actividad</label>
+                    <input type="text" class="form-input-lcp" placeholder="Ej: Control de precintos dársena 2" @bind="NuevaTarea.Titulo" />
+                </div>
+
+                <div class="form-group-lcp">
+                    <label class="form-label-lcp">Detalle</label>
+                    <textarea rows="2" class="form-textarea-lcp" placeholder="Instrucciones específicas..." @bind="NuevaTarea.Detalle"></textarea>
+                </div>
+
+                <div class="form-group-lcp">
+                    <label class="form-label-lcp">Personal Responsable</label>
+                    <select class="form-select-lcp" @bind="NuevaTarea.ResponsableUsuarioId">
+                        <option value="2">Martín Benítez (Operador)</option>
+                        <option value="3">Lucía Pereyra (Auditor)</option>
+                        <option value="1">Roberto Gómez (Administrador)</option>
+                    </select>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <div>
+                        <label class="form-label-lcp">Hora Inicio</label>
+                        <input type="time" class="form-input-lcp" @bind="HoraInicioTemp" />
+                    </div>
+                    <div>
+                        <label class="form-label-lcp">Hora Fin</label>
+                        <input type="time" class="form-input-lcp" @bind="HoraFinTemp" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer-lcp">
+                <button class="btn-lcp-outline" @onclick="() => MostrarModalCrear = false">Cancelar</button>
+                <button class="btn-lcp-gold" @onclick="GuardarNuevaTarea">
+                    <i class="fa-solid fa-calendar-plus"></i>
+                    <span>Crear Actividad</span>
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<TareaCalendarioDto> Tareas = new();
+    private DateTime FechaSeleccionada = DateTime.Today;
+    private string FiltroTipo = "Todos";
+    private bool IsLoading = true;
+    private bool MostrarModalCrear = false;
+    private UsuarioDto? CurrentUser;
+
+    private CrearTareaCalendarioDto NuevaTarea = new()
+    {
+        Titulo = "",
+        Detalle = "",
+        TipoActividad = "Tarea",
+        ResponsableUsuarioId = 2
+    };
+
+    private DateTime HoraInicioTemp = DateTime.Today.AddHours(10);
+    private DateTime HoraFinTemp = DateTime.Today.AddHours(11).AddMinutes(30);
+
+    protected override async Task OnInitializedAsync()
+    {
+        CurrentUser = await TokenStorage.GetUserAsync();
+        await Cargar();
+    }
+
+    private async Task Cargar()
+    {
+        IsLoading = true;
+        try
+        {
+            Tareas = await ApiClient.GetTareasCalendarioAsync(FechaSeleccionada);
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private IEnumerable<TareaCalendarioDto> TareasFiltradas =>
+        FiltroTipo == "Todos"
+            ? Tareas
+            : Tareas.Where(t => t.TipoActividad == FiltroTipo);
+
+    private async Task DiaAnterior()
+    {
+        FechaSeleccionada = FechaSeleccionada.AddDays(-1);
+        await Cargar();
+    }
+
+    private async Task DiaSiguiente()
+    {
+        FechaSeleccionada = FechaSeleccionada.AddDays(1);
+        await Cargar();
+    }
+
+    private async Task CompletarTarea(int id)
+    {
+        var ok = await ApiClient.CambiarEstadoTareaAsync(id, "Completada");
+        if (ok)
+        {
+            Notifier.Success("Actividad marcada como completada.");
+            await Cargar();
+        }
+    }
+
+    private async Task GuardarNuevaTarea()
+    {
+        if (string.IsNullOrWhiteSpace(NuevaTarea.Titulo))
+        {
+            Notifier.Warning("Por favor complete el título de la actividad.");
+            return;
+        }
+
+        NuevaTarea.Fecha = DateOnly.FromDateTime(FechaSeleccionada);
+        NuevaTarea.HoraInicio = TimeOnly.FromDateTime(HoraInicioTemp);
+        NuevaTarea.HoraFin = TimeOnly.FromDateTime(HoraFinTemp);
+
+        var res = await ApiClient.CrearTareaCalendarioAsync(NuevaTarea);
+        if (res != null)
+        {
+            Notifier.Success("Actividad agregada a la agenda.");
+            MostrarModalCrear = false;
+            NuevaTarea.Titulo = "";
+            NuevaTarea.Detalle = "";
+            await Cargar();
+        }
+    }
+}

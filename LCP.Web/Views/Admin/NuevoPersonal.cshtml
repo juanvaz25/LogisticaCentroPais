@@ -1,0 +1,315 @@
+@model CrearPersonalDto
+@using LCP.Shared.Enums
+@{
+    ViewData["Title"] = "Alta de Personal Interno - Legajo de RRHH";
+}
+
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+    <div>
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+            <a asp-action="Usuarios" style="color: var(--lcp-primary); text-decoration: none; font-size: 13px; font-weight: 700;">
+                ⬅ Volver a Personal Interno
+            </a>
+            <span style="color: var(--lcp-text-muted);">/</span>
+            <span style="font-size: 13px; color: var(--lcp-text-muted);">Incorporación de Personal</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 26px;">👥</span>
+            <h1 class="page-title" style="margin: 0;">Alta de Personal Interno · Legajo de RRHH</h1>
+        </div>
+        <p class="page-subtitle" style="margin-top: 6px;">
+            Formulario integral de contratación y registro telemático para colaboradores del nodo logístico Santa Rosa, La Pampa.
+        </p>
+    </div>
+</div>
+
+<!-- BANNER EXPLICATIVO DE VERIFICACIÓN TELEMÁTICA -->
+<div class="lcp-card" style="background: linear-gradient(135deg, #162E3B 0%, #28536B 100%); color: #FFFFFF; border: none; padding: 22px 24px; margin-bottom: 24px; box-shadow: 0 4px 18px rgba(22, 46, 59, 0.15);">
+    <div style="display: flex; gap: 16px; align-items: flex-start;">
+        <span style="font-size: 32px; line-height: 1;">🛡️</span>
+        <div style="flex: 1;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                <h3 style="font-size: 16px; font-weight: 800; color: #FFD54F; margin: 0;">
+                    Verificación Telemática Obligatoria mediante EmailSender
+                </h3>
+                <span style="background: rgba(255, 213, 79, 0.2); color: #FFD54F; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(255, 213, 79, 0.4);">
+                    CASILLA VERÍDICA Y ÚNICA
+                </span>
+            </div>
+            <p style="font-size: 13px; line-height: 1.6; color: #E0EBF0; margin: 0;">
+                • El correo electrónico ingresado <strong>debe ser genuino y exclusivo</strong> (no repetido en clientes, choferes o personal).
+                <br />• Al registrar al colaborador, el sistema utilizará el servicio de mensajería telemática <strong>EmailSender</strong> para remitirle de inmediato una invitación de activación.
+                <br />• Dicho correo contendrá su <strong>contraseña provisoria auto-generada</strong> y un <strong>enlace seguro de confirmación</strong> que validará la autenticidad de su casilla antes de habilitarle el ingreso a la plataforma.
+            </p>
+        </div>
+    </div>
+</div>
+
+<form asp-action="NuevoPersonal" method="post" enctype="multipart/form-data">
+    @Html.AntiForgeryToken()
+
+    <div asp-validation-summary="ModelOnly" class="alert-lcp-danger" style="margin-bottom: 20px;"></div>
+
+    <!-- SECCIÓN 1: DATOS PERSONALES Y DE IDENTIFICACIÓN -->
+    <div class="lcp-card" style="margin-bottom: 22px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+            <span style="font-size: 20px;">🪪</span>
+            <h2 class="lcp-card-title" style="margin: 0;">1. Datos Personales e Identificación Oficial</h2>
+        </div>
+        <p style="font-size: 13px; color: var(--lcp-text-muted); margin: 0 0 18px;">
+            Identidad formal del colaborador según constancia de Registro Nacional de las Personas.
+        </p>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 14px;">
+            <div class="form-group">
+                <label asp-for="Nombre" class="form-label" style="font-weight: 700;">Nombre(s) *</label>
+                <input asp-for="Nombre" class="form-input" required placeholder="Ej: Juan Martín" />
+                <span asp-validation-for="Nombre" class="text-danger" style="font-size: 12px;"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Apellido" class="form-label" style="font-weight: 700;">Apellido(s) *</label>
+                <input asp-for="Apellido" class="form-input" required placeholder="Ej: Rossi" />
+                <span asp-validation-for="Apellido" class="text-danger" style="font-size: 12px;"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Dni" class="form-label" style="font-weight: 700;">DNI / CUIL oficial *</label>
+                <input asp-for="Dni" class="form-input" required placeholder="Ej: 38.123.456 o 20-38123456-7" />
+                <span asp-validation-for="Dni" class="text-danger" style="font-size: 12px;"></span>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;">
+            <div class="form-group">
+                <label asp-for="FechaNacimiento" class="form-label" style="font-weight: 700;">Fecha de Nacimiento *</label>
+                <input asp-for="FechaNacimiento" type="date" class="form-input" required />
+                <span asp-validation-for="FechaNacimiento" class="text-danger" style="font-size: 12px;"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="EstadoCivil" class="form-label" style="font-weight: 700;">Estado Civil</label>
+                <select asp-for="EstadoCivil" class="form-input">
+                    <option value="Soltero/a">Soltero/a</option>
+                    <option value="Casado/a">Casado/a</option>
+                    <option value="Conviviente / Unión Convivencial">Conviviente / Unión Convivencial</option>
+                    <option value="Divorciado/a">Divorciado/a</option>
+                    <option value="Viudo/a">Viudo/a</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 2: CONTACTO, DOMICILIO Y RESIDENCIA -->
+    <div class="lcp-card" style="margin-bottom: 22px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+            <span style="font-size: 20px;">📍</span>
+            <h2 class="lcp-card-title" style="margin: 0;">2. Contacto Directo y Residencia</h2>
+        </div>
+        <p style="font-size: 13px; color: var(--lcp-text-muted); margin: 0 0 18px;">
+            Canales de comunicación telemática y radicación domiciliaria real.
+        </p>
+
+        <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px; margin-bottom: 14px;">
+            <div class="form-group">
+                <label asp-for="Email" class="form-label" style="font-weight: 700;">
+                    Correo Electrónico Verídico (Usuario Único de Acceso) *
+                </label>
+                <div style="position: relative;">
+                    <input asp-for="Email" type="email" class="form-input" required placeholder="Ej: jrossi@lcp.com o juan.rossi@gmail.com" style="padding-left: 36px;" />
+                    <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 14px; color: var(--lcp-text-muted);">✉️</span>
+                </div>
+                <span asp-validation-for="Email" class="text-danger" style="font-size: 12px;"></span>
+                <small style="display: block; margin-top: 4px; font-size: 11.5px; color: #2B7A4B;">
+                    ℹ️ Se enviará un correo de confirmación de casilla con credenciales a esta dirección.
+                </small>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Telefono" class="form-label" style="font-weight: 700;">Teléfono Celular / WhatsApp *</label>
+                <div style="position: relative;">
+                    <input asp-for="Telefono" class="form-input" required placeholder="Ej: 2954-551122" style="padding-left: 36px;" />
+                    <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 14px; color: var(--lcp-text-muted);">📱</span>
+                </div>
+                <span asp-validation-for="Telefono" class="text-danger" style="font-size: 12px;"></span>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 0.8fr; gap: 14px;">
+            <div class="form-group">
+                <label asp-for="Direccion" class="form-label" style="font-weight: 700;">Domicilio Real (Calle y Número) *</label>
+                <input asp-for="Direccion" class="form-input" required placeholder="Ej: Av. Spinetto 1450, Piso 2 B" />
+                <span asp-validation-for="Direccion" class="text-danger" style="font-size: 12px;"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Localidad" class="form-label" style="font-weight: 700;">Localidad *</label>
+                <input asp-for="Localidad" class="form-input" required placeholder="Santa Rosa" />
+                <span asp-validation-for="Localidad" class="text-danger" style="font-size: 12px;"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Provincia" class="form-label" style="font-weight: 700;">Provincia *</label>
+                <input asp-for="Provincia" class="form-input" required placeholder="La Pampa" />
+                <span asp-validation-for="Provincia" class="text-danger" style="font-size: 12px;"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="CodigoPostal" class="form-label" style="font-weight: 700;">C.P.</label>
+                <input asp-for="CodigoPostal" class="form-input" placeholder="6300" />
+            </div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 3: CONTACTO EN CASO DE EMERGENCIA -->
+    <div class="lcp-card" style="margin-bottom: 22px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+            <span style="font-size: 20px;">🚨</span>
+            <h2 class="lcp-card-title" style="margin: 0;">3. Contacto en Caso de Emergencia</h2>
+        </div>
+        <p style="font-size: 13px; color: var(--lcp-text-muted); margin: 0 0 18px;">
+            Referencia directa para contingencias laborales en predio o trayecto.
+        </p>
+
+        <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px;">
+            <div class="form-group">
+                <label asp-for="ContactoEmergenciaNombre" class="form-label" style="font-weight: 700;">Nombre Completo y Parentesco *</label>
+                <input asp-for="ContactoEmergenciaNombre" class="form-input" required placeholder="Ej: María Rossi (Cónyuge) o Pedro Rossi (Padre)" />
+                <span asp-validation-for="ContactoEmergenciaNombre" class="text-danger" style="font-size: 12px;"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="ContactoEmergenciaTelefono" class="form-label" style="font-weight: 700;">Teléfono de Contacto Urgente *</label>
+                <input asp-for="ContactoEmergenciaTelefono" class="form-input" required placeholder="Ej: 2954-442233" />
+                <span asp-validation-for="ContactoEmergenciaTelefono" class="text-danger" style="font-size: 12px;"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 4: CONTRATACIÓN Y PERFIL LABORAL -->
+    <div class="lcp-card" style="margin-bottom: 22px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+            <span style="font-size: 20px;">💼</span>
+            <h2 class="lcp-card-title" style="margin: 0;">4. Perfil Laboral y Condiciones de Ingreso</h2>
+        </div>
+        <p style="font-size: 13px; color: var(--lcp-text-muted); margin: 0 0 18px;">
+            Rol de permisos funcionales en el sistema y puesto desempeñado dentro de la empresa.
+        </p>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 14px;">
+            <div class="form-group">
+                <label asp-for="Rol" class="form-label" style="font-weight: 700;">Rol en Plataforma *</label>
+                <select asp-for="Rol" class="form-input" required>
+                    <option value="@((int)RolUsuario.Operador)">Operador (Gestión de Patio, Dársenas e Inventario)</option>
+                    <option value="@((int)RolUsuario.Auditor)">Auditor (Finanzas, Liquidaciones y Aprobaciones)</option>
+                    <option value="@((int)RolUsuario.Administrador)">Administrador (Gestión Total de Sistema)</option>
+                </select>
+                <span asp-validation-for="Rol" class="text-danger" style="font-size: 12px;"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="PuestoCargo" class="form-label" style="font-weight: 700;">Puesto / Cargo Asignado *</label>
+                <input asp-for="PuestoCargo" class="form-input" required placeholder="Ej: Operador de Autoelevador, Supervisor de Patio..." />
+                <span asp-validation-for="PuestoCargo" class="text-danger" style="font-size: 12px;"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="FechaIngreso" class="form-label" style="font-weight: 700;">Fecha de Ingreso *</label>
+                <input asp-for="FechaIngreso" type="date" class="form-input" required />
+                <span asp-validation-for="FechaIngreso" class="text-danger" style="font-size: 12px;"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="ModalidadContratacion" class="form-label" style="font-weight: 700;">Modalidad de Contratación</label>
+                <select asp-for="ModalidadContratacion" class="form-input">
+                    <option value="Tiempo Indeterminado (Efectivo)">Tiempo Indeterminado (Efectivo)</option>
+                    <option value="Plazo Fijo / Eventual">Plazo Fijo / Eventual</option>
+                    <option value="Pasantía Universitaria">Pasantía Universitaria</option>
+                    <option value="Prestación de Servicios">Prestación de Servicios</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label asp-for="ObservacionesLegajo" class="form-label" style="font-weight: 700;">Observaciones y Notas de Contratación</label>
+            <textarea asp-for="ObservacionesLegajo" class="form-input" rows="2" placeholder="Detalles de inducción, turno asignado (Mañana/Tarde/Noche), certificaciones especiales..."></textarea>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 5: DOCUMENTACIÓN RESPALDATORIA (DNI Y CV) -->
+    <div class="lcp-card" style="margin-bottom: 24px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+            <span style="font-size: 20px;">📁</span>
+            <h2 class="lcp-card-title" style="margin: 0;">5. Documentación Respaldatoria Digital (DNI y CV)</h2>
+        </div>
+        <p style="font-size: 13px; color: var(--lcp-text-muted); margin: 0 0 18px;">
+            Adjunte copia digital del documento de identidad y el currículum vitae para el legajo informático.
+        </p>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <!-- Archivo DNI -->
+            <div style="border: 2px dashed #B8C7D1; border-radius: 8px; padding: 20px; background: #FAFBFB; text-align: center; transition: all 0.2s;" id="dropzoneDni">
+                <div style="font-size: 32px; margin-bottom: 8px;">🪪</div>
+                <div style="font-weight: 800; font-size: 14px; color: #192A33; margin-bottom: 4px;">
+                    Imagen / Escaneo del Documento (DNI)
+                </div>
+                <p style="font-size: 12px; color: var(--lcp-text-muted); margin: 0 0 14px;">
+                    Formatos JPG, PNG o PDF (Frente y dorso)
+                </p>
+                <input type="file" name="archivoDni" id="inputArchivoDni" accept="image/*,application/pdf" style="display: none;" onchange="actualizarInfoArchivo('inputArchivoDni', 'nombreArchivoDni')" />
+                <button type="button" class="btn-lcp-outline btn-lcp-sm" onclick="document.getElementById('inputArchivoDni').click()" style="display: inline-flex; align-items: center; gap: 6px;">
+                    <span>📎</span> Seleccionar Archivo DNI
+                </button>
+                <div id="nombreArchivoDni" style="font-size: 12px; font-weight: 700; color: #28536B; margin-top: 10px; word-break: break-all;">
+                    Ningún archivo seleccionado
+                </div>
+            </div>
+
+            <!-- Archivo CV -->
+            <div style="border: 2px dashed #B8C7D1; border-radius: 8px; padding: 20px; background: #FAFBFB; text-align: center; transition: all 0.2s;" id="dropzoneCv">
+                <div style="font-size: 32px; margin-bottom: 8px;">📄</div>
+                <div style="font-weight: 800; font-size: 14px; color: #192A33; margin-bottom: 4px;">
+                    Curriculum Vitae (CV) del Postulante
+                </div>
+                <p style="font-size: 12px; color: var(--lcp-text-muted); margin: 0 0 14px;">
+                    Formatos PDF, DOC, DOCX o imagen
+                </p>
+                <input type="file" name="archivoCv" id="inputArchivoCv" accept=".pdf,.doc,.docx,image/*" style="display: none;" onchange="actualizarInfoArchivo('inputArchivoCv', 'nombreArchivoCv')" />
+                <button type="button" class="btn-lcp-outline btn-lcp-sm" onclick="document.getElementById('inputArchivoCv').click()" style="display: inline-flex; align-items: center; gap: 6px;">
+                    <span>📎</span> Seleccionar Archivo CV
+                </button>
+                <div id="nombreArchivoCv" style="font-size: 12px; font-weight: 700; color: #28536B; margin-top: 10px; word-break: break-all;">
+                    Ningún archivo seleccionado
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BOTONES DE ACCIÓN -->
+    <div style="display: flex; justify-content: flex-end; align-items: center; gap: 14px; margin-bottom: 40px;">
+        <a asp-action="Usuarios" class="btn-lcp-outline" style="text-decoration: none; padding: 12px 22px;">
+            Cancelar
+        </a>
+        <button type="submit" class="btn-lcp-primary" style="display: inline-flex; align-items: center; gap: 10px; padding: 13px 28px; font-size: 14.5px; font-weight: 800; box-shadow: 0 4px 14px rgba(40, 83, 107, 0.25);">
+            <span>✓</span> Registrar Personal y Enviar Correo de Confirmación
+        </button>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        function actualizarInfoArchivo(inputId, displayId) {
+            const input = document.getElementById(inputId);
+            const display = document.getElementById(displayId);
+            if (input && input.files && input.files[0]) {
+                const file = input.files[0];
+                const sizeKb = Math.round(file.size / 1024);
+                display.innerHTML = `<span style="color: #2ECC71;">✓</span> <strong>${file.name}</strong> (${sizeKb} KB)`;
+            } else {
+                display.textContent = "Ningún archivo seleccionado";
+            }
+        }
+    </script>
+}
+

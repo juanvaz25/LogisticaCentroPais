@@ -1,0 +1,1264 @@
+@model List<LiquidacionDto>
+@using LCP.Shared.Constants
+@using System.Text.Json
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = "Facturación - Liquidaciones y comprobantes";
+    var kpis = ViewBag.Kpis as KpisLiquidacionDto;
+    var filtro = ViewBag.FiltroActual as EstadoLiquidacion?;
+    var liquidacionesJson = JsonSerializer.Serialize(Model ?? new List<LiquidacionDto>(), new JsonSerializerOptions { 
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    });
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Facturación y Auditoría Financiera</h1>
+        <p class="page-subtitle">Liquidaciones de servicios, canon de alquiler y control de facturas comerciales</p>
+    </div>
+</div>
+
+<!-- 3 KPIS SUPERIORES (PDF Página 10) -->
+@if (kpis != null)
+{
+    <div class="kpi-row">
+        <div class="kpi-card" style="border-left: 4px solid #C2821E;">
+            <div class="kpi-label">Pendiente de auditoría</div>
+            <div class="kpi-value" style="color: #946712;">$ @kpis.MontoPendienteAuditoria.ToString("N0")</div>
+            <div style="font-size: 12px; color: var(--lcp-text-muted); margin-top: 4px;">@kpis.CantidadPendientes comprobantes a auditar</div>
+        </div>
+
+        <div class="kpi-card" style="border-left: 4px solid #2B7A4B;">
+            <div class="kpi-label">Validado este mes</div>
+            <div class="kpi-value" style="color: #21613E;">$ @kpis.MontoValidadoEsteMes.ToString("N0")</div>
+            <div style="font-size: 12px; color: var(--lcp-text-muted); margin-top: 4px;">@kpis.CantidadValidadasEsteMes facturados en curso</div>
+        </div>
+
+        <div class="kpi-card" style="border-left: 4px solid #28536B;">
+            <div class="kpi-label">Total liquidado</div>
+            <div class="kpi-value">$ @kpis.MontoTotalLiquidado.ToString("N0")</div>
+            <div style="font-size: 12px; color: var(--lcp-text-muted); margin-top: 4px;">@kpis.CantidadTotalValidadas validados totales</div>
+        </div>
+    </div>
+}
+
+@if (User.IsInRole(Roles.Auditor) || User.IsInRole(Roles.Administrador))
+{
+    var solicitudesPendientes = ViewBag.SolicitudesDarsenasPendientes as List<ContratoAlquilerDarsenaDto> ?? new();
+    var darsenasListasParaHabilitar = ViewBag.DarsenasListasParaHabilitar as List<ContratoAlquilerDarsenaDto> ?? new();
+    var solicitudesAprobadas = ViewBag.SolicitudesDarsenasAprobadas as List<ContratoAlquilerDarsenaDto> ?? new();
+
+    @if (darsenasListasParaHabilitar.Any())
+    {
+        <div class="lcp-card" style="margin-bottom: 24px; border-left: 4px solid #2E7D32; background: #FDFEFC;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <h2 class="lcp-card-title" style="margin-bottom: 2px; display: flex; align-items: center; gap: 8px;">
+                        <span>🔑 Facturas de Dársenas Cargadas - Listas para Habilitar</span>
+                        <span class="badge-estado badge-validada" style="background: #E8F5E9; color: #1B5E20; border: 1px solid #A5D6A7; font-weight: 700;">
+                            @darsenasListasParaHabilitar.Count dársena(s) para habilitar
+                        </span>
+                    </h2>
+                    <p style="font-size: 13px; color: var(--lcp-text-muted); margin: 0;">
+                        El cliente ya cargó la factura / comprobante de pago. Verifique el comprobante y confirme la habilitación de la dársena para que comience a operar y cargar stock.
+                    </p>
+                </div>
+            </div>
+
+            <div class="lcp-table-container">
+                <table class="lcp-table">
+                    <thead>
+                        <tr>
+                            <th>Dársena</th>
+                            <th>Cliente</th>
+                            <th>Mercadería Declarada</th>
+                            <th>Plan / Importe</th>
+                            <th>Comprobante</th>
+                            <th style="text-align: right; width: 230px;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var d in darsenasListasParaHabilitar)
+                        {
+                            <tr>
+                                <td style="font-weight: 800; font-size: 15px; color: #192A33;">@d.DarsenaCodigo</td>
+                                <td>
+                                    <div style="font-weight: 700; color: #192A33;">@d.ClienteRazonSocial</div>
+                                    <div style="font-size: 11px; color: var(--lcp-text-muted);">
+                                        Pago: @(d.FechaPagoFactura?.ToString("dd/MM/yyyy HH:mm") ?? "Reciente")
+                                    </div>
+                                </td>
+                                <td>
+                                    <div style="font-weight: 600; color: #192A33;">@(string.IsNullOrWhiteSpace(d.MercaderiaAlmacenar) ? "Carga General" : d.MercaderiaAlmacenar)</div>
+                                    <div style="font-size: 11.5px; color: #1B5277;">🌡️ @d.TipoAlmacenamiento</div>
+                                </td>
+                                <td>
+                                    <div><strong>@d.PlanNombre</strong></div>
+                                    <div style="font-weight: 700; color: #192A33; font-size: 13px;">$ @d.MontoTotalContrato.ToString("N0")</div>
+                                </td>
+                                <td>
+                                    @if (!string.IsNullOrWhiteSpace(d.ComprobantePagoUrl))
+                                    {
+                                        <a href="http://localhost:5152@d.ComprobantePagoUrl" target="_blank" class="btn-lcp-outline btn-lcp-sm" style="font-size: 11px; padding: 3px 8px; display: inline-flex; align-items: center; gap: 4px;">
+                                            📄 Ver
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <span style="font-size: 12px; color: var(--lcp-text-muted);">-</span>
+                                    }
+                                </td>
+                                <td style="text-align: right;">
+                                    <div style="display: inline-flex; gap: 6px; align-items: center;">
+                                        <button type="button" class="btn-lcp-outline btn-lcp-sm" style="font-weight: 700; font-size: 11px; padding: 4px 8px;"
+                                                onclick="abrirFichaHabilitacionModal(@d.Id, '@d.DarsenaCodigo', '@Html.Raw(d.ClienteRazonSocial)', '@Html.Raw(d.MercaderiaAlmacenar ?? "Carga General")', '@Html.Raw(d.TipoAlmacenamiento ?? "Ambiente")', '@Html.Raw(d.ConsideracionesEspeciales ?? "Ninguna")', '@d.PlanNombre', '@d.MontoTotalContrato.ToString("N0")', '@(d.ComprobantePagoUrl ?? "")')">
+                                            📋 Ficha
+                                        </button>
+                                        <form asp-action="HabilitarDarsena" method="post" style="margin: 0; display: inline-block;">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@d.Id" />
+                                            <button type="submit" class="btn-lcp-primary btn-lcp-sm" style="background-color: #2E7D32; border-color: #2E7D32; padding: 4px 10px; font-weight: 700; font-size: 11px;">
+                                                ✓ Habilitar
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    <div class="lcp-card" style="margin-bottom: 24px; border-left: 4px solid #1B5277;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+            <div>
+                <h2 class="lcp-card-title" style="margin-bottom: 2px; display: flex; align-items: center; gap: 8px;">
+                    <span>🛡️ Solicitudes de Alquiler de Dársenas - Evaluación Técnica</span>
+                    @if (solicitudesPendientes.Any())
+                    {
+                        <span class="badge-estado badge-pendiente" style="background: #FFE082; color: #8D6E63; font-weight: 700;">
+                            @solicitudesPendientes.Count pendiente(s) de confirmar
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="badge-estado badge-validada" style="background: #E8F5E9; color: #2E7D32;">Sin solicitudes pendientes</span>
+                    }
+                </h2>
+                <p style="font-size: 13px; color: var(--lcp-text-muted); margin: 0;">
+                    El Auditor debe evaluar y confirmar la compatibilidad técnica del tipo de mercadería y régimen térmico antes de requerir el pago y habilitar la dársena.
+                </p>
+            </div>
+            @if (solicitudesAprobadas.Any())
+            {
+                <span style="font-size: 12px; color: #0277BD; background: #E1F5FE; border: 1px solid #81D4FA; padding: 5px 12px; border-radius: 6px; font-weight: 600;">
+                    💳 @solicitudesAprobadas.Count dárnena(s) esperando factura de pago del cliente
+                </span>
+            }
+        </div>
+
+        @if (!solicitudesPendientes.Any())
+        {
+            <div style="padding: 16px; background: #F8F6F0; border-radius: 6px; font-size: 13px; color: var(--lcp-text-muted); text-align: center;">
+                No hay solicitudes de dársenas pendientes de evaluación técnica en este momento.
+            </div>
+        }
+        else
+        {
+            <div class="lcp-table-container">
+                <table class="lcp-table">
+                    <thead>
+                        <tr>
+                            <th>Dársena</th>
+                            <th>Cliente</th>
+                            <th>Mercadería a Almacenar</th>
+                            <th>Régimen Térmico</th>
+                            <th>Plan / Importe</th>
+                            <th style="text-align: right; width: 230px;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var s in solicitudesPendientes)
+                        {
+                            <tr>
+                                <td style="font-weight: 800; font-size: 15px; color: #192A33;">@s.DarsenaCodigo</td>
+                                <td>
+                                    <div style="font-weight: 700; color: #192A33;">@s.ClienteRazonSocial</div>
+                                    <div style="font-size: 11px; color: var(--lcp-text-muted);">Solicitud: @s.FechaInicio.ToString("dd/MM/yyyy HH:mm")</div>
+                                </td>
+                                <td>
+                                    <strong style="color: #192A33;">@(string.IsNullOrWhiteSpace(s.MercaderiaAlmacenar) ? "Carga General" : s.MercaderiaAlmacenar)</strong>
+                                </td>
+                                <td>
+                                    <div style="font-weight: 600; color: #1B5277; font-size: 12px;">🌡️ @(string.IsNullOrWhiteSpace(s.TipoAlmacenamiento) ? "Ambiente" : s.TipoAlmacenamiento)</div>
+                                </td>
+                                <td>
+                                    <div><strong>@s.PlanNombre</strong></div>
+                                    <div style="font-weight: 700; color: #192A33; font-size: 13px;">$ @s.MontoTotalContrato.ToString("N0")</div>
+                                </td>
+                                <td style="text-align: right;">
+                                    <div style="display: inline-flex; gap: 6px; align-items: center;">
+                                        <button type="button" class="btn-lcp-outline btn-lcp-sm" style="font-weight: 700; font-size: 11px; padding: 4px 8px;"
+                                                onclick="abrirFichaEvaluacionModal(@s.Id, '@s.DarsenaCodigo', '@Html.Raw(s.ClienteRazonSocial)', '@Html.Raw(s.MercaderiaAlmacenar ?? "Carga General")', '@Html.Raw(s.TipoAlmacenamiento ?? "Ambiente")', '@Html.Raw(s.ConsideracionesEspeciales ?? "Ninguna")', '@s.PlanNombre', '@s.MontoTotalContrato.ToString("N0")')">
+                                            📋 Ficha
+                                        </button>
+                                        <form asp-action="AprobarSolicitudDarsena" method="post" style="margin: 0;">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@s.Id" />
+                                            <input type="hidden" name="observacion" value="Viabilidad técnica aprobada para la mercadería declarada." />
+                                            <button type="submit" class="btn-lcp-primary btn-lcp-sm" style="background-color: #2B7A4B; border-color: #2B7A4B; padding: 4px 10px; font-weight: 700; font-size: 11px;" title="Aprobar y requerir pago">
+                                                ✓ Confirmar
+                                            </button>
+                                        </form>
+
+                                        <button type="button" class="btn-lcp-outline btn-lcp-sm" style="color: #9D2424; border-color: #F3C7C7; background: #FDEDEC; font-size: 11px; padding: 4px 8px;" onclick="abrirModalRechazoDarsena(@s.Id, '@s.DarsenaCodigo', '@s.ClienteRazonSocial')" title="Rechazar">
+                                            ✕
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+}
+
+<!-- TABS DE FILTRO -->
+<div class="filter-tabs">
+    <a asp-action="Index" class="tab-btn @(!filtro.HasValue ? "active" : "")">Todas</a>
+    <a asp-action="Index" asp-route-filtro="@((int)EstadoLiquidacion.PendienteDeAuditoria)" class="tab-btn @(filtro == EstadoLiquidacion.PendienteDeAuditoria ? "active" : "")">Pendientes de Auditoría</a>
+    <a asp-action="Index" asp-route-filtro="@((int)EstadoLiquidacion.Validada)" class="tab-btn @(filtro == EstadoLiquidacion.Validada ? "active" : "")">Validadas</a>
+    <a asp-action="Index" asp-route-filtro="@((int)EstadoLiquidacion.Observada)" class="tab-btn @(filtro == EstadoLiquidacion.Observada ? "active" : "")">Observadas</a>
+</div>
+
+<!-- GRILLA DE LIQUIDACIONES Y FACTURAS ORDENADA -->
+<div class="lcp-card" style="padding: 0; overflow: hidden; margin-bottom: 28px;">
+    <div style="padding: 16px 20px; background-color: #FFFFFF; border-bottom: 1px solid var(--lcp-card-border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div>
+            <h3 style="font-size: 16px; font-weight: 800; color: #192A33; margin: 0; display: flex; align-items: center; gap: 8px;">
+                <span>🧾 Listado Contable de Liquidaciones y Facturas Comerciales</span>
+                <span class="badge-estado badge-validada" style="font-size: 11px;">@Model.Count registros</span>
+            </h3>
+            <div style="font-size: 12px; color: var(--lcp-text-muted); margin-top: 2px;">
+                Para confirmar y auditar una liquidación es <strong>estricto requisito</strong> que el Cliente o Chofer hayan cargado la factura o remito respaldatorio.
+            </div>
+        </div>
+        @if (User.IsInRole(Roles.Cliente) || User.IsInRole(Roles.Operador) || User.IsInRole(Roles.Administrador))
+        {
+            <div style="font-size: 12px; color: #28536B;">
+                💡 <em>Hacé clic en "📋 Ficha y Facturas" para ver los comprobantes o cargar uno nuevo.</em>
+            </div>
+        }
+    </div>
+
+    <div class="lcp-table-container" style="border: none; margin: 0;">
+        <table class="lcp-table">
+            <thead>
+                <tr>
+                    <th style="width: 140px;">Comprobante</th>
+                    <th>Cliente / Operación</th>
+                    <th style="width: 160px;">Tipo de Servicio</th>
+                    <th style="width: 140px;">Total Liquidado</th>
+                    <th style="width: 180px;">Factura / Respaldo</th>
+                    <th style="width: 150px;">Estado</th>
+                    <th style="width: 190px; text-align: right;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Any())
+                {
+                    <tr>
+                        <td colspan="7" style="text-align: center; color: var(--lcp-text-muted); padding: 36px;">
+                            No hay liquidaciones registradas en este filtro.
+                        </td>
+                    </tr>
+                }
+                @foreach (var l in Model)
+                {
+                    var tieneFacturas = l.DocumentosRespaldatorios.Any();
+
+                    <tr>
+                        <td>
+                            <div style="font-weight: 800; color: #192A33; font-size: 13.5px;">@l.NumeroComprobante</div>
+                            <div style="font-size: 11px; color: var(--lcp-text-muted);">
+                                📅 @l.FechaEmision.ToString("dd/MM/yyyy HH:mm")
+                            </div>
+                        </td>
+                        <td>
+                            <div style="font-weight: 700; color: #192A33;">@l.ClienteRazonSocial</div>
+                            <div style="font-size: 11.5px; color: #28536B; display: flex; align-items: center; gap: 6px; margin-top: 2px;">
+                                @if (!string.IsNullOrWhiteSpace(l.CodigoSolicitud))
+                                {
+                                    <span>📦 Operación <strong>@l.CodigoSolicitud</strong></span>
+                                }
+                                else if (!string.IsNullOrWhiteSpace(l.DarsenaCodigo))
+                                {
+                                    <span>🏷️ Dársena <strong>@l.DarsenaCodigo</strong></span>
+                                }
+                                else
+                                {
+                                    <span>Servicio General LCP</span>
+                                }
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge-estado" style="background: #EEF4F8; color: #1B5277; border: 1px solid #CBDCE6; font-size: 11px; font-weight: 600;">
+                                @l.TipoLiquidacionNombre
+                            </span>
+                        </td>
+                        <td>
+                            <div style="font-weight: 800; font-size: 15px; color: #1E663B;">
+                                $ @l.ImporteTotal.ToString("N2")
+                            </div>
+                        </td>
+                        <td>
+                            @if (tieneFacturas)
+                            {
+                                <span class="badge-estado badge-validada" style="background: #E8F5E9; color: #1B5E20; border: 1px solid #A5D6A7; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
+                                    ✓ @l.DocumentosRespaldatorios.Count Comprobante(s)
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="badge-estado badge-observada" style="background: #FEF3C7; color: #92400E; border: 1px solid #FCD34D; font-size: 10.5px; font-weight: 700; display: inline-flex; align-items: center; gap: 3px;" title="Pendiente de carga de factura por Cliente o Chofer">
+                                    ⚠️ Falta Factura
+                                </span>
+                            }
+                        </td>
+                        <td>
+                            <span class="badge-estado @(l.Estado == EstadoLiquidacion.Validada ? "badge-validada" : l.Estado == EstadoLiquidacion.PendienteDeAuditoria ? "badge-pendiente" : "badge-observada")" style="font-size: 11px; font-weight: 700;">
+                                @l.EstadoNombre
+                            </span>
+                            @if (l.AuditadoPorUsuarioId.HasValue)
+                            {
+                                <div style="font-size: 10.5px; color: var(--lcp-text-muted); margin-top: 2px;">
+                                    Auditor: @l.AuditadoPorNombre
+                                </div>
+                            }
+                        </td>
+                        <td style="text-align: right;">
+                            <div style="display: inline-flex; gap: 6px; align-items: center;">
+                                <button type="button" class="btn-lcp-outline btn-lcp-sm" style="font-weight: 700; font-size: 11px; padding: 4px 9px; display: inline-flex; align-items: center; gap: 4px;"
+                                        onclick="abrirFichaLiquidacionModalPorId(@l.Id)">
+                                    📋 Ficha y Facturas
+                                </button>
+
+                                @if (User.IsInRole(Roles.Auditor) || User.IsInRole(Roles.Administrador))
+                                {
+                                    @if (l.Estado == EstadoLiquidacion.PendienteDeAuditoria)
+                                    {
+                                        if (tieneFacturas)
+                                        {
+                                            <form asp-action="Auditar" method="post" style="margin: 0; display: inline-block;">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="id" value="@l.Id" />
+                                                <input type="hidden" name="nuevoEstado" value="@((int)EstadoLiquidacion.Validada)" />
+                                                <input type="hidden" name="observacion" value="Factura y remito conformados y validados conforme por Auditoría." />
+                                                <button type="submit" class="btn-lcp-primary btn-lcp-sm" style="background-color: #2B7A4B; border-color: #2B7A4B; padding: 4px 8px; font-size: 11px; font-weight: 700;" title="Validar Liquidación">
+                                                    ✓ Validar
+                                                </button>
+                                            </form>
+                                        }
+                                        else
+                                        {
+                                            <button type="button" class="btn-lcp-outline btn-lcp-sm" style="opacity: 0.55; cursor: not-allowed; background-color: #F3F4F6; color: #9CA3AF; border-color: #D1D5DB; padding: 4px 8px; font-size: 11px;" title="Bloqueado: Para confirmar debe cargarse previamente la factura por el cliente o chofer" onclick="alert('⚠️ ACCIÓN BLOQUEADA: La normativa contable exige que el Cliente o el Chofer carguen la factura comercial antes de poder validar esta liquidación.')">
+                                                🔒 Validar
+                                            </button>
+                                        }
+
+                                        <button type="button" class="btn-lcp-outline btn-lcp-sm" style="color: #9D2424; border-color: #F3C7C7; background: #FDEDEC; font-size: 11px; padding: 4px 7px;" onclick="observarLiquidacion(@l.Id, '@l.NumeroComprobante')" title="Observar liquidación">
+                                            ⚠️
+                                        </button>
+                                    }
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- MODAL: CARD DE FICHA DE LIQUIDACIÓN Y VISOR DE FACTURAS (VENTANA MODAL CENTRADA) -->
+<div id="modalFichaLiquidacion" class="lcp-modal-backdrop" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(5px); z-index: 9999; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box;" onclick="if (event.target === this) cerrarFichaLiquidacionModal();">
+    <div class="lcp-modal" style="background: #FFFFFF; border-radius: 12px; max-width: 820px; width: 100%; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 60px -15px rgba(0,0,0,0.5); position: relative;">
+        
+        <!-- HEADER DEL CARD -->
+        <div class="lcp-modal-header" style="background: linear-gradient(135deg, #192A33 0%, #28536B 100%); color: #FFFFFF; padding: 18px 24px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span style="font-size: 26px;">🧾</span>
+                <div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <h3 id="mflTitulo" style="font-size: 18px; font-weight: 800; color: #FFFFFF; margin: 0;">Ficha de Liquidación y Facturas</h3>
+                        <span id="mflBadgeEstado" class="badge-estado" style="font-size: 11px;">Pendiente</span>
+                    </div>
+                    <div id="mflSubtitulo" style="font-size: 12px; color: #CBDCE6; margin-top: 3px;">
+                        Comprobante · Emitido por Logística Centro País
+                    </div>
+                </div>
+            </div>
+            <button type="button" class="lcp-modal-close" style="color: #FFFFFF; font-size: 26px;" onclick="cerrarFichaLiquidacionModal()">&times;</button>
+        </div>
+
+        <!-- CUERPO DEL CARD -->
+        <div class="lcp-modal-body" style="padding: 22px; max-height: calc(85vh - 120px); overflow-y: auto;">
+            
+            <!-- BANNER DE ALERTA DE REQUISITO DE AUDITORÍA -->
+            <div id="mflBannerAlerta" style="margin-bottom: 20px;"></div>
+
+            <!-- GRID PRINCIPAL: COMERCIAL Y OPERATIVO -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 20px;">
+                
+                <!-- CARD DATOS COMERCIALES -->
+                <div style="background: #F8F9FA; border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; font-size: 12.5px; line-height: 1.8;">
+                    <div style="font-weight: 800; color: #192A33; font-size: 13px; border-bottom: 1px solid #CBD5E1; padding-bottom: 6px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                        <span>🏢 Empresa Cliente</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: var(--lcp-text-muted);">Razón Social:</span>
+                        <strong id="mflClienteRazonSocial" style="color: #192A33; text-align: right;">-</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: var(--lcp-text-muted);">CUIT:</span>
+                        <span id="mflClienteCUIT" style="font-family: monospace; font-weight: 700;">-</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: var(--lcp-text-muted);">Contacto:</span>
+                        <span id="mflClienteContacto" style="text-align: right; color: #475569;">-</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; border-top: 1px dashed #E2E8F0; padding-top: 6px; margin-top: 6px;">
+                        <span style="color: var(--lcp-text-muted);">Tipo de Liquidación:</span>
+                        <span id="mflTipoLiquidacion" style="font-weight: 700; color: #1B5277;">-</span>
+                    </div>
+                </div>
+
+                <!-- CARD DATOS OPERATIVOS / TRANSPORTE -->
+                <div style="background: #F8F9FA; border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; font-size: 12.5px; line-height: 1.8;">
+                    <div style="font-weight: 800; color: #192A33; font-size: 13px; border-bottom: 1px solid #CBD5E1; padding-bottom: 6px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                        <span>🚛 Detalle de la Operación y Logística</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: var(--lcp-text-muted);">Solicitud / Dársena:</span>
+                        <strong id="mflOperacionRef" style="color: #28536B;">-</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: var(--lcp-text-muted);">Modalidad:</span>
+                        <span id="mflModalidadTransporte" style="font-weight: 700; color: #192A33;">-</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: var(--lcp-text-muted);">Chofer Designado:</span>
+                        <span id="mflChoferAsignado" style="font-weight: 700; color: #2B7A4B;">-</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: var(--lcp-text-muted);">Itinerario:</span>
+                        <span id="mflTrayecto" style="font-weight: 600; text-align: right;">-</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; border-top: 1px dashed #E2E8F0; padding-top: 6px; margin-top: 6px;">
+                        <span style="color: var(--lcp-text-muted);">Carga declarada:</span>
+                        <span id="mflCargaDetalle" style="font-weight: 600; color: #475569; text-align: right;">-</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- CUADRO DE DESGLOSE TARIFARIO ORDENADO -->
+            <div style="background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px; padding: 16px; margin-bottom: 22px;">
+                <div style="font-weight: 800; color: #192A33; font-size: 13px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+                    <span>📊 Desglose de Tarifas y Subtotales</span>
+                    <span id="mflResumenVariables" style="font-size: 11.5px; color: var(--lcp-text-muted); font-weight: normal;">-</span>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 14px;">
+                    <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 10px; text-align: center;">
+                        <div style="font-size: 11px; color: var(--lcp-text-muted); text-transform: uppercase;">Subtotal Peso</div>
+                        <div id="mflSubPeso" style="font-size: 14px; font-weight: 700; color: #192A33; margin-top: 3px;">$ 0</div>
+                    </div>
+                    <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 10px; text-align: center;">
+                        <div style="font-size: 11px; color: var(--lcp-text-muted); text-transform: uppercase;">Subtotal Volumen</div>
+                        <div id="mflSubVol" style="font-size: 14px; font-weight: 700; color: #192A33; margin-top: 3px;">$ 0</div>
+                    </div>
+                    <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 10px; text-align: center;">
+                        <div style="font-size: 11px; color: var(--lcp-text-muted); text-transform: uppercase;">Subtotal Distancia</div>
+                        <div id="mflSubDist" style="font-size: 14px; font-weight: 700; color: #192A33; margin-top: 3px;">$ 0</div>
+                    </div>
+                    <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 10px; text-align: center;">
+                        <div style="font-size: 11px; color: var(--lcp-text-muted); text-transform: uppercase;">Dársena / Tiempo</div>
+                        <div id="mflSubTiempo" style="font-size: 14px; font-weight: 700; color: #192A33; margin-top: 3px;">$ 0</div>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 6px; padding: 12px 18px;">
+                    <div>
+                        <span style="font-size: 13px; font-weight: 700; color: #166534;">IMPORTE TOTAL A FACTURAR:</span>
+                        <div style="font-size: 11px; color: #15803D;">Liquidación final sujeta a validación técnica de auditoría</div>
+                    </div>
+                    <div id="mflTotalImporte" style="font-size: 20px; font-weight: 900; color: #14532D;">
+                        $ 0
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECCIÓN: FACTURAS Y DOCUMENTOS RESPALDATORIOS -->
+            <div style="border: 1px solid #CBD5E1; border-radius: 8px; overflow: hidden; margin-bottom: 20px;">
+                <div style="background: #F1F5F9; padding: 12px 18px; border-bottom: 1px solid #CBD5E1; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="font-weight: 800; font-size: 13.5px; color: #192A33; display: flex; align-items: center; gap: 8px;">
+                        <span>📑 Comprobantes y Facturas Adjuntas</span>
+                        <span id="mflCantComprobantesBadge" class="badge-estado badge-validada" style="font-size: 11px;">0 comprobante(s)</span>
+                    </div>
+                    <button type="button" class="btn-lcp-outline btn-lcp-sm" style="font-size: 11px; padding: 3px 8px;" onclick="togglePanelSubirFacturaModal()">
+                        + Adjuntar Factura / Remito
+                    </button>
+                </div>
+
+                <!-- CONTENEDOR DE LISTA DE FACTURAS -->
+                <div id="mflContenedorFacturas" style="padding: 14px 18px; background: #FFFFFF; min-height: 80px;">
+                    <p style="color: var(--lcp-text-muted); font-size: 13px; margin: 0;">Cargando comprobantes...</p>
+                </div>
+
+                <!-- FORMULARIO DE CARGA DIRECTA DENTRO DEL CARD (ACCORDION) -->
+                <div id="mflPanelSubirFactura" style="display: none; background: #FAF5EB; border-top: 1px dashed #D6C2A5; padding: 16px 18px;">
+                    <h4 style="margin: 0 0 8px; font-size: 13px; font-weight: 700; color: #192A33;">
+                        📤 Adjuntar Factura Comercial o Remito de la Operación
+                    </h4>
+                    <p style="font-size: 11.5px; color: var(--lcp-text-muted); margin: 0 0 12px;">
+                        Tanto el Cliente, el Chofer o la Auditoría pueden cargar el comprobante para habilitar la confirmación.
+                    </p>
+                    <form asp-action="SubirFactura" method="post" enctype="multipart/form-data">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" id="mflInputSubirLiqId" name="liquidacionId" value="" />
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) auto; gap: 10px; align-items: flex-end;">
+                            <div class="form-group" style="margin: 0;">
+                                <label class="form-label" style="font-size: 11px;">Tipo de Documento:</label>
+                                <select name="tipoDocumento" class="form-input" style="font-size: 12px; padding: 6px;">
+                                    <option value="Factura">🧾 Factura Comercial</option>
+                                    <option value="Remito">📄 Remito Firmado de Entrega</option>
+                                    <option value="ConstanciaPago">💳 Comprobante de Pago / Transferencia</option>
+                                    <option value="CartaDePorte">📜 Carta de Porte</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label class="form-label" style="font-size: 11px;">Archivo (PDF o Imagen):</label>
+                                <input type="file" name="archivo" class="form-input" accept=".pdf,.png,.jpg,.jpeg" required style="font-size: 12px; padding: 5px;" />
+                            </div>
+                            <div>
+                                <button type="submit" class="btn-lcp-primary btn-lcp-sm" style="font-size: 12px; padding: 8px 14px; font-weight: 700;">
+                                    Subir Comprobante
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- HISTORIAL DE AUDITORÍA Y OBSERVACIONES -->
+            <div id="mflSeccionAuditoria" style="display: none; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px 18px; margin-bottom: 10px; font-size: 12px;">
+                <div style="font-weight: 700; color: #192A33; margin-bottom: 4px;">🛡️ Dictamen de Auditoría:</div>
+                <div id="mflDetalleAuditoria" style="color: #475569;">-</div>
+            </div>
+
+        </div>
+
+        <!-- FOOTER DEL CARD CON ACCIONES RESTRINGIDAS -->
+        <div class="lcp-modal-footer" style="padding: 14px 24px; background: #F8FAFC; border-top: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <button type="button" class="btn-lcp-outline btn-lcp-sm" onclick="cerrarFichaLiquidacionModal()">Cerrar</button>
+            
+            @if (User.IsInRole(Roles.Auditor) || User.IsInRole(Roles.Administrador))
+            {
+                <div id="mflAccionesAuditor" style="display: flex; gap: 8px; align-items: center;">
+                    <!-- Botón dinámico de Validación o Bloqueo exclusivo para Auditor / Admin -->
+                    <div id="mflBotonValidarContainer"></div>
+
+                    <button type="button" class="btn-lcp-outline btn-lcp-sm" style="color: #9D2424; border-color: #F3C7C7; background: #FDEDEC; font-weight: 700;" onclick="observarDesdeFichaModal()">
+                        ⚠️ Observar
+                    </button>
+                </div>
+            }
+            else
+            {
+                <div id="mflMensajeEstadoCliente" style="display: flex; align-items: center; gap: 8px;">
+                    <!-- Mensaje de estado informativo para la empresa cliente -->
+                </div>
+            }
+        </div>
+
+    </div>
+</div>
+
+<!-- MODAL DE ZOOM PARA VISUALIZACIÓN DE FACTURA (IMAGEN) -->
+<div id="modalZoomImagenFactura" class="lcp-modal-backdrop" style="display: none; z-index: 1060; background: rgba(0,0,0,0.85); align-items: center; justify-content: center;">
+    <div style="position: relative; max-width: 90vw; max-height: 90vh; text-align: center;">
+        <button type="button" onclick="cerrarZoomImagenFactura()" style="position: absolute; top: -38px; right: 0; background: none; border: none; color: #FFF; font-size: 32px; cursor: pointer;">&times;</button>
+        <img id="mzfImagenGrande" src="" alt="Factura / Remito" style="max-width: 90vw; max-height: 85vh; border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); object-fit: contain;" />
+        <div id="mzfCaption" style="color: #E2E8F0; font-size: 13px; margin-top: 8px; font-weight: 600;"></div>
+    </div>
+</div>
+
+<!-- MODAL PARA CARGAR FACTURA (CLIENTE / OPERADOR) -->
+<div id="modalCargarFactura" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; align-items: center; justify-content: center;">
+    <div style="background: #FAF8F5; border: 1px solid #DDD7CD; border-radius: 8px; max-width: 440px; width: 90%; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+        <h3 id="modalCargarTitulo" style="margin-top: 0; font-size: 18px; font-weight: 700; color: #192A33;">Cargar Factura / Remito</h3>
+
+        <form asp-action="SubirFactura" method="post" enctype="multipart/form-data">
+            @Html.AntiForgeryToken()
+            <input type="hidden" id="modalCargarLiqId" name="liquidacionId" value="" />
+
+            <div class="form-group">
+                <label class="form-label">Tipo de Comprobante:</label>
+                <select name="tipoDocumento" class="form-input">
+                    <option value="Factura">Factura Comercial</option>
+                    <option value="Remito">Remito Firmado de Entrega</option>
+                    <option value="ConstanciaPago">Comprobante de Transferencia / Pago</option>
+                    <option value="CartaDePorte">Carta de Porte</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Archivo de la Factura (PDF, Imagen):</label>
+                <input type="file" name="archivo" class="form-input" accept=".pdf,.png,.jpg,.jpeg" required />
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                <button type="button" class="btn-lcp-outline" onclick="cerrarModalCargarFactura()">Cancelar</button>
+                <button type="submit" class="btn-lcp-primary">Subir Comprobante</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL PARA OBSERVAR LIQUIDACIÓN (AUDITOR) -->
+<div id="modalObservar" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; align-items: center; justify-content: center;">
+    <div style="background: #FAF8F5; border: 1px solid #DDD7CD; border-radius: 8px; max-width: 440px; width: 90%; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+        <h3 id="modalObservarTitulo" style="margin-top: 0; font-size: 18px; font-weight: 700;">Observar Liquidación</h3>
+
+        <form asp-action="Auditar" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" id="modalLiqId" name="id" value="" />
+            <input type="hidden" name="nuevoEstado" value="@((int)EstadoLiquidacion.Observada)" />
+
+            <div class="form-group">
+                <label class="form-label">Motivo de observación / Corrección requerida al cliente:</label>
+                <textarea name="observacion" class="form-input" rows="3" placeholder="Ej: La factura adjunta no coincide con el importe o falta adjuntar el remito con firma de recepción." required></textarea>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                <button type="button" class="btn-lcp-outline" onclick="cerrarModalObservar()">Cancelar</button>
+                <button type="submit" class="btn-lcp-primary" style="background-color: #9D2424; border-color: #9D2424;">Guardar observación</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL PARA RECHAZAR SOLICITUD DE DÁRSENA (AUDITOR) -->
+<div id="modalRechazoDarsena" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1050; align-items: center; justify-content: center;">
+    <div style="background: #FFFFFF; border-radius: 8px; max-width: 520px; width: 90%; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+        <h3 style="margin-top: 0; margin-bottom: 8px; font-size: 16px; font-weight: 700; color: #9D2424;">
+            Rechazo Técnico de Solicitud de Dársena
+        </h3>
+        <p style="font-size: 13px; color: #4A5568; margin-bottom: 16px;" id="modalRechazoSubtitulo">
+            Indique el motivo técnico por el cual no es viable almacenar dicha mercadería en la dársena solicitada.
+        </p>
+        <form asp-action="RechazarSolicitudDarsena" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" id="modalRechazoId" value="" />
+            <div class="form-group" style="margin-bottom: 16px;">
+                <label class="form-label" style="font-size: 12px; font-weight: 600;">Motivo del Rechazo / Incompatibilidad:</label>
+                <textarea name="motivo" class="form-input" rows="3" required placeholder="Ej: La dársena seleccionada no cuenta con sistema frigorífico certificado para supercongelados..."></textarea>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                <button type="button" class="btn-lcp-outline btn-lcp-sm" onclick="cerrarModalRechazoDarsena()">Cancelar</button>
+                <button type="submit" class="btn-lcp-primary btn-lcp-sm" style="background-color: #9D2424; border-color: #9D2424;">
+                    Confirmar Rechazo
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL: FICHA DE HABILITACIÓN DE DÁRSENA Y FACTURA -->
+<div id="modalFichaHabilitacion" class="lcp-modal-backdrop" style="display: none;">
+    <div class="lcp-modal" style="max-width: 620px;">
+        <div class="lcp-modal-header" style="background: linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%); color: #FFF; padding: 18px 24px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span style="font-size: 26px;">🔑</span>
+                <div>
+                    <h3 id="mfhTitulo" style="font-size: 18px; font-weight: 800; color: #FFF; margin: 0;">Ficha de Habilitación de Dársena</h3>
+                    <div style="font-size: 12px; color: #D5E8D4; margin-top: 2px;">Comprobante de Pago Validado - Lista para Operar</div>
+                </div>
+            </div>
+            <button type="button" class="lcp-modal-close" style="color: #FFF; font-size: 26px;" onclick="cerrarFichaHabilitacionModal()">&times;</button>
+        </div>
+
+        <div class="lcp-modal-body" style="padding: 22px;">
+            <div style="background: #F8F6F0; border: 1px solid var(--lcp-card-border); border-radius: 8px; padding: 16px; font-size: 13px; line-height: 1.8;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="color: var(--lcp-text-muted);">Dársena:</span>
+                    <strong id="mfhDarsena" style="font-size: 16px; color: #192A33;">-</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="color: var(--lcp-text-muted);">Empresa Cliente:</span>
+                    <strong id="mfhCliente" style="color: #192A33;">-</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="color: var(--lcp-text-muted);">Mercadería Declarada:</span>
+                    <span id="mfhMercaderia" style="font-weight: 700; color: #28536B;">-</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="color: var(--lcp-text-muted);">Régimen Térmico:</span>
+                    <span id="mfhRegimen" style="font-weight: 600;">-</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                    <span style="color: var(--lcp-text-muted); white-space: nowrap;">Consideraciones:</span>
+                    <span id="mfhConsideraciones" style="text-align: right; font-weight: 600; color: #6D4C41;">-</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-top: 8px; border-top: 1px solid #E5DFD5;">
+                    <span style="color: var(--lcp-text-muted);">Plan Contratado:</span>
+                    <strong id="mfhPlan">-</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="color: var(--lcp-text-muted);">Importe Total:</span>
+                    <strong id="mfhMonto" style="font-size: 16px; color: #1E663B;">$ -</strong>
+                </div>
+            </div>
+
+            <div id="mfhContenedorComprobante" style="margin-top: 16px; text-align: center;">
+                <a id="mfhLinkComprobante" href="#" target="_blank" class="btn-lcp-outline" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 700;">
+                    <span>📄</span> Abrir Factura / Comprobante de Pago Cargado
+                </a>
+            </div>
+        </div>
+
+        <div class="lcp-modal-footer" style="padding: 14px 24px; background: #F8F6F0; border-top: 1px solid var(--lcp-card-border); display: flex; justify-content: space-between; align-items: center;">
+            <button type="button" class="btn-lcp-outline btn-lcp-sm" onclick="cerrarFichaHabilitacionModal()">Cerrar</button>
+            <form id="formHabilitarModal" asp-action="HabilitarDarsena" method="post" style="margin: 0;">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" id="mfhInputIdHabilitar" value="" />
+                <button type="submit" class="btn-lcp-primary btn-lcp-sm" style="background-color: #2E7D32; border-color: #2E7D32; font-weight: 700;">
+                    ✓ Confirmar y Habilitar Dársena
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: FICHA DE EVALUACIÓN TÉCNICA DE DÁRSENA -->
+<div id="modalFichaEvaluacion" class="lcp-modal-backdrop" style="display: none;">
+    <div class="lcp-modal" style="max-width: 620px;">
+        <div class="lcp-modal-header" style="background: linear-gradient(135deg, #1B5277 0%, #28536B 100%); color: #FFF; padding: 18px 24px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span style="font-size: 26px;">🛡️</span>
+                <div>
+                    <h3 id="mfevTitulo" style="font-size: 18px; font-weight: 800; color: #FFF; margin: 0;">Ficha de Evaluación Técnica</h3>
+                    <div style="font-size: 12px; color: #D5E1DF; margin-top: 2px;">Verificación de Requerimientos de Almacenamiento</div>
+                </div>
+            </div>
+            <button type="button" class="lcp-modal-close" style="color: #FFF; font-size: 26px;" onclick="cerrarFichaEvaluacionModal()">&times;</button>
+        </div>
+
+        <div class="lcp-modal-body" style="padding: 22px;">
+            <div style="background: #F8F6F0; border: 1px solid var(--lcp-card-border); border-radius: 8px; padding: 16px; font-size: 13px; line-height: 1.8;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="color: var(--lcp-text-muted);">Dársena Solicitada:</span>
+                    <strong id="mfevDarsena" style="font-size: 16px; color: #192A33;">-</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="color: var(--lcp-text-muted);">Cliente Postulante:</span>
+                    <strong id="mfevCliente" style="color: #192A33;">-</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="color: var(--lcp-text-muted);">Mercadería a Almacenar:</span>
+                    <span id="mfevMercaderia" style="font-weight: 700; color: #28536B;">-</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="color: var(--lcp-text-muted);">Régimen Térmico:</span>
+                    <span id="mfevRegimen" style="font-weight: 600;">-</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                    <span style="color: var(--lcp-text-muted); white-space: nowrap;">Consideraciones Especiales:</span>
+                    <span id="mfevConsideraciones" style="text-align: right; font-weight: 600; color: #6D4C41;">-</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-top: 8px; border-top: 1px solid #E5DFD5;">
+                    <span style="color: var(--lcp-text-muted);">Plan Solicitado:</span>
+                    <strong id="mfevPlan">-</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="color: var(--lcp-text-muted);">Monto de Contrato:</span>
+                    <strong id="mfevMonto" style="font-size: 16px; color: #192A33;">$ -</strong>
+                </div>
+            </div>
+
+            <div style="margin-top: 14px; background: #E8F5E9; border-left: 4px solid #2ECC71; padding: 10px 14px; border-radius: 6px; font-size: 12px; color: #1E663B;">
+                <strong>ℹ️ Al confirmar alquiler:</strong> El cliente recibirá notificación para abonar el canon y subir la factura / comprobante.
+            </div>
+        </div>
+
+        <div class="lcp-modal-footer" style="padding: 14px 24px; background: #F8F6F0; border-top: 1px solid var(--lcp-card-border); display: flex; justify-content: space-between; align-items: center;">
+            <button type="button" class="btn-lcp-outline btn-lcp-sm" onclick="cerrarFichaEvaluacionModal()">Cerrar</button>
+            <div style="display: flex; gap: 8px;">
+                <form id="formAprobarDarsenaModal" asp-action="AprobarSolicitudDarsena" method="post" style="margin: 0;">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" id="mfevInputIdAprobar" value="" />
+                    <input type="hidden" name="observacion" value="Viabilidad técnica aprobada para la mercadería declarada." />
+                    <button type="submit" class="btn-lcp-primary btn-lcp-sm" style="background-color: #2B7A4B; border-color: #2B7A4B; font-weight: 700;">
+                        ✓ Confirmar Alquiler
+                    </button>
+                </form>
+                <button type="button" class="btn-lcp-outline btn-lcp-sm" style="color: #9D2424; border-color: #9D2424;" onclick="rechazarDesdeFichaModal()">
+                    ✕ Rechazar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function abrirFichaHabilitacionModal(id, darsena, cliente, mercaderia, regimen, consideraciones, plan, monto, urlComprobante) {
+            document.getElementById("mfhDarsena").textContent = darsena;
+            document.getElementById("mfhCliente").textContent = cliente;
+            document.getElementById("mfhMercaderia").textContent = mercaderia;
+            document.getElementById("mfhRegimen").textContent = regimen;
+            document.getElementById("mfhConsideraciones").textContent = consideraciones;
+            document.getElementById("mfhPlan").textContent = plan;
+            document.getElementById("mfhMonto").textContent = `$ ${monto}`;
+            document.getElementById("mfhInputIdHabilitar").value = id;
+
+            const linkComp = document.getElementById("mfhLinkComprobante");
+            if (urlComprobante) {
+                linkComp.href = `http://localhost:5152${urlComprobante}`;
+                document.getElementById("mfhContenedorComprobante").style.display = "block";
+            } else {
+                document.getElementById("mfhContenedorComprobante").style.display = "none";
+            }
+
+            document.getElementById("modalFichaHabilitacion").style.display = "flex";
+        }
+        function cerrarFichaHabilitacionModal() {
+            document.getElementById("modalFichaHabilitacion").style.display = "none";
+        }
+
+        let mfevIdActual = 0;
+        let mfevDarsenaActual = "";
+        let mfevClienteActual = "";
+
+        function abrirFichaEvaluacionModal(id, darsena, cliente, mercaderia, regimen, consideraciones, plan, monto) {
+            mfevIdActual = id;
+            mfevDarsenaActual = darsena;
+            mfevClienteActual = cliente;
+
+            document.getElementById("mfevDarsena").textContent = darsena;
+            document.getElementById("mfevCliente").textContent = cliente;
+            document.getElementById("mfevMercaderia").textContent = mercaderia;
+            document.getElementById("mfevRegimen").textContent = regimen;
+            document.getElementById("mfevConsideraciones").textContent = consideraciones;
+            document.getElementById("mfevPlan").textContent = plan;
+            document.getElementById("mfevMonto").textContent = `$ ${monto}`;
+            document.getElementById("mfevInputIdAprobar").value = id;
+
+            document.getElementById("modalFichaEvaluacion").style.display = "flex";
+        }
+        function cerrarFichaEvaluacionModal() {
+            document.getElementById("modalFichaEvaluacion").style.display = "none";
+        }
+
+        function rechazarDesdeFichaModal() {
+            cerrarFichaEvaluacionModal();
+            abrirModalRechazoDarsena(mfevIdActual, mfevDarsenaActual, mfevClienteActual);
+        }
+
+        function abrirModalRechazoDarsena(id, darsenaCodigo, cliente) {
+            document.getElementById("modalRechazoId").value = id;
+            document.getElementById("modalRechazoSubtitulo").textContent = `Dársena ${darsenaCodigo} - Cliente: ${cliente}. Especifique la causa del dictamen desfavorable.`;
+            document.getElementById("modalRechazoDarsena").style.display = "flex";
+        }
+        function cerrarModalRechazoDarsena() {
+            document.getElementById("modalRechazoDarsena").style.display = "none";
+        }
+
+
+        let currentFichaLiqId = 0;
+        let currentFichaLiqComp = "";
+
+        // Almacén seguro de liquidaciones cargadas desde el servidor
+        const liquidacionesRaw = @Html.Raw(liquidacionesJson);
+        const liquidacionesMap = new Map();
+        if (Array.isArray(liquidacionesRaw)) {
+            liquidacionesRaw.forEach(item => {
+                if (item && (item.id != null || item.Id != null)) {
+                    liquidacionesMap.set(Number(item.id ?? item.Id), item);
+                }
+            });
+        }
+
+        // Función normalizadora que tolera tanto camelCase como PascalCase sin fallos
+        function normalizarLiquidacion(liq) {
+            if (!liq) return {};
+            const rawDocs = liq.documentosRespaldatorios || liq.DocumentosRespaldatorios || [];
+            const safeDocs = Array.isArray(rawDocs) ? rawDocs.map(d => ({
+                id: d.id ?? d.Id ?? 0,
+                tipoDocumento: d.tipoDocumento || d.TipoDocumento || 'Comprobante',
+                nombreArchivo: d.nombreArchivo || d.NombreArchivo || 'archivo',
+                rutaUrl: (d.rutaUrl || d.RutaUrl || '').trim(),
+                subidoPorNombre: d.subidoPorNombre || d.SubidoPorNombre || 'Usuario',
+                fechaSubida: d.fechaSubida || d.FechaSubida || ''
+            })) : [];
+
+            return {
+                id: Number(liq.id ?? liq.Id ?? 0),
+                numeroComprobante: liq.numeroComprobante || liq.NumeroComprobante || '',
+                clienteRazonSocial: liq.clienteRazonSocial || liq.ClienteRazonSocial || '-',
+                clienteCUIT: liq.clienteCUIT || liq.ClienteCUIT || 'No registrado',
+                clienteEmail: liq.clienteEmail || liq.ClienteEmail || '',
+                clienteTelefono: liq.clienteTelefono || liq.ClienteTelefono || '',
+                tipoLiquidacionNombre: liq.tipoLiquidacionNombre || liq.TipoLiquidacionNombre || 'Servicio General',
+                codigoSolicitud: liq.codigoSolicitud || liq.CodigoSolicitud || '',
+                darsenaCodigo: liq.darsenaCodigo || liq.DarsenaCodigo || '',
+                modalidadTransporte: liq.modalidadTransporte || liq.ModalidadTransporte || '',
+                conductorNombre: liq.conductorNombre || liq.ConductorNombre || '',
+                conductorPatente: liq.conductorPatente || liq.ConductorPatente || '',
+                ciudadOrigen: liq.ciudadOrigen || liq.CiudadOrigen || '',
+                ciudadDestino: liq.ciudadDestino || liq.CiudadDestino || '',
+                descripcionMercaderia: liq.descripcionMercaderia || liq.DescripcionMercaderia || '',
+                pesoTotalKg: Number(liq.pesoTotalKg ?? liq.PesoTotalKg ?? 0),
+                volumenTotalM3: Number(liq.volumenTotalM3 ?? liq.VolumenTotalM3 ?? 0),
+                variablesAplicadasResumen: liq.variablesAplicadasResumen || liq.VariablesAplicadasResumen || '',
+                subtotalPeso: Number(liq.subtotalPeso ?? liq.SubtotalPeso ?? 0),
+                subtotalVolumen: Number(liq.subtotalVolumen ?? liq.SubtotalVolumen ?? 0),
+                subtotalDistancia: Number(liq.subtotalDistancia ?? liq.SubtotalDistancia ?? 0),
+                subtotalTiempoDepositoOAlquiler: Number(liq.subtotalTiempoDepositoOAlquiler ?? liq.SubtotalTiempoDepositoOAlquiler ?? 0),
+                importeTotal: Number(liq.importeTotal ?? liq.ImporteTotal ?? 0),
+                estado: Number(liq.estado ?? liq.Estado ?? 1),
+                estadoNombre: liq.estadoNombre || liq.EstadoNombre || 'Pendiente de auditoría',
+                auditadoPorUsuarioId: liq.auditadoPorUsuarioId ?? liq.AuditadoPorUsuarioId,
+                auditadoPorNombre: liq.auditadoPorNombre || liq.AuditadoPorNombre || '',
+                fechaAuditoria: liq.fechaAuditoria || liq.FechaAuditoria,
+                observacionAuditoria: liq.observacionAuditoria || liq.ObservacionAuditoria || '',
+                fechaEmision: liq.fechaEmision || liq.FechaEmision,
+                documentosRespaldatorios: safeDocs
+            };
+        }
+
+        // Abre la ficha usando el ID directamente desde la tabla
+        async function abrirFichaLiquidacionModalPorId(id) {
+            const numId = Number(id);
+            let item = liquidacionesMap.get(numId);
+            if (!item) {
+                console.warn("Liquidación no encontrada localmente:", id);
+                return;
+            }
+
+            let norm = normalizarLiquidacion(item);
+
+            // Renderizado inmediato
+            renderFichaLiquidacionModal(norm);
+
+            // Actualización asíncrona de comprobantes en tiempo real
+            try {
+                const res = await fetch(`/Facturacion/Documentos?liquidacionId=${numId}`);
+                if (res.ok) {
+                    const freshDocs = await res.json();
+                    if (Array.isArray(freshDocs)) {
+                        norm.documentosRespaldatorios = freshDocs.map(d => ({
+                            id: d.id ?? d.Id ?? 0,
+                            tipoDocumento: d.tipoDocumento || d.TipoDocumento || 'Comprobante',
+                            nombreArchivo: d.nombreArchivo || d.NombreArchivo || 'archivo',
+                            rutaUrl: (d.rutaUrl || d.RutaUrl || '').trim(),
+                            subidoPorNombre: d.subidoPorNombre || d.SubidoPorNombre || 'Usuario',
+                            fechaSubida: d.fechaSubida || d.FechaSubida || ''
+                        }));
+                        // Actualizar objeto en mapa
+                        item.documentosRespaldatorios = freshDocs;
+                        // Si el usuario aún tiene el modal abierto para esta liquidación, actualizarlo
+                        if (currentFichaLiqId === numId) {
+                            renderFichaLiquidacionModal(norm);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn("No se pudieron refrescar los documentos vía fetch:", err);
+            }
+        }
+
+        // Compatibilidad por si se llama con objeto o ID
+        function abrirFichaLiquidacionModal(liq) {
+            if (typeof liq === 'number' || typeof liq === 'string') {
+                abrirFichaLiquidacionModalPorId(liq);
+                return;
+            }
+            renderFichaLiquidacionModal(normalizarLiquidacion(liq));
+        }
+
+        // Renderizado del modal y sus pestañas
+        function renderFichaLiquidacionModal(liq) {
+            currentFichaLiqId = liq.id;
+            currentFichaLiqComp = liq.numeroComprobante;
+
+            document.getElementById("mflTitulo").textContent = `Ficha de Liquidación: ${liq.numeroComprobante || '-'}`;
+            
+            // Estado Badge
+            const badge = document.getElementById("mflBadgeEstado");
+            badge.textContent = liq.estadoNombre || (liq.estado === 2 ? "Validada" : liq.estado === 1 ? "Pendiente" : "Observada");
+            badge.className = "badge-estado " + (liq.estado === 2 ? "badge-validada" : liq.estado === 1 ? "badge-pendiente" : "badge-observada");
+
+            // Subtítulo
+            let fechaEmisionTxt = "-";
+            if (liq.fechaEmision) {
+                try {
+                    fechaEmisionTxt = new Date(liq.fechaEmision).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + " hs";
+                } catch (e) {
+                    fechaEmisionTxt = liq.fechaEmision;
+                }
+            }
+            document.getElementById("mflSubtitulo").textContent = `Comprobante fiscal · Emitido el ${fechaEmisionTxt} por Logística Centro País`;
+
+            // Datos Comerciales
+            document.getElementById("mflClienteRazonSocial").textContent = liq.clienteRazonSocial || "-";
+            document.getElementById("mflClienteCUIT").textContent = liq.clienteCUIT || "No registrado";
+            document.getElementById("mflClienteContacto").textContent = `${liq.clienteEmail || '-'} · ${liq.clienteTelefono || '-'}`;
+            document.getElementById("mflTipoLiquidacion").textContent = liq.tipoLiquidacionNombre || "Servicio General";
+
+            // Datos Operativos
+            const opRef = liq.codigoSolicitud ? `Operación #${liq.codigoSolicitud}` : (liq.darsenaCodigo ? `Dársena ${liq.darsenaCodigo}` : "Servicio de Depósito");
+            document.getElementById("mflOperacionRef").textContent = opRef;
+
+            const modTrans = liq.modalidadTransporte === "FlotaLCP" ? "Camión Flota LCP (Doble Viaje)" : (liq.modalidadTransporte ? "Transporte Propio del Cliente" : "Almacenamiento en Dársena");
+            document.getElementById("mflModalidadTransporte").textContent = modTrans;
+
+            const choferTxt = liq.conductorNombre ? `${liq.conductorNombre} ${liq.conductorPatente ? '· Patente ' + liq.conductorPatente : ''}` : "Sin chofer designado";
+            document.getElementById("mflChoferAsignado").textContent = choferTxt;
+
+            const trayectoTxt = `${liq.ciudadOrigen || 'Origen'} ➔ ${liq.ciudadDestino || 'Base LCP Santa Rosa'}`;
+            document.getElementById("mflTrayecto").textContent = trayectoTxt;
+
+            const cargaTxt = `${liq.descripcionMercaderia || 'Carga declarada'} · ${liq.pesoTotalKg.toLocaleString('es-AR')} kg · ${liq.volumenTotalM3.toLocaleString('es-AR')} m³`;
+            document.getElementById("mflCargaDetalle").textContent = cargaTxt;
+
+            // Desglose
+            document.getElementById("mflResumenVariables").textContent = liq.variablesAplicadasResumen || "";
+            document.getElementById("mflSubPeso").textContent = `$ ${liq.subtotalPeso.toLocaleString('es-AR')}`;
+            document.getElementById("mflSubVol").textContent = `$ ${liq.subtotalVolumen.toLocaleString('es-AR')}`;
+            document.getElementById("mflSubDist").textContent = `$ ${liq.subtotalDistancia.toLocaleString('es-AR')}`;
+            document.getElementById("mflSubTiempo").textContent = `$ ${liq.subtotalTiempoDepositoOAlquiler.toLocaleString('es-AR')}`;
+            document.getElementById("mflTotalImporte").textContent = `$ ${liq.importeTotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+
+            // Formulario de subida rápida
+            document.getElementById("mflInputSubirLiqId").value = liq.id;
+            document.getElementById("mflPanelSubirFactura").style.display = "none";
+
+            // Documentos y Facturas
+            const docs = liq.documentosRespaldatorios || [];
+            const tieneFacturas = docs.length > 0;
+
+            // Banner Alerta
+            const banner = document.getElementById("mflBannerAlerta");
+            if (tieneFacturas) {
+                banner.innerHTML = `
+                    <div style="background-color: #ECFDF5; border: 1px solid #10B981; border-radius: 8px; padding: 12px 16px; color: #065F46; display: flex; align-items: flex-start; gap: 10px;">
+                        <span style="font-size: 20px;">✓</span>
+                        <div>
+                            <strong style="display: block; font-size: 13px; margin-bottom: 2px;">COMPROBANTE RESPALDATORIO DISPONIBLE (${docs.length} ARCHIVO/S)</strong>
+                            <span style="font-size: 12px; line-height: 1.5;">El cliente o chofer ya han adjuntado la factura comercial o remito firmado. La liquidación cumple con los requisitos contables para su aprobación definitiva.</span>
+                        </div>
+                    </div>`;
+            } else {
+                banner.innerHTML = `
+                    <div style="background-color: #FEF3C7; border: 1px solid #F59E0B; border-radius: 8px; padding: 12px 16px; color: #92400E; display: flex; align-items: flex-start; gap: 10px;">
+                        <span style="font-size: 20px;">🔒</span>
+                        <div>
+                            <strong style="display: block; font-size: 13px; margin-bottom: 2px;">CONFIRMACIÓN BLOQUEADA: FALTA CARGAR FACTURA O REMITO</strong>
+                            <span style="font-size: 12px; line-height: 1.5;">Para poder confirmar y validar esta liquidación, <strong>es obligatorio</strong> que los actores involucrados (el Cliente y/o el Chofer) carguen la factura comercial o remito de la operación.</span>
+                        </div>
+                    </div>`;
+            }
+
+            document.getElementById("mflCantComprobantesBadge").textContent = `${docs.length} archivo(s)`;
+
+            // Renderizar lista de comprobantes
+            const contFacturas = document.getElementById("mflContenedorFacturas");
+            if (!tieneFacturas) {
+                contFacturas.innerHTML = `
+                    <div style="padding: 18px; text-align: center; color: var(--lcp-text-muted); background: #FAF5EB; border-radius: 6px; font-size: 12.5px;">
+                        ⚠️ Aún no se han adjuntado facturas o remitos para esta liquidación.<br/>
+                        <span style="font-size: 11.5px; color: #8C6A3E;">Podés adjuntar uno haciendo clic en el botón <strong>"+ Adjuntar Factura / Remito"</strong> superior.</span>
+                    </div>`;
+            } else {
+                let html = `<table class="lcp-table" style="font-size: 12px; margin: 0;">
+                    <thead>
+                        <tr>
+                            <th>Tipo Comprobante</th>
+                            <th>Archivo</th>
+                            <th>Subido por</th>
+                            <th>Fecha</th>
+                            <th style="text-align: right;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+                docs.forEach(d => {
+                    const tipoDoc = d.tipoDocumento || 'Comprobante';
+                    const nomArch = d.nombreArchivo || 'comprobante';
+                    const subPor = d.subidoPorNombre || 'Usuario';
+                    let fSubTxt = '-';
+                    if (d.fechaSubida) {
+                        try {
+                            fSubTxt = new Date(d.fechaSubida).toLocaleString('es-AR');
+                        } catch (e) {
+                            fSubTxt = d.fechaSubida;
+                        }
+                    }
+
+                    const ruta = (d.rutaUrl || '').trim();
+                    const rutaLower = ruta.toLowerCase();
+                    const esImg = rutaLower.endsWith('.jpg') || rutaLower.endsWith('.jpeg') || rutaLower.endsWith('.png') || rutaLower.endsWith('.webp');
+
+                    let urlCompleta = '#';
+                    if (ruta) {
+                        if (ruta.startsWith('http://') || ruta.startsWith('https://')) {
+                            urlCompleta = ruta;
+                        } else if (ruta.startsWith('/uploads')) {
+                            urlCompleta = ruta;
+                        } else {
+                            urlCompleta = `http://localhost:5152${ruta.startsWith('/') ? '' : '/'}${ruta}`;
+                        }
+                    }
+
+                    const tipoTitulo = tipoDoc === 'Factura' ? '🧾 Factura Comercial' : 
+                                       (tipoDoc === 'Remito' || tipoDoc === 'RemitoConformado' ? '📄 Remito Firmado' : 
+                                       (tipoDoc === 'ConstanciaPago' ? '💳 Comprobante Pago' : tipoDoc));
+
+                    html += `<tr>
+                        <td>
+                            <strong style="color: #192A33;">${tipoTitulo}</strong>
+                        </td>
+                        <td style="font-family: monospace; color: #28536B;">${nomArch}</td>
+                        <td>${subPor}</td>
+                        <td style="font-size: 11px; color: var(--lcp-text-muted);">${fSubTxt}</td>
+                        <td style="text-align: right;">
+                            <div style="display: inline-flex; gap: 6px;">
+                                ${esImg ? `<button type="button" class="btn-lcp-outline btn-lcp-sm" style="padding: 2px 8px; font-size: 11px;" onclick="abrirZoomImagenFactura('${urlCompleta}', '${nomArch}')">🔍 Zoom</button>` : ''}
+                                <a href="${urlCompleta}" target="_blank" class="btn-lcp-primary btn-lcp-sm" style="padding: 2px 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;">
+                                    👁️ Abrir
+                                </a>
+                            </div>
+                        </td>
+                    </tr>`;
+                });
+
+                html += `</tbody></table>`;
+                contFacturas.innerHTML = html;
+            }
+
+            // Historial de auditoría
+            const secAud = document.getElementById("mflSeccionAuditoria");
+            if (liq.auditadoPorNombre || liq.observacionAuditoria) {
+                secAud.style.display = "block";
+                let fechaAudTxt = "";
+                if (liq.fechaAuditoria) {
+                    try {
+                        fechaAudTxt = " el " + new Date(liq.fechaAuditoria).toLocaleString('es-AR') + " hs";
+                    } catch (e) {
+                        fechaAudTxt = " el " + liq.fechaAuditoria;
+                    }
+                }
+                document.getElementById("mflDetalleAuditoria").innerHTML = `
+                    Dictamen emitido por <strong>${liq.auditadoPorNombre || 'Auditor'}</strong>${fechaAudTxt}.<br/>
+                    ${liq.observacionAuditoria ? `<span style="color: #9D2424; font-weight: 600;">Observación: ${liq.observacionAuditoria}</span>` : 'Sin observaciones técnicas adicionales.'}
+                `;
+            } else {
+                secAud.style.display = "none";
+            }
+
+            // Acciones para Auditor / Admin (exclusivo para perfiles con permisos de auditoría)
+            const esAuditorOAdmin = @((User.IsInRole(Roles.Auditor) || User.IsInRole(Roles.Administrador)).ToString().ToLower());
+            const secAccionesAuditor = document.getElementById("mflAccionesAuditor");
+            const contBotonVal = document.getElementById("mflBotonValidarContainer");
+            const contMsgCliente = document.getElementById("mflMensajeEstadoCliente");
+
+            if (esAuditorOAdmin && secAccionesAuditor) {
+                if (liq.estado === 1) { // Pendiente de auditoría
+                    secAccionesAuditor.style.display = "flex";
+                    if (tieneFacturas) {
+                        const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+                        contBotonVal.innerHTML = `
+                            <form asp-action="Auditar" method="post" style="margin: 0; display: inline-block;">
+                                <input type="hidden" name="__RequestVerificationToken" value="${token}" />
+                                <input type="hidden" name="id" value="${liq.id}" />
+                                <input type="hidden" name="nuevoEstado" value="2" />
+                                <input type="hidden" name="observacion" value="Factura y remito conformados y validados conforme por Auditoría." />
+                                <button type="submit" class="btn-lcp-primary btn-lcp-sm" style="background-color: #2B7A4B; border-color: #2B7A4B; font-weight: 700; padding: 6px 14px;">
+                                    ✓ Confirmar y Validar Liquidación
+                                </button>
+                            </form>`;
+                    } else {
+                        contBotonVal.innerHTML = `
+                            <button type="button" class="btn-lcp-outline btn-lcp-sm" style="opacity: 0.55; cursor: not-allowed; background-color: #F3F4F6; color: #9CA3AF; border-color: #D1D5DB; font-weight: 700; padding: 6px 14px;" onclick="alert('⚠️ ACCIÓN BLOQUEADA: La normativa contable exige que el Cliente o el Chofer carguen la factura comercial o remito antes de poder validar esta liquidación.')" title="Requiere factura comercial cargada por el cliente o chofer">
+                                🔒 Validación Bloqueada (Falta Factura)
+                            </button>`;
+                    }
+                } else {
+                    secAccionesAuditor.style.display = "none";
+                }
+            } else if (contMsgCliente) {
+                if (liq.estado === 1) {
+                    contMsgCliente.innerHTML = `<span style="font-size: 12px; color: #946712; font-weight: 700; background: #FEF3C7; padding: 6px 14px; border-radius: 6px; border: 1px solid #FCD34D;">⏳ Pendiente de Auditoría y Dictamen Contable por Logística Centro País</span>`;
+                } else if (liq.estado === 2) {
+                    contMsgCliente.innerHTML = `<span style="font-size: 12px; color: #2B7A4B; font-weight: 700; background: #EBF8F0; padding: 6px 14px; border-radius: 6px; border: 1px solid #C3E6D0;">✓ Liquidación Auditada y Aprobada por Auditoría</span>`;
+                } else if (liq.estado === 3) {
+                    contMsgCliente.innerHTML = `<span style="font-size: 12px; color: #9D2424; font-weight: 700; background: #FBE8E8; padding: 6px 14px; border-radius: 6px; border: 1px solid #F3C7C7;">⚠️ Observada por Auditoría</span>`;
+                }
+            }
+
+            document.getElementById("modalFichaLiquidacion").style.display = "flex";
+        }
+
+        function cerrarFichaLiquidacionModal() {
+            document.getElementById("modalFichaLiquidacion").style.display = "none";
+        }
+
+        function togglePanelSubirFacturaModal() {
+            const panel = document.getElementById("mflPanelSubirFactura");
+            panel.style.display = panel.style.display === "none" ? "block" : "none";
+        }
+
+        function observarDesdeFichaModal() {
+            cerrarFichaLiquidacionModal();
+            observarLiquidacion(currentFichaLiqId, currentFichaLiqComp);
+        }
+
+        function abrirZoomImagenFactura(url, titulo) {
+            document.getElementById("mzfImagenGrande").src = url;
+            document.getElementById("mzfCaption").textContent = titulo || "Factura / Comprobante Comercial";
+            document.getElementById("modalZoomImagenFactura").style.display = "flex";
+        }
+
+        function cerrarZoomImagenFactura() {
+            document.getElementById("modalZoomImagenFactura").style.display = "none";
+        }
+
+        function observarLiquidacion(id, comprobante) {
+            document.getElementById("modalLiqId").value = id;
+            document.getElementById("modalObservarTitulo").textContent = `Observar Liquidación ${comprobante}`;
+            document.getElementById("modalObservar").style.display = "flex";
+        }
+        function cerrarModalObservar() {
+            document.getElementById("modalObservar").style.display = "none";
+        }
+
+        function abrirModalCargarFactura(id, comprobante) {
+            document.getElementById("modalCargarLiqId").value = id;
+            document.getElementById("modalCargarTitulo").textContent = `Cargar Factura: ${comprobante}`;
+            document.getElementById("modalCargarFactura").style.display = "flex";
+        }
+        function cerrarModalCargarFactura() {
+            document.getElementById("modalCargarFactura").style.display = "none";
+        }
+
+        async function verFacturas(id, comprobante, cliente) {
+            abrirFichaLiquidacionModalPorId(id);
+        }
+    </script>
+}

@@ -1,0 +1,711 @@
+@model SolicitudOperacionDto
+@using LCP.Shared.Constants
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = $"Solicitud {Model.CodigoSolicitud}";
+    var documentos = ViewBag.Documentos as List<DocumentoAdjuntoDto> ?? new();
+    var choferes = ViewBag.Conductores as List<ConductorViewModel> ?? new();
+    var darsenas = ViewBag.Darsenas as List<DarsenaDto> ?? new();
+    bool esDespacho = Model.TipoOperacion == TipoOperacionSolicitud.DespachoRetiro;
+    bool camionLlego = (Model.EstadoViaje >= EstadoViaje.EnPredioDarsena)
+        || (Model.ViajeInfo != null && Model.ViajeInfo.EstadoViaje >= EstadoViaje.EnPredioDarsena)
+        || Model.FechaHoraIngresoReal.HasValue
+        || (Model.ViajeInfo?.ObservacionesChofer != null && (
+            Model.ViajeInfo.ObservacionesChofer.Contains("Paso 5") ||
+            Model.ViajeInfo.ObservacionesChofer.Contains("Paso 3") ||
+            Model.ViajeInfo.ObservacionesChofer.Contains("Paso 2: Llegada") ||
+            Model.ViajeInfo.ObservacionesChofer.Contains("Arrib") ||
+            Model.ViajeInfo.ObservacionesChofer.Contains("Lleg") ||
+            Model.ViajeInfo.ObservacionesChofer.Contains("posicionado", StringComparison.OrdinalIgnoreCase) ||
+            Model.ViajeInfo.ObservacionesChofer.Contains("San Martín", StringComparison.OrdinalIgnoreCase)
+        ));
+}
+
+<div style="max-width: 900px; margin: 0 auto; padding-bottom: 60px;">
+    <div class="page-header">
+        <div>
+            <a asp-action="Index" style="font-size: 13px; color: var(--lcp-primary); font-weight: 600; text-decoration: none;">← Volver a solicitudes</a>
+            <div style="display: flex; align-items: center; gap: 14px; margin-top: 8px;">
+                <h1 class="page-title" style="margin: 0;">Solicitud @Model.CodigoSolicitud</h1>
+                <span class="badge-estado @(Model.Estado == EstadoSolicitud.Completada ? "badge-completada" : Model.Estado == EstadoSolicitud.EnCurso ? "badge-encurso" : Model.Estado == EstadoSolicitud.Programada ? "badge-turno" : Model.Estado == EstadoSolicitud.Cancelada ? "badge-rechazada" : "badge-pendiente")">
+                    @Model.EstadoNombre
+                </span>
+            </div>
+            <p class="page-subtitle" style="margin-top: 4px;">@Model.TipoOperacionNombre · @Model.ClienteRazonSocial</p>
+        </div>
+
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            @if (User.IsInRole(Roles.Conductor))
+            {
+                <a asp-controller="Conductor" asp-action="HojaDeRuta" asp-route-id="@Model.Id" class="btn-lcp-primary" style="background-color: #2ECC71; border-color: #2ECC71; color: #162E3B; font-weight: 800; text-decoration: none;">
+                    🗺️ Abrir Mi Hoja de Ruta
+                </a>
+            }
+            else
+            {
+                <a asp-controller="Conductor" asp-action="HojaDeRuta" asp-route-id="@Model.Id" class="btn-lcp-outline" style="text-decoration: none; font-weight: 700;">
+                    🗺️ Hoja de Ruta e Itinerario
+                </a>
+            }
+
+            @if (Model.Estado == EstadoSolicitud.Programada && (User.IsInRole(Roles.Operador) || User.IsInRole(Roles.Administrador)))
+            {
+                if (esDespacho)
+                {
+                    <form asp-action="IniciarOperacion" method="post" style="margin: 0;">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@Model.Id" />
+                        <button type="submit" class="btn-lcp-primary">
+                            🚚 Posicionar Camión en Muelle para Carga
+                        </button>
+                    </form>
+                }
+                else if (camionLlego)
+                {
+                    <form asp-action="IniciarOperacion" method="post" style="margin: 0;">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@Model.Id" />
+                        <button type="submit" class="btn-lcp-primary">
+                            🚚 Marcar Arribo / Camión en Muelle
+                        </button>
+                    </form>
+                }
+                else
+                {
+                    <button type="button" class="btn-lcp-primary" disabled style="background-color: #A0AEC0; border-color: #A0AEC0; cursor: not-allowed; opacity: 0.8;" title="El chofer debe confirmar su llegada en la hoja de ruta">
+                        ⏳ Esperando arribo del camión a LCP
+                    </button>
+                }
+            }
+
+            @if (Model.Estado == EstadoSolicitud.EnCurso && (User.IsInRole(Roles.Operador) || User.IsInRole(Roles.Administrador)))
+            {
+                if (esDespacho)
+                {
+                    <a asp-controller="Patio" asp-action="DescargarYOrdenar" asp-route-solicitudId="@Model.Id" class="btn-lcp-primary" style="background-color: #C2821E; border-color: #C2821E;">
+                        📤 Cargar Mercadería y Despachar desde LCP
+                    </a>
+                }
+                else if (camionLlego)
+                {
+                    <a asp-controller="Patio" asp-action="DescargarYOrdenar" asp-route-solicitudId="@Model.Id" class="btn-lcp-primary" style="background-color: #2B7A4B; border-color: #2B7A4B;">
+                        📥 Completar Descarga y Guardar Stock
+                    </a>
+                }
+                else
+                {
+                    <button type="button" class="btn-lcp-primary" disabled style="background-color: #A0AEC0; border-color: #A0AEC0; cursor: not-allowed; opacity: 0.8;" title="El chofer debe reportar su arribo a dársena en la hoja de ruta antes de descargar">
+                        ⏳ Esperando arribo del camión a LCP
+                    </button>
+                }
+            }
+            else if (Model.Estado == EstadoSolicitud.Completada && !esDespacho && Model.LoteInventarioId == null && (User.IsInRole(Roles.Operador) || User.IsInRole(Roles.Administrador)))
+            {
+                <a asp-controller="Patio" asp-action="DescargarYOrdenar" asp-route-solicitudId="@Model.Id" class="btn-lcp-primary" style="background-color: #2B7A4B; border-color: #2B7A4B;">
+                    📥 Registrar Stock y Emitir Facturación en Dársena
+                </a>
+            }
+
+            @if (Model.Estado != EstadoSolicitud.Completada && Model.Estado != EstadoSolicitud.Cancelada)
+            {
+                @if (User.IsInRole(Roles.Operador) || User.IsInRole(Roles.Administrador))
+                {
+                    if (Model.Estado == EstadoSolicitud.Pendiente)
+                    {
+                        <button type="button" class="btn-lcp-outline" style="color: #9D2424; border-color: #F3C7C7; font-weight: 600;"
+                                onclick="abrirModalCancelar('⛔ Rechazar Solicitud', 'Indique el motivo por el cual rechaza la solicitud del cliente:')">
+                            ⛔ Rechazar Solicitud
+                        </button>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn-lcp-outline" style="color: #9D2424; border-color: #F3C7C7; font-weight: 600;"
+                                onclick="abrirModalCancelar('✕ Cancelar Operación', 'Indique el motivo por el cual cancela esta operación activa:')">
+                            ✕ Cancelar Operación
+                        </button>
+                    }
+                }
+                else if (User.IsInRole(Roles.Cliente) && (Model.Estado == EstadoSolicitud.Pendiente || Model.Estado == EstadoSolicitud.Programada))
+                {
+                    <button type="button" class="btn-lcp-outline" style="color: #9D2424; border-color: #F3C7C7; font-weight: 600;"
+                            onclick="abrirModalCancelar('✕ Cancelar Solicitud', '¿Deseas cancelar esta operación solicitada? Indique el motivo:')">
+                        ✕ Cancelar Solicitud
+                    </button>
+                }
+            }
+        </div>
+    </div>
+
+    @if (User.IsInRole(Roles.Conductor))
+    {
+        <div style="background-color: #E8F4F8; border: 1px solid #BEE3F8; color: #162E3B; padding: 14px 18px; border-radius: 6px; margin-bottom: 20px; font-size: 13.5px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+            <div>
+                <strong>🚛 Panel del Conductor:</strong> Para actualizar las etapas de tu viaje, registrar salida y reportar tu llegada a la dársena de Base LCP, utilizá tu <strong>Hoja de Ruta e Itinerario</strong>.
+            </div>
+            <a asp-controller="Conductor" asp-action="HojaDeRuta" asp-route-id="@Model.Id" class="btn-lcp-primary btn-lcp-sm" style="background-color: #162E3B; color: #FFF; border-color: #162E3B;">
+                Abrir Mi Hoja de Ruta ➔
+            </a>
+        </div>
+    }
+
+    @if (Model.Estado == EstadoSolicitud.Cancelada)
+    {
+        <div style="background-color: #FBE8E8; border: 1px solid #F3C7C7; color: #9D2424; padding: 14px 18px; border-radius: 6px; margin-bottom: 20px; font-size: 14px;">
+            <div style="font-weight: 700; font-size: 15px; margin-bottom: 4px;">❌ Solicitud / Operación Cancelada o Rechazada</div>
+            <div style="color: #631818;">
+                @(string.IsNullOrWhiteSpace(Model.ObservacionesOperador) ? "Esta operación ha sido cancelada y la dársena quedó liberada." : Model.ObservacionesOperador)
+            </div>
+        </div>
+    }
+
+    @if (!esDespacho && !camionLlego && (Model.Estado == EstadoSolicitud.Programada || Model.Estado == EstadoSolicitud.EnCurso))
+    {
+        <div style="background-color: #FEF3C7; border: 1px solid #FCD34D; color: #92400E; padding: 14px 18px; border-radius: 6px; margin-bottom: 20px; font-size: 13.5px; display: flex; align-items: flex-start; gap: 12px;">
+            <span style="font-size: 22px; line-height: 1;">⏳</span>
+            <div>
+                <strong>En espera de arribo del camión a LCP:</strong>
+                <br />El camión se encuentra en trayecto carretero hacia el predio de Santa Rosa. Por procedimiento operativo y control de stock, la recepción, descarga y guardado del nuevo stock en la dársena se habilitará cuando el chofer confirme su arribo al muelle en su hoja de ruta.
+            </div>
+        </div>
+    }
+
+    <!-- SI ESTÁ PENDIENTE Y ES OPERADOR: PANEL PARA ASIGNAR TURNO Y RECURSOS -->
+    @if (Model.Estado == EstadoSolicitud.Pendiente && (User.IsInRole(Roles.Operador) || User.IsInRole(Roles.Administrador)))
+    {
+        var darsenaAsignada = darsenas.FirstOrDefault(d => d.Id == Model.DarsenaId);
+        bool esArribo = Model.TipoOperacion == TipoOperacionSolicitud.ArriboIngreso;
+        bool capacidadExcedida = esArribo && darsenaAsignada != null && (darsenaAsignada.EstaLlena || Model.VolumenTotalM3 > darsenaAsignada.VolumenDisponibleM3);
+
+        <div class="lcp-card" style="border: 2px solid #C2821E; background-color: #FFFDF9;">
+            <h2 class="lcp-card-title" style="color: #946712;">📅 Asignación y Programación de Turno (Operador LCP)</h2>
+            <p style="font-size: 13px; color: var(--lcp-text-muted); margin-top: -8px; margin-bottom: 16px;">
+                El cliente indicó salida para: <strong>@(Model.FechaSalidaCliente?.ToString("dd/MM/yyyy HH:mm") ?? "No especificada") hs</strong>.
+                Programá el turno oficial en dársena y asigná los recursos para confirmar la operación:
+            </p>
+
+            @if (esArribo && darsenaAsignada != null)
+            {
+                if (capacidadExcedida)
+                {
+                    <div style="background-color: #FBE8E8; border: 1px solid #F3C7C7; color: #9D2424; padding: 12px 16px; border-radius: 6px; margin-bottom: 16px; font-size: 13px;">
+                        <strong>⛔ Bloqueo por Límite de Capacidad:</strong>
+                        @if (darsenaAsignada.EstaLlena)
+                        {
+                            <span>La dársena @darsenaAsignada.Codigo ya se encuentra al 100% de su capacidad (@darsenaAsignada.CapacidadMaximaM3.ToString("N0") m³). No es posible confirmar la solicitud ni programar el ingreso de mercadería.</span>
+                        }
+                        else
+                        {
+                            <span>El volumen solicitado para este arribo (@Model.VolumenTotalM3.ToString("N2") m³) excede la capacidad disponible en @darsenaAsignada.Codigo (@darsenaAsignada.VolumenDisponibleM3.ToString("N2") m³ libres de @darsenaAsignada.CapacidadMaximaM3.ToString("N0") m³ totales). No es posible confirmar la solicitud.</span>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div style="background-color: #EBF8F0; border: 1px solid #C3E6D0; color: #1E663B; padding: 10px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 13px;">
+                        📊 <strong>Capacidad en Dársena @darsenaAsignada.Codigo:</strong> @darsenaAsignada.VolumenOcupadoM3.ToString("N1") m³ ocupados / @darsenaAsignada.CapacidadMaximaM3.ToString("N0") m³ totales · <strong>@darsenaAsignada.VolumenDisponibleM3.ToString("N1") m³ disponibles</strong> (este ingreso ocupará @Model.VolumenTotalM3.ToString("N2") m³).
+                    </div>
+                }
+            }
+
+            <form asp-action="Asignar" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="SolicitudId" value="@Model.Id" />
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 14px;">
+                    <div class="form-group">
+                        <label class="form-label">Fecha y Hora Oficial del Turno *</label>
+                        <input type="datetime-local" name="FechaHoraTurnoProgramado" class="form-input" 
+                               value="@(Model.FechaSalidaCliente?.ToString("yyyy-MM-ddTHH:mm") ?? DateTime.Now.ToString("yyyy-MM-ddTHH:mm"))" required />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Dársena Asignada (Alquiler del Cliente):</label>
+                        <div style="display: flex; align-items: center; gap: 10px; background: #EFECE6; border: 1px solid #D5CEBE; border-radius: 6px; padding: 10px 14px;">
+                            <span style="font-size: 20px;">🔒</span>
+                            <div style="flex: 1;">
+                                <div style="font-weight: 800; color: #192A33; font-size: 15px;">@Model.DarsenaCodigo (Alquiler de @Model.ClienteRazonSocial)</div>
+                                <div style="font-size: 11px; color: #2B7A4B; font-weight: 600;">
+                                    ✓ Dársena fija por contrato de alquiler. La operación se ejecuta exclusivamente en este muelle.
+                                </div>
+                            </div>
+                        </div>
+                        <input type="hidden" name="DarsenaId" value="@Model.DarsenaId" />
+                    </div>
+                </div>
+
+                <!-- ESTIMACIÓN DE TIEMPOS VIALES SEGÚN MODALIDAD -->
+                <div style="background-color: #F4EFE6; border: 1px solid #DDD7CD; border-radius: 6px; padding: 14px 16px; margin-bottom: 16px;">
+                    <div style="font-weight: 700; font-size: 13.5px; color: #192A33; display: flex; align-items: center; gap: 8px;">
+                        <span>⏱️</span>
+                        <span>Estimación de Cronograma de Viaje:</span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: 10px;">
+                        <div>
+                            <span style="font-size: 11px; text-transform: uppercase; color: var(--lcp-text-muted); font-weight: 700;">Salida Declarada</span>
+                            <div style="font-size: 14px; font-weight: 700; color: #192A33;">@(Model.FechaSalidaCliente?.ToString("dd/MM/yyyy HH:mm") ?? "No indicada") hs</div>
+                        </div>
+                        <div>
+                            <span style="font-size: 11px; text-transform: uppercase; color: var(--lcp-text-muted); font-weight: 700;">Llegada Estimada a Destino</span>
+                            <div style="font-size: 14px; font-weight: 800; color: #1E663B;">@(Model.FechaHoraEstimadaLlegada?.ToString("dd/MM/yyyy HH:mm") ?? "A calcular") hs</div>
+                        </div>
+                        @if (Model.EsDobleViaje)
+                        {
+                            <div>
+                                <span style="font-size: 11px; text-transform: uppercase; color: var(--lcp-text-muted); font-weight: 700;">Retorno Estimado a Base LCP</span>
+                                <div style="font-size: 14px; font-weight: 800; color: #946712;">@(Model.FechaHoraEstimadaRetornoLCP?.ToString("dd/MM/yyyy HH:mm") ?? "A calcular") hs</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 14px;">
+                    <div class="form-group">
+                        @if (Model.ModalidadTransporte == ModalidadTransporte.ChoferPropio)
+                        {
+                            <label class="form-label">Chofer Designado por la Empresa (Transporte Propio):</label>
+                            <div style="display: flex; align-items: center; gap: 10px; background: #EBF8F0; border: 1px solid #C3E6D0; border-radius: 6px; padding: 10px 14px;">
+                                <span style="font-size: 20px;">🚛</span>
+                                <div>
+                                    <div style="font-weight: 800; color: #1E663B; font-size: 14px;">
+                                        @(Model.ConductorNombreCompleto ?? "Chofer propio de la empresa")
+                                    </div>
+                                    <div style="font-size: 11.5px; color: #192A33;">
+                                        ✓ Camión propio designado por el cliente. No se sustituye por chofer de LCP.
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <label class="form-label">Chofer Oficial de Flota LCP a Designar *</label>
+                            <select name="ConductorId" class="form-input" required>
+                                <option value="">-- Seleccionar Chofer Oficial de Flota LCP --</option>
+                                @foreach (var ch in choferes.Where(c => c.TipoConductor == TipoConductor.FlotaLCP))
+                                {
+                                    <option value="@ch.Id" selected="@(ch.Id == Model.ConductorAsignadoId)">@ch.NombreCompleto - Camión: @ch.PatenteCamion (@ch.CapacidadCargaKg.ToString("N0") kg)</option>
+                                }
+                            </select>
+                        }
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Observaciones para el cliente:</label>
+                        <input type="text" name="ObservacionesOperador" class="form-input" value="@Model.ObservacionesOperador" placeholder="Ej: Presentar remito impreso al ingresar por San Martín 245." />
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 12px; align-items: center; margin-top: 10px;">
+                    @if (capacidadExcedida)
+                    {
+                        <button type="button" class="btn-lcp-outline" disabled style="padding: 10px 24px; cursor: not-allowed; opacity: 0.6; color: #9D2424; border-color: #9D2424; font-weight: 700;">
+                            ⛔ Confirmación Bloqueada por Límite de Capacidad en Dársena
+                        </button>
+                    }
+                    else
+                    {
+                        <button type="submit" class="btn-lcp-primary" style="padding: 10px 24px;">
+                            ✓ Confirmar Turno y Notificar al Cliente
+                        </button>
+                    }
+
+                    <button type="button" class="btn-lcp-outline" style="padding: 10px 20px; color: #9D2424; border-color: #F3C7C7; font-weight: 600;"
+                            onclick="abrirModalCancelar('⛔ Rechazar Solicitud', 'Indique el motivo por el cual rechaza la solicitud del cliente:')">
+                        ⛔ Rechazar Solicitud
+                    </button>
+                </div>
+            </form>
+        </div>
+    }
+
+    <!-- RESUMEN OPERATIVO -->
+    <div class="lcp-card">
+        <h2 class="lcp-card-title">Resumen de la Operación</h2>
+
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; background-color: #F4F0E8; padding: 18px; border-radius: 8px; margin-bottom: 24px;">
+            <div>
+                <span style="font-size: 11px; text-transform: uppercase; color: var(--lcp-text-muted); font-weight: 700;">Dársena</span>
+                <div style="font-size: 15px; font-weight: 700; color: #192A33;">@Model.DarsenaCodigo</div>
+            </div>
+            <div>
+                <span style="font-size: 11px; text-transform: uppercase; color: var(--lcp-text-muted); font-weight: 700;">Modalidad</span>
+                <div style="font-size: 15px; font-weight: 700; color: #192A33;">@Model.ModalidadNombre</div>
+                @if (Model.EsDobleViaje)
+                {
+                    <span style="font-size: 11px; font-weight: 800; color: #946712;">🔁 Doble Viaje (Ida y Vuelta)</span>
+                }
+                else
+                {
+                    <span style="font-size: 11px; font-weight: 800; color: #1E663B;">➡️ Viaje Simple (Directo)</span>
+                }
+            </div>
+            <div>
+                <span style="font-size: 11px; text-transform: uppercase; color: var(--lcp-text-muted); font-weight: 700;">Salida Cliente</span>
+                <div style="font-size: 15px; font-weight: 700; color: #192A33;">@(Model.FechaSalidaCliente?.ToString("dd/MM/yyyy HH:mm") ?? "-")</div>
+            </div>
+            <div>
+                <span style="font-size: 11px; text-transform: uppercase; color: var(--lcp-text-muted); font-weight: 700;">Turno Oficial LCP</span>
+                <div style="font-size: 15px; font-weight: 700; color: #2B7A4B;">
+                    @(Model.Estado == EstadoSolicitud.Pendiente ? "Pendiente programación" : Model.FechaHoraTurnoProgramado.ToString("dd/MM/yyyy HH:mm"))
+                </div>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+            <div>
+                <h3 style="font-size: 15px; font-weight: 700; color: #192A33; margin: 0 0 10px;">Detalles de la Carga y Ruta</h3>
+                <table style="width: 100%; font-size: 13px; line-height: 2;">
+                    <tr>
+                        <td style="color: var(--lcp-text-muted); width: 140px;">Origen:</td>
+                        <td style="font-weight: 600;">@(string.IsNullOrEmpty(Model.CiudadOrigen) ? "Santa Rosa, La Pampa" : Model.CiudadOrigen)</td>
+                    </tr>
+                    <tr>
+                        <td style="color: var(--lcp-text-muted);">Destino:</td>
+                        <td style="font-weight: 600;">@(string.IsNullOrEmpty(Model.CiudadDestino) ? "Santa Rosa, La Pampa" : Model.CiudadDestino)</td>
+                    </tr>
+                    <tr>
+                        <td style="color: var(--lcp-text-muted);">Distancia del recorrido:</td>
+                        <td style="font-weight: 600;">
+                            @Model.DistanciaEstimadaKm.ToString("N0") km @(Model.EsDobleViaje ? "(Doble Viaje Base ↔ Cliente)" : "(Viaje Directo)")
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="color: var(--lcp-text-muted);">Salida declarada:</td>
+                        <td style="font-weight: 600;">@(Model.FechaSalidaCliente?.ToString("dd/MM/yyyy HH:mm") ?? "No indicada") hs</td>
+                    </tr>
+                    <tr>
+                        <td style="color: #1E663B; font-weight: 700;">Llegada estimada destino:</td>
+                        <td style="font-weight: 700; color: #1E663B;">@(Model.FechaHoraEstimadaLlegada?.ToString("dd/MM/yyyy HH:mm") ?? "A calcular") hs</td>
+                    </tr>
+                    @if (Model.EsDobleViaje)
+                    {
+                        <tr>
+                            <td style="color: #946712; font-weight: 700;">Retorno estimado LCP:</td>
+                            <td style="font-weight: 700; color: #946712;">@(Model.FechaHoraEstimadaRetornoLCP?.ToString("dd/MM/yyyy HH:mm") ?? "A calcular") hs</td>
+                        </tr>
+                    }
+                    <tr>
+                        <td style="color: var(--lcp-text-muted);">Mercadería:</td>
+                        <td style="font-weight: 600;">@Model.DescripcionMercaderia</td>
+                    </tr>
+                    @if (Model.LoteInventarioId.HasValue)
+                    {
+                        <tr>
+                            <td style="color: #2B7A4B; font-weight: 700;">Retiro de Stock:</td>
+                            <td style="font-weight: 700; color: #2B7A4B;">@Model.CantidadRetirada unidades (Lote: @Model.LoteCodigo)</td>
+                        </tr>
+                    }
+                    <tr>
+                        <td style="color: var(--lcp-text-muted);">Peso total:</td>
+                        <td style="font-weight: 600;">@Model.PesoTotalKg.ToString("N1") kg</td>
+                    </tr>
+                    <tr>
+                        <td style="color: var(--lcp-text-muted);">Volumen total:</td>
+                        <td style="font-weight: 600;">@Model.VolumenTotalM3.ToString("N2") m³</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div>
+                <h3 style="font-size: 15px; font-weight: 700; color: #192A33; margin: 0 0 10px;">Personal y Logística</h3>
+                <table style="width: 100%; font-size: 13px; line-height: 2;">
+                    <tr>
+                        <td style="color: var(--lcp-text-muted); width: 140px;">Conductor asignado:</td>
+                        <td style="font-weight: 600;">@(Model.ConductorNombreCompleto ?? "A designar por Operador")</td>
+                    </tr>
+                    <tr>
+                        <td style="color: var(--lcp-text-muted);">Patente camión:</td>
+                        <td style="font-weight: 600;">@(Model.ConductorPatente ?? "-")</td>
+                    </tr>
+                    <tr>
+                        <td style="color: var(--lcp-text-muted);">Responsable depósito:</td>
+                        <td style="font-weight: 600;">@(Model.ResponsableDepositoNombre ?? "Por asignar")</td>
+                    </tr>
+                    <tr>
+                        <td style="color: var(--lcp-text-muted);">Acceso muelle:</td>
+                        <td style="font-weight: 600;">Calle San Martín 245 (Predio Central LCP)</td>
+                    </tr>
+                    @if (!string.IsNullOrEmpty(Model.ObservacionesOperador))
+                    {
+                        <tr>
+                            <td style="color: #946712; font-weight: 700;">Indicación Operador:</td>
+                            <td style="color: #946712; font-weight: 600;">@Model.ObservacionesOperador</td>
+                        </tr>
+                    }
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- DOCUMENTACIÓN Y FACTURAS DE LA OPERACIÓN (Subida por Cliente / Auditoría) -->
+    <div class="lcp-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+            <div>
+                <h2 class="lcp-card-title" style="margin: 0; display: flex; align-items: center; gap: 8px;">
+                    <span>📄 Facturas y Documentación Respaldatoria</span>
+                    <span class="badge-estado badge-validada" style="font-size: 11px;">@documentos.Count archivo(s)</span>
+                </h2>
+                <p style="font-size: 13px; color: var(--lcp-text-muted); margin: 4px 0 0;">
+                    Comprobantes comerciales, facturas y remitos asociados a esta operación.
+                </p>
+            </div>
+            @if (!User.IsInRole(Roles.Conductor))
+            {
+                <button type="button" class="btn-lcp-primary btn-lcp-sm" onclick="abrirModalSubirDoc()">
+                    + Adjuntar Factura / Remito
+                </button>
+            }
+        </div>
+
+        <div class="lcp-table-container">
+            <table class="lcp-table">
+                <thead>
+                    <tr>
+                        <th>Tipo Comprobante</th>
+                        <th>Archivo</th>
+                        <th>Subido Por</th>
+                        <th>Fecha</th>
+                        <th style="width: 170px; text-align: right;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!documentos.Any())
+                    {
+                        <tr>
+                            <td colspan="5" style="text-align: center; color: var(--lcp-text-muted); padding: 24px;">
+                                Aún no se han adjuntado facturas ni remitos a esta operación.
+                            </td>
+                        </tr>
+                    }
+                    @foreach (var d in documentos)
+                    {
+                        var ruta = (d.RutaUrl ?? "").Trim();
+                        var rutaLower = ruta.ToLower();
+                        var esImg = rutaLower.EndsWith(".jpg") || rutaLower.EndsWith(".jpeg") || rutaLower.EndsWith(".png") || rutaLower.EndsWith(".webp");
+                        var urlCompleta = ruta.StartsWith("http://") || ruta.StartsWith("https://") 
+                                          ? ruta 
+                                          : (ruta.StartsWith("/") ? ruta : "/" + ruta);
+
+                        var tipoTitulo = d.TipoDocumento == "Factura" ? "🧾 Factura Comercial" :
+                                         (d.TipoDocumento == "Remito" || d.TipoDocumento == "RemitoConformado" ? "📄 Remito Firmado" :
+                                         (d.TipoDocumento == "ConstanciaPago" ? "💳 Comprobante de Pago" :
+                                         (d.TipoDocumento == "CartaDePorte" ? "📜 Carta de Porte" : d.TipoDocumento)));
+
+                        <tr>
+                            <td>
+                                <strong style="color: #192A33;">@tipoTitulo</strong>
+                            </td>
+                            <td style="font-family: monospace; color: #28536B;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    @if (esImg)
+                                    {
+                                        <img src="@urlCompleta" alt="Miniatura" style="width: 28px; height: 28px; object-fit: cover; border-radius: 4px; border: 1px solid #CBD5E1; cursor: pointer;" onclick="abrirZoomImagenDoc('@urlCompleta', '@d.NombreArchivo')" />
+                                    }
+                                    else
+                                    {
+                                        <span style="font-size: 18px;">📄</span>
+                                    }
+                                    <span>@d.NombreArchivo</span>
+                                </div>
+                            </td>
+                            <td>@d.SubidoPorNombre</td>
+                            <td style="font-size: 11.5px; color: var(--lcp-text-muted);">@d.FechaSubida.ToString("dd/MM/yyyy HH:mm") hs</td>
+                            <td style="text-align: right;">
+                                <div style="display: inline-flex; gap: 6px; justify-content: flex-end;">
+                                    @if (esImg)
+                                    {
+                                        <button type="button" class="btn-lcp-outline btn-lcp-sm" style="font-size: 11px; padding: 3px 8px;" onclick="abrirZoomImagenDoc('@urlCompleta', '@d.NombreArchivo')">
+                                            🔍 Zoom
+                                        </button>
+                                    }
+                                    <a href="@urlCompleta" target="_blank" class="btn-lcp-primary btn-lcp-sm" style="font-size: 11px; padding: 3px 8px; display: inline-flex; align-items: center; gap: 4px;">
+                                        👁️ Abrir
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- SECCIÓN CHAT TRIPARTITO / HISTORIAL DE LA CONVERSACIÓN -->
+    @{
+        var historialChat = Model.HistorialChat ?? new();
+        bool esFinalizada = Model.Estado == EstadoSolicitud.Completada || Model.Estado == EstadoSolicitud.Cancelada;
+    }
+    <div class="lcp-card" style="border: @(esFinalizada ? "1px solid #D5CEBE" : "2px solid #28536B"); background-color: #FAF8F5;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+            <div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #192A33;">
+                        💬 Historial de Chat Operativo (Sala Tripartita)
+                    </h3>
+                    @if (esFinalizada)
+                    {
+                        <span class="badge-estado badge-rechazada" style="font-size: 11px; padding: 2px 8px;">
+                            🔒 Chat Finalizado (Solo lectura)
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="badge-estado badge-encurso" style="font-size: 11px; padding: 2px 8px;">
+                            ● Sala Activa en Vivo
+                        </span>
+                    }
+                </div>
+                <p style="margin: 4px 0 0; font-size: 13px; color: var(--lcp-text-muted);">
+                    @(esFinalizada 
+                        ? $"Historial archivado de las comunicaciones mantenidas entre el Cliente ({Model.ClienteRazonSocial}), el Chofer ({(Model.ConductorNombreCompleto ?? "Flota LCP")}) y el Operador."
+                        : $"Sala en vivo compartida entre vos ({Model.ClienteRazonSocial}), el chofer ({(Model.ConductorNombreCompleto ?? "Flota LCP")}) y el Operador.")
+                </p>
+            </div>
+
+            <div>
+                <a asp-controller="Inbox" asp-action="Index" asp-route-conv="GRP-SOL-@Model.Id" class="btn-lcp-outline" style="font-size: 13px;">
+                    @(esFinalizada ? "Ver sala en Inbox ↗" : "Entrar a la Sala en Vivo →")
+                </a>
+            </div>
+        </div>
+
+        @if (esFinalizada)
+        {
+            <div style="background-color: #F4EFE6; border: 1px solid #DDD7CD; color: #5C5449; padding: 10px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 16px;">🔒</span>
+                <div>
+                    <strong>Chat Finalizado:</strong> Al haberse concluido o cancelado la solicitud, la mensajería se dio por terminada. A continuación se preserva el registro histórico de los mensajes intercambiados.
+                </div>
+            </div>
+        }
+
+        <!-- REGISTRO / HISTORIAL DE MENSAJES -->
+        @if (historialChat.Any())
+        {
+            <div style="background: #FFFFFF; border: 1px solid #DDD7CD; border-radius: 8px; padding: 16px; max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;">
+                @foreach (var msg in historialChat)
+                {
+                    bool esIncidente = msg.EsIncidenteRuta;
+                    bool esSistema = msg.TextoMensaje.StartsWith("🔒");
+
+                    <div style="background-color: @(esIncidente ? "#FDECEC" : esSistema ? "#F4F0E8" : "#F7F5F0"); border: 1px solid @(esIncidente ? "#F5BABA" : esSistema ? "#D8D0C5" : "#E8E2D6"); border-radius: 6px; padding: 10px 14px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 11px;">
+                            <span style="font-weight: 700; color: @(esIncidente ? "#9D2424" : esSistema ? "#631818" : "#192A33");">
+                                @(esSistema ? "🤖 Sistema LCP (Cierre de Operación)" : $"{msg.RemitenteNombre} ({msg.RemitenteRol})")
+                            </span>
+                            <span style="color: var(--lcp-text-muted);">
+                                @msg.FechaHoraEnvio.ToString("dd/MM/yyyy HH:mm") hs
+                            </span>
+                        </div>
+                        <div style="font-size: 13px; color: @(esIncidente ? "#9D2424" : "#192A33"); font-weight: @(esSistema || esIncidente ? "600" : "400"); word-break: break-word;">
+                            @msg.TextoMensaje
+                        </div>
+                    </div>
+                }
+            </div>
+            <div style="font-size: 12px; color: var(--lcp-text-muted); margin-top: 10px; display: flex; align-items: center; gap: 6px;">
+                <span>✓</span> <em>Registro de @historialChat.Count mensaje(s) preservado(s) en los detalles del pedido #@Model.CodigoSolicitud.</em>
+            </div>
+        }
+        else
+        {
+            <div style="background: #FFFFFF; border: 1px dashed #DDD7CD; border-radius: 8px; padding: 24px; text-align: center; color: var(--lcp-text-muted); font-size: 13px;">
+                @(esFinalizada 
+                    ? "No se registraron mensajes en la sala de chat durante esta operación."
+                    : "Aún no hay mensajes en esta sala. Podés ingresar para coordinar con el operador y chofer.")
+            </div>
+        }
+    </div>
+</div>
+
+<!-- MODAL ADJUNTAR FACTURA / DOCUMENTO -->
+<div id="modalSubirDoc" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; align-items: center; justify-content: center;">
+    <div style="background: #FAF8F5; border: 1px solid #DDD7CD; border-radius: 8px; max-width: 450px; width: 90%; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+        <h3 style="margin-top: 0; font-size: 18px; font-weight: 700; color: #192A33;">Adjuntar Factura o Remito</h3>
+
+        <form asp-action="SubirDocumento" method="post" enctype="multipart/form-data">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="solicitudId" value="@Model.Id" />
+
+            <div class="form-group">
+                <label class="form-label">Tipo de Comprobante *</label>
+                <select name="tipoDocumento" class="form-input" required>
+                    <option value="Factura">Factura Comercial</option>
+                    <option value="Remito">Remito de Entrega / Despacho</option>
+                    <option value="CartaDePorte">Carta de Porte Electrónica</option>
+                    <option value="ConstanciaPesaje">Ticket de Báscula / Pesaje</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Archivo (PDF, PNG, JPG hasta 10 MB) *</label>
+                <input type="file" name="archivo" class="form-input" accept=".pdf,.png,.jpg,.jpeg" required />
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                <button type="button" class="btn-lcp-outline" onclick="cerrarModalSubirDoc()">Cancelar</button>
+                <button type="submit" class="btn-lcp-primary">Subir Documento</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL CANCELAR / RECHAZAR SOLICITUD -->
+<div id="modalCancelar" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; align-items: center; justify-content: center;">
+    <div style="background: #FAF8F5; border: 1px solid #DDD7CD; border-radius: 8px; max-width: 480px; width: 90%; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+        <h3 id="modalCancelarTitulo" style="margin-top: 0; font-size: 18px; font-weight: 700; color: #9D2424;">Rechazar Solicitud</h3>
+        <p id="modalCancelarSubtitulo" style="font-size: 13px; color: var(--lcp-text-muted); margin-top: -6px; margin-bottom: 16px;">
+            Indique el motivo para registrar en el historial de la operación y notificar a las partes.
+        </p>
+
+        <form asp-action="Cancelar" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" value="@Model.Id" />
+
+            <div class="form-group">
+                <label class="form-label">Motivo o Justificación *</label>
+                <textarea name="motivo" class="form-input" rows="3" required placeholder="Indique el motivo de la cancelación o rechazo..."></textarea>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                <button type="button" class="btn-lcp-outline" onclick="cerrarModalCancelar()">Volver</button>
+                <button type="submit" class="btn-lcp-primary" style="background-color: #9D2424; border-color: #9D2424;">Confirmar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL DE ZOOM PARA COMPROBANTES / FACTURAS -->
+<div id="modalZoomImagenDoc" class="lcp-modal-backdrop" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(5px); z-index: 9999; align-items: center; justify-content: center;" onclick="if (event.target === this) cerrarZoomImagenDoc();">
+    <div style="position: relative; max-width: 90vw; max-height: 90vh; text-align: center;">
+        <button type="button" onclick="cerrarZoomImagenDoc()" style="position: absolute; top: -38px; right: 0; background: none; border: none; color: #FFF; font-size: 32px; cursor: pointer;">&times;</button>
+        <img id="mzdImagenGrande" src="" alt="Comprobante" style="max-width: 90vw; max-height: 85vh; border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); object-fit: contain; background: #FFF;" />
+        <div id="mzdCaption" style="color: #E2E8F0; font-size: 13px; margin-top: 8px; font-weight: 600;"></div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function abrirModalSubirDoc() {
+            document.getElementById("modalSubirDoc").style.display = "flex";
+        }
+        function cerrarModalSubirDoc() {
+            document.getElementById("modalSubirDoc").style.display = "none";
+        }
+        function abrirModalCancelar(titulo, subtitulo) {
+            if (titulo) document.getElementById("modalCancelarTitulo").textContent = titulo;
+            if (subtitulo) document.getElementById("modalCancelarSubtitulo").textContent = subtitulo;
+            document.getElementById("modalCancelar").style.display = "flex";
+        }
+        function cerrarModalCancelar() {
+            document.getElementById("modalCancelar").style.display = "none";
+        }
+        function abrirZoomImagenDoc(url, titulo) {
+            document.getElementById("mzdImagenGrande").src = url;
+            document.getElementById("mzdCaption").textContent = titulo || "Factura / Comprobante Comercial";
+            document.getElementById("modalZoomImagenDoc").style.display = "flex";
+        }
+        function cerrarZoomImagenDoc() {
+            document.getElementById("modalZoomImagenDoc").style.display = "none";
+        }
+    </script>
+}

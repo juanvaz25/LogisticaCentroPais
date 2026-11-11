@@ -1,0 +1,217 @@
+@model CrearConductorFlotaDto
+@{
+    ViewData["Title"] = "Alta de Chofer - Flota Oficial LCP";
+}
+
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+    <div>
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+            <a asp-action="FlotaLCP" style="color: var(--lcp-primary); text-decoration: none; font-size: 13px; font-weight: 700;">
+                ⬅ Volver a Flota LCP
+            </a>
+            <span style="color: var(--lcp-text-muted);">/</span>
+            <span style="font-size: 13px; color: var(--lcp-text-muted);">Incorporación de Conductor</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 26px;">🚛</span>
+            <h1 class="page-title" style="margin: 0;">Alta Operativa de Chofer · Flota LCP</h1>
+        </div>
+        <p class="page-subtitle" style="margin-top: 6px;">
+            Los choferes registrados en esta sección forman parte de la dotación oficial de Logística Centro País.
+        </p>
+    </div>
+</div>
+
+<!-- BANNER EXPLICATIVO -->
+<div class="lcp-card" style="background: linear-gradient(135deg, #162E3B 0%, #244B60 100%); color: #FFFFFF; border: none; padding: 20px 24px; margin-bottom: 24px;">
+    <div style="display: flex; gap: 16px; align-items: flex-start;">
+        <span style="font-size: 28px;">ℹ️</span>
+        <div>
+            <h3 style="font-size: 16px; font-weight: 800; color: #FFD54F; margin: 0 0 6px;">
+                Carga Operativa Directa de la Flota Central
+            </h3>
+            <p style="font-size: 13px; line-height: 1.6; color: #E0EBF0; margin: 0;">
+                A diferencia de los choferes propios postulados por clientes, los choferes cargados por el <strong>Administrador</strong>:
+                <br />• Quedan registrados como <strong>Flota LCP Oficial</strong> (sin empresa cliente asignada).
+                <br />• Se activan automáticamente con estado <strong>Aprobada</strong> para ser designados de inmediato a viajes y solicitudes.
+                <br />• El sistema les crea una <strong>cuenta de usuario operativo</strong> y les envía por correo electrónico sus credenciales provisorias.
+            </p>
+        </div>
+    </div>
+</div>
+
+<form asp-action="NuevoChoferFlota" method="post" enctype="multipart/form-data">
+    @Html.AntiForgeryToken()
+
+    <div asp-validation-summary="All" class="alert-lcp-danger" style="margin-bottom: 20px;"></div>
+
+    <!-- 1. DATOS PERSONALES -->
+    <div class="lcp-card">
+        <h2 class="lcp-card-title">1. Datos Personales del Conductor</h2>
+        <p style="font-size: 13px; color: var(--lcp-text-muted); margin: 0 0 18px;">
+            Identificación, CUIL oficial y datos de contacto directo para telemetría y comunicaciones.
+        </p>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 14px;">
+            <div class="form-group">
+                <label asp-for="Nombre" class="form-label">Nombre(s) *</label>
+                <input asp-for="Nombre" class="form-input" required placeholder="Ej: Carlos Alberto" />
+                <span asp-validation-for="Nombre" class="text-danger" style="font-size: 12px;"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Apellido" class="form-label">Apellido(s) *</label>
+                <input asp-for="Apellido" class="form-input" required placeholder="Ej: Fernández" />
+                <span asp-validation-for="Apellido" class="text-danger" style="font-size: 12px;"></span>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 14px;">
+            <div class="form-group">
+                <label asp-for="CUIL" class="form-label">CUIL (con guiones: XX-XXXXXXXX-X) *</label>
+                <input asp-for="CUIL" class="form-input" required placeholder="Ej: 20-31234567-8" />
+                <span asp-validation-for="CUIL" class="text-danger" style="font-size: 12px;"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="FechaNacimiento" class="form-label">Fecha de Nacimiento *</label>
+                <input asp-for="FechaNacimiento" type="date" class="form-input" required />
+                <span asp-validation-for="FechaNacimiento" class="text-danger" style="font-size: 12px;"></span>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div class="form-group">
+                <label asp-for="CelularWhatsApp" class="form-label">Celular / WhatsApp (con código de área) *</label>
+                <input asp-for="CelularWhatsApp" class="form-input" required placeholder="Ej: 2954-556677" />
+                <span asp-validation-for="CelularWhatsApp" class="text-danger" style="font-size: 12px;"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Email" class="form-label">Correo Electrónico (será su usuario de ingreso) *</label>
+                <input asp-for="Email" type="email" class="form-input" required placeholder="Ej: chofer.carlos@lcp.com" />
+                <span asp-validation-for="Email" class="text-danger" style="font-size: 12px;"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. DOMICILIO Y BASE OPERATIVA -->
+    <div class="lcp-card">
+        <h2 class="lcp-card-title">2. Domicilio y Radicación</h2>
+        <p style="font-size: 13px; color: var(--lcp-text-muted); margin: 0 0 18px;">
+            Localización geográfica del chofer para la asignación logística de rutas.
+        </p>
+
+        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 16px;">
+            <div class="form-group">
+                <label asp-for="Domicilio" class="form-label">Domicilio / Dirección Real *</label>
+                <input asp-for="Domicilio" class="form-input" required placeholder="Ej: Av. Spinetto 1420" />
+                <span asp-validation-for="Domicilio" class="text-danger" style="font-size: 12px;"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Localidad" class="form-label">Localidad *</label>
+                <input asp-for="Localidad" class="form-input" required placeholder="Ej: Santa Rosa" />
+                <span asp-validation-for="Localidad" class="text-danger" style="font-size: 12px;"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Provincia" class="form-label">Provincia *</label>
+                <input asp-for="Provincia" class="form-input" required placeholder="Ej: La Pampa" />
+                <span asp-validation-for="Provincia" class="text-danger" style="font-size: 12px;"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. UNIDAD DE TRANSPORTE / CAMIÓN ASIGNADO -->
+    <div class="lcp-card">
+        <h2 class="lcp-card-title">3. Camión / Unidad de Flota Asignada</h2>
+        <p style="font-size: 13px; color: var(--lcp-text-muted); margin: 0 0 18px;">
+            Datos de la unidad de carga, capacidad máxima de transporte en peso y volumen.
+        </p>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
+            <div class="form-group">
+                <label asp-for="PatenteCamion" class="form-label">Patente de la Unidad (Chasis/Tractor) *</label>
+                <input asp-for="PatenteCamion" class="form-input" required placeholder="Ej: AF 123 CD o AA 987 ZZ" style="font-weight: 800; font-family: monospace; text-transform: uppercase;" />
+                <span asp-validation-for="PatenteCamion" class="text-danger" style="font-size: 12px;"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="CapacidadCargaKg" class="form-label">Capacidad de Carga Máxima (Kilogramos) *</label>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <input asp-for="CapacidadCargaKg" type="number" step="100" class="form-input" required />
+                    <span style="font-weight: 700; color: var(--lcp-text-muted);">kg</span>
+                </div>
+                <span asp-validation-for="CapacidadCargaKg" class="text-danger" style="font-size: 12px;"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="CapacidadVolumenM3" class="form-label">Capacidad Volumétrica (Metros Cúbicos) *</label>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <input asp-for="CapacidadVolumenM3" type="number" step="1" class="form-input" required />
+                    <span style="font-weight: 700; color: var(--lcp-text-muted);">m³</span>
+                </div>
+                <span asp-validation-for="CapacidadVolumenM3" class="text-danger" style="font-size: 12px;"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. DOCUMENTACIÓN OBLIGATORIA RESPALDATORIA -->
+    <div class="lcp-card">
+        <h2 class="lcp-card-title">4. Documentación Digital Respaldatoria Obligatoria</h2>
+        <p style="font-size: 13px; color: var(--lcp-text-muted); margin: 0 0 18px;">
+            Cargá los archivos digitalizados del chofer y la unidad para conformar su legajo operativo auditado.
+        </p>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
+            
+            <!-- DOC 1: LICENCIA / LINTI -->
+            <div style="background-color: #F8F6F0; border: 1px solid var(--lcp-card-border); border-radius: 8px; padding: 16px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                    <span style="font-size: 20px;">🪪</span>
+                    <strong style="font-size: 13px; color: #192A33;">1. Licencia / LINTI Cargas</strong>
+                </div>
+                <p style="font-size: 11px; color: var(--lcp-text-muted); margin: 0 0 12px; line-height: 1.4;">
+                    Licencia Nacional de Conducir habilitante y curso LINTI de cargas generales vigente.
+                </p>
+                <input type="file" name="archivoLicencia" class="form-input" accept=".pdf,image/*" style="font-size: 12px; padding: 6px;" />
+            </div>
+
+            <!-- DOC 2: CÉDULA CAMIÓN -->
+            <div style="background-color: #F8F6F0; border: 1px solid var(--lcp-card-border); border-radius: 8px; padding: 16px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                    <span style="font-size: 20px;">🚛</span>
+                    <strong style="font-size: 13px; color: #192A33;">2. Cédula / Título Camión</strong>
+                </div>
+                <p style="font-size: 11px; color: var(--lcp-text-muted); margin: 0 0 12px; line-height: 1.4;">
+                    Cédula verde, título de propiedad del vehículo o contrato de comodato de la unidad.
+                </p>
+                <input type="file" name="archivoCedula" class="form-input" accept=".pdf,image/*" style="font-size: 12px; padding: 6px;" />
+            </div>
+
+            <!-- DOC 3: SEGURO Y ART -->
+            <div style="background-color: #F8F6F0; border: 1px solid var(--lcp-card-border); border-radius: 8px; padding: 16px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                    <span style="font-size: 20px;">🛡️</span>
+                    <strong style="font-size: 13px; color: #192A33;">3. Póliza Seguro / ART</strong>
+                </div>
+                <p style="font-size: 11px; color: var(--lcp-text-muted); margin: 0 0 12px; line-height: 1.4;">
+                    Póliza de seguro con cláusula de no repetición y cobertura de ART o seguro de accidentes.
+                </p>
+                <input type="file" name="archivoSeguro" class="form-input" accept=".pdf,image/*" style="font-size: 12px; padding: 6px;" />
+            </div>
+
+        </div>
+    </div>
+
+    <!-- BOTONES DE ACCIÓN -->
+    <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+        <a asp-action="FlotaLCP" class="btn-lcp-outline" style="text-decoration: none;">
+            Cancelar
+        </a>
+        <button type="submit" class="btn-lcp-primary" style="padding: 12px 28px; font-weight: 800;">
+            🚀 Incorporar a Flota LCP y Crear Usuario
+        </button>
+    </div>
+</form>

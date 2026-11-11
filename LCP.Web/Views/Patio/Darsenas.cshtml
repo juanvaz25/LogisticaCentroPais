@@ -1,0 +1,250 @@
+@model List<DarsenaDto>
+@using LCP.Shared.Constants
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = "Dársenas - Estado del patio en tiempo real";
+    var turnosHoy = ViewBag.TurnosHoy as List<SolicitudOperacionDto> ?? new();
+    var todasSolicitudes = ViewBag.Solicitudes as List<SolicitudOperacionDto> ?? new();
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Dársenas y Patio Logístico</h1>
+        <p class="page-subtitle">Monitoreo en tiempo real de ocupación de muelles y alquileres vigentes</p>
+    </div>
+
+    @if (User.IsInRole(Roles.Operador) || User.IsInRole(Roles.Administrador))
+    {
+        <div style="display: flex; gap: 10px;">
+            <a asp-controller="Solicitudes" asp-action="Index" class="btn-lcp-primary">
+                📋 Bandeja de Solicitudes
+            </a>
+        </div>
+    }
+    else if (User.IsInRole(Roles.Cliente))
+    {
+        <div style="display: flex; gap: 10px;">
+            <a asp-controller="Solicitudes" asp-action="Nueva" class="btn-lcp-primary">
+                + Nueva Solicitud
+            </a>
+        </div>
+    }
+</div>
+
+<!-- GRILLA DE DÁRSENAS (PDF Página 6) -->
+<div class="darsenas-grid">
+    @foreach (var d in Model)
+    {
+        bool tieneInquilino = !string.IsNullOrEmpty(d.ClienteRazonSocial);
+        <div class="darsena-card" id="patio-card-@d.Id" style="@(d.EstadoActual == EstadoDarsena.Ocupada ? "border-color: #C2410C;" : "")">
+            <div>
+                <!-- CABECERA: CÓDIGO + ESTADO DE MANIOBRA -->
+                <div class="darsena-header" style="margin-bottom: 10px;">
+                    <div>
+                        <span class="darsena-name">@d.Codigo</span>
+                        <div style="font-size: 11px; color: var(--lcp-text-muted);">Cap: @d.CapacidadMaximaPallets pal. (@d.CapacidadMaximaM3.ToString("N0") m³)</div>
+                    </div>
+                    <span class="badge-estado @(d.EstadoActual == EstadoDarsena.Ocupada ? "badge-ocupada" : d.EstadoActual == EstadoDarsena.Libre ? "badge-libre" : d.EstadoActual == EstadoDarsena.TurnoAsignado ? "badge-turno" : "badge-mantenimiento")">
+                        @(d.EstadoActual == EstadoDarsena.Libre ? "🟢 Muelle Libre" :
+                          d.EstadoActual == EstadoDarsena.Ocupada ? "🔴 Camión en Muelle" :
+                          d.EstadoActual == EstadoDarsena.TurnoAsignado ? "🟡 Turno Asignado" : "⚪ Mantenimiento")
+                    </span>
+                </div>
+
+                <!-- ESTADO DE ALQUILER VIGENTE (PRESERVADO) -->
+                <div style="background: #FAF8F5; border: 1px solid #E5DFD5; border-radius: 6px; padding: 8px 12px; margin-bottom: 10px;">
+                    <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--lcp-text-muted); margin-bottom: 2px;">
+                        Contrato de Alquiler:
+                    </div>
+                    @if (tieneInquilino)
+                    {
+                        <div style="font-weight: 700; color: #192A33; font-size: 13px; display: flex; align-items: center; gap: 6px;">
+                            <span>🏢 @d.ClienteRazonSocial</span>
+                        </div>
+                        <div style="font-size: 11px; color: #2B7A4B; font-weight: 600; margin-top: 1px;">
+                            ● Alquiler Activo Vigente
+                        </div>
+                    }
+                    else
+                    {
+                        <div style="font-size: 12px; color: var(--lcp-text-muted); font-style: italic;">
+                            ⚪ Sin contrato activo (Disponible para alquilar)
+                        </div>
+                    }
+                </div>
+
+                <!-- DETALLE DE OPERACIÓN / TURNO -->
+                <div class="darsena-detail" style="margin-bottom: 14px; font-size: 12px; min-height: 36px;">
+                    @if (!string.IsNullOrEmpty(d.ProximoTurnoHora))
+                    {
+                        <div style="color: #946712; font-weight: 600;">
+                            🕒 Próx. Turno: @d.ProximoTurnoHora hs
+                        </div>
+                        <div style="color: var(--lcp-text-muted); font-size: 11px;">@d.ProximoTurnoDetalle</div>
+                    }
+                    else
+                    {
+                        <div style="color: #4B5A63;">
+                            @(string.IsNullOrEmpty(d.DetalleOperacionActual) ? (tieneInquilino ? "Muelle libre para maniobras del cliente" : "Muelle disponible") : d.DetalleOperacionActual)
+                        </div>
+                    }
+                </div>
+            </div>
+
+            @if (User.IsInRole(Roles.Operador) || User.IsInRole(Roles.Administrador))
+            {
+                <div style="border-top: 1px solid #ECE7DE; padding-top: 10px; display: flex; justify-content: space-between; align-items: center;">
+                    <button type="button" class="btn-lcp-outline btn-lcp-sm" onclick="cambiarEstadoDarsena(@d.Id, '@d.Codigo', @((int)d.EstadoActual), '@d.ClienteRazonSocial')">
+                        Modificar estado
+                    </button>
+
+                    @{
+                        var solActiva = todasSolicitudes.FirstOrDefault(s => s.DarsenaId == d.Id && (s.Estado == EstadoSolicitud.EnCurso || s.Estado == EstadoSolicitud.Programada))
+                                     ?? turnosHoy.FirstOrDefault(t => t.DarsenaId == d.Id && (t.Estado == EstadoSolicitud.EnCurso || t.Estado == EstadoSolicitud.Programada));
+                    }
+                    @if (solActiva != null && solActiva.Estado != EstadoSolicitud.Completada && (d.EstadoActual == EstadoDarsena.Ocupada || solActiva.Estado == EstadoSolicitud.EnCurso))
+                    {
+                        bool esDespacho = solActiva.TipoOperacion == TipoOperacionSolicitud.DespachoRetiro;
+                        <a asp-action="DescargarYOrdenar" asp-route-solicitudId="@solActiva.Id" class="btn-lcp-primary btn-lcp-sm" style="background-color: @(esDespacho ? "#C2821E" : "#2B7A4B"); border-color: @(esDespacho ? "#C2821E" : "#2B7A4B");">
+                            @(esDespacho ? "📤 Despachar y Descontar" : "📥 Descargar y Guardar")
+                        </a>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<!-- TURNOS DE HOY (PDF Página 6) -->
+<div class="lcp-card">
+    <h2 class="lcp-card-title">Turnos Programados para Hoy</h2>
+
+    <div class="lcp-table-container">
+        <table class="lcp-table">
+            <thead>
+                <tr>
+                    <th style="width: 120px;">Hora</th>
+                    <th style="width: 180px;">Dársena</th>
+                    <th>Operación / Cliente / Mercadería</th>
+                    <th style="width: 160px;">Chofer / Ruta</th>
+                    <th style="width: 140px;">Estado</th>
+                    <th style="width: 130px; text-align: right;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!turnosHoy.Any())
+                {
+                    <tr>
+                        <td colspan="6" style="text-align: center; color: var(--lcp-text-muted); padding: 24px;">
+                            No hay turnos programados para la fecha de hoy.
+                        </td>
+                    </tr>
+                }
+                @foreach (var t in turnosHoy)
+                {
+                    <tr>
+                        <td style="font-weight: 800; color: #192A33; font-size: 14px;">@t.FechaHoraTurnoProgramado.ToString("HH:mm") hs</td>
+                        <td><strong>@t.DarsenaCodigo</strong></td>
+                        <td>
+                            <div>
+                                <span class="badge-estado @(t.TipoOperacion == TipoOperacionSolicitud.ArriboIngreso ? "badge-encurso" : "badge-ocupada")" style="font-size: 10px; padding: 1px 5px;">
+                                    @(t.TipoOperacion == TipoOperacionSolicitud.ArriboIngreso ? "Arribo" : "Retiro")
+                                </span>
+                                <strong>@t.CodigoSolicitud</strong> · @t.ClienteRazonSocial
+                            </div>
+                            <div style="font-size: 12px; color: var(--lcp-text-muted);">@t.DescripcionMercaderia</div>
+                        </td>
+                        <td>
+                            <div style="font-size: 12px; font-weight: 600;">@(t.ConductorNombreCompleto ?? "Flota LCP")</div>
+                            <div style="font-size: 11px; color: var(--lcp-text-muted);">
+                                @(string.IsNullOrEmpty(t.CiudadOrigen) ? "" : $"{t.CiudadOrigen} ➔") @(t.CiudadDestino ?? "")
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge-estado @(t.Estado == EstadoSolicitud.Completada ? "badge-completada" : t.Estado == EstadoSolicitud.EnCurso ? "badge-encurso" : t.Estado == EstadoSolicitud.Programada ? "badge-turno" : "badge-pendiente")">
+                                @t.EstadoNombre
+                            </span>
+                        </td>
+                        <td style="text-align: right;">
+                            <a asp-controller="Solicitudes" asp-action="Detalle" asp-route-id="@t.Id" class="btn-lcp-outline btn-lcp-sm">
+                                Ver
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- MODAL CAMBIAR ESTADO DE DÁRSENA -->
+<div id="modalCambiarEstado" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; align-items: center; justify-content: center;">
+    <div style="background: #FAF8F5; border: 1px solid #DDD7CD; border-radius: 8px; max-width: 460px; width: 90%; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+        <h3 id="modalTituloDarsena" style="margin-top: 0; font-size: 18px; font-weight: 700; color: #192A33;">Modificar Estado de Dársena</h3>
+        <p id="modalInquilinoInfo" style="font-size: 13px; color: var(--lcp-text-muted); margin-top: -6px; margin-bottom: 16px;"></p>
+
+        <form asp-action="CambiarEstado" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" id="modalDarsenaId" name="id" value="" />
+
+            <div class="form-group">
+                <label class="form-label">Estado Operativo de Maniobra:</label>
+                <select name="nuevoEstado" id="modalSelectEstado" class="form-input">
+                    <option value="1">🟢 Libre (Muelle disponible)</option>
+                    <option value="2">🟡 Turno Asignado (Muelle reservado)</option>
+                    <option value="3">🔴 Ocupada (Camión en muelle / maniobra)</option>
+                    <option value="4">⚪ Mantenimiento (Fuera de servicio)</option>
+                </select>
+                <span style="font-size: 11px; color: var(--lcp-text-muted); display: block; margin-top: 4px;">
+                    Nota: El contrato de alquiler de la empresa permanece intacto independientemente del estado físico del muelle.
+                </span>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Detalle de Operación / Observación:</label>
+                <input type="text" name="detalle" id="modalInputDetalle" class="form-input" placeholder="Ej: Camión en descarga de granos · Chofer Carlos Fernández" />
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                <button type="button" class="btn-lcp-outline" onclick="cerrarModalEstado()">Cancelar</button>
+                <button type="submit" class="btn-lcp-primary">Guardar cambios</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function cambiarEstadoDarsena(id, codigo, estadoActual, inquilino) {
+            document.getElementById("modalDarsenaId").value = id;
+            document.getElementById("modalTituloDarsena").textContent = `Modificar Maniobra: ${codigo}`;
+            document.getElementById("modalInquilinoInfo").textContent = inquilino ? `Empresa inquilina: ${inquilino}` : "Sin inquilino activo asignado";
+            document.getElementById("modalSelectEstado").value = estadoActual;
+            document.getElementById("modalCambiarEstado").style.display = "flex";
+        }
+
+        function cerrarModalEstado() {
+            document.getElementById("modalCambiarEstado").style.display = "none";
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            iniciarPatioHub(function (d) {
+                const card = document.getElementById(`patio-card-${d.id}`);
+                if (card) {
+                    const badge = card.querySelector(".badge-estado");
+                    const detail = card.querySelector(".darsena-detail");
+                    if (detail) detail.textContent = d.detalleOperacionActual || "Disponible ahora";
+                    if (badge) {
+                        badge.textContent = d.estadoActual === 1 ? "🟢 Muelle Libre" :
+                                            d.estadoActual === 3 ? "🔴 Camión en Muelle" :
+                                            d.estadoActual === 2 ? "🟡 Turno Asignado" : "⚪ Mantenimiento";
+                        badge.className = "badge-estado " +
+                            (d.estadoActual === 3 ? "badge-ocupada" :
+                             d.estadoActual === 1 ? "badge-libre" :
+                             d.estadoActual === 2 ? "badge-turno" : "badge-mantenimiento");
+                    }
+                }
+            });
+        });
+    </script>
+}

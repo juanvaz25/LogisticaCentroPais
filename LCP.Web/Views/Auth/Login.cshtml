@@ -1,0 +1,73 @@
+@model LoginRequestDto
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = "Ingresá a tu cuenta - Logística Centro País";
+}
+
+<div class="login-page-container">
+    <div class="login-grid">
+        <!-- LADO IZQUIERDO INSTITUCIONAL (PDF Página 3) -->
+        <div class="login-left-brand">
+            <span class="brand-badge" style="font-size: 16px; padding: 6px 12px;">LCP</span>
+            <h1 class="login-left-title">
+                Gestión inteligente de transporte, depósitos y logística en tiempo real.
+            </h1>
+            <p style="font-size: 16px; color: #ADC2CE; margin: 0;">
+                Panel administrativo y portal de clientes de Logística Centro País.
+            </p>
+            <div style="margin-top: 32px;">
+                <a asp-controller="Home" asp-action="Index" style="color: #FFFFFF; font-size: 13px; text-decoration: none; font-weight: 600;">
+                    ← Volver a la Landing Page
+                </a>
+            </div>
+        </div>
+
+        <!-- TARJETA DE LOGIN (PDF Página 3) -->
+        <div class="login-card">
+            <h2 class="login-title">Ingresá a tu cuenta</h2>
+
+            @if (!ViewData.ModelState.IsValid)
+            {
+                <div style="background-color: #FBE8E8; border: 1px solid #F3C7C7; color: #9D2424; padding: 10px 14px; border-radius: 4px; margin-bottom: 16px; font-size: 13px;">
+                    @Html.ValidationSummary(true)
+                </div>
+            }
+
+            <form asp-action="Login" asp-route-returnUrl="@ViewBag.ReturnUrl" method="post">
+                @Html.AntiForgeryToken()
+
+                <div class="form-group">
+                    <label class="form-label">Usuario / Correo</label>
+                    <input asp-for="Email" type="email" class="form-input" placeholder="ejemplo@lcp.com" required />
+                    <span asp-validation-for="Email" style="color: #9D2424; font-size: 12px;"></span>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Contraseña</label>
+                    <input asp-for="Password" type="password" class="form-input" placeholder="••••••••" required />
+                    <span asp-validation-for="Password" style="color: #9D2424; font-size: 12px;"></span>
+                </div>
+
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #4B5A63; cursor: pointer;">
+                        <input asp-for="Recordarme" type="checkbox" style="width: 16px; height: 16px;" />
+                        Mantener sesión iniciada
+                    </label>
+                </div>
+
+                <button type="submit" class="btn-lcp-primary" style="width: 100%; justify-content: center; padding: 12px; font-size: 15px;">
+                    Ingresar
+                </button>
+
+                <div style="margin-top: 22px; padding-top: 16px; border-top: 1px solid #E2E8F0; display: flex; flex-direction: column; gap: 10px; font-size: 13.5px; text-align: center; color: #4B5A63;">
+                    <div>
+                        ¿Querés registrar tu empresa? <a asp-controller="Home" asp-action="RegistroEmpresa" style="color: var(--lcp-primary); font-weight: 700; text-decoration: underline;">Registrate acá</a>
+                    </div>
+                    <div>
+                        ¿Sos chofer o transportista? <a asp-controller="Home" asp-action="PostulacionChofer" style="color: #475569; font-weight: 700; text-decoration: underline;">Postulate acá</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

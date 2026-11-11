@@ -1,0 +1,166 @@
+@model List<ConductorViewModel>
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = "Padrón de Choferes Propios";
+}
+
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+    <div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 26px;">🚛</span>
+            <h1 class="page-title" style="margin: 0;">Padrón de Choferes Propios</h1>
+        </div>
+        <p class="page-subtitle" style="margin-top: 6px;">
+            Conductores y camiones propios asociados a tu empresa para movimientos de stock y transporte.
+        </p>
+    </div>
+
+    <div style="display: flex; gap: 10px;">
+        <a asp-action="RegistrarChofer" class="btn-lcp-primary" style="display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font-weight: 700;">
+            <span>➕</span> Registrar Nuevo Chofer Propio
+        </a>
+    </div>
+</div>
+
+<div class="lcp-table-container">
+    <table class="lcp-table">
+        <thead>
+            <tr>
+                <th>Chofer / Contacto</th>
+                <th>CUIL</th>
+                <th>Patente Camión</th>
+                <th>Capacidad</th>
+                <th>Localidad</th>
+                <th>Estado Habilitación</th>
+                <th style="text-align: right; width: 140px;">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!Model.Any())
+            {
+                <tr>
+                    <td colspan="7" style="text-align: center; color: var(--lcp-text-muted); padding: 40px 20px;">
+                        <div style="font-size: 32px; margin-bottom: 8px;">🚚</div>
+                        <div style="font-weight: 700; color: #192A33;">Tu empresa no tiene choferes propios registrados en el padrón.</div>
+                        <div style="font-size: 13px; color: var(--lcp-text-muted); margin-top: 4px;">
+                            Podés dar de alta a tus camioneros con el botón superior para que puedan transportar tus productos a LCP.
+                        </div>
+                    </td>
+                </tr>
+            }
+            @foreach (var c in Model)
+            {
+                <tr>
+                    <td>
+                        <div style="font-weight: 800; color: #192A33; font-size: 14px;">@c.NombreCompleto</div>
+                        <div style="font-size: 12px; color: var(--lcp-text-muted); display: flex; align-items: center; gap: 8px; margin-top: 2px;">
+                            <span>📱 @c.CelularWhatsApp</span>
+                            <span>✉️ @c.Email</span>
+                        </div>
+                    </td>
+                    <td>
+                        <span style="font-weight: 700; font-family: monospace; background: #F8F6F0; padding: 3px 8px; border-radius: 4px; border: 1px solid #E5DFD5;">
+                            @c.CUIL
+                        </span>
+                    </td>
+                    <td>
+                        <span style="background-color: #162E3B; color: #FFFFFF; font-family: monospace; font-size: 12px; font-weight: 800; padding: 3px 8px; border-radius: 4px; letter-spacing: 1px; display: inline-block;">
+                            @c.PatenteCamion
+                        </span>
+                    </td>
+                    <td>
+                        <div style="font-weight: 700; color: #192A33;">@c.CapacidadCargaKg.ToString("N0") kg</div>
+                        <div style="font-size: 11px; color: var(--lcp-text-muted);">@c.CapacidadVolumenM3.ToString("N1") m³</div>
+                    </td>
+                    <td>
+                        <div style="font-weight: 600;">@c.Localidad</div>
+                        <div style="font-size: 11px; color: var(--lcp-text-muted);">@c.Provincia</div>
+                    </td>
+                    <td>
+                        @if (c.EstadoPostulacion == EstadoPostulacionAlta.PendienteRevision)
+                        {
+                            <span class="badge-estado badge-pendiente" title="Esperando que el Administrador de LCP lo apruebe">
+                                ⏳ Pendiente Aprobación LCP
+                            </span>
+                            <div style="font-size: 10.5px; color: #C2821E; margin-top: 2px;">No disponible aún para viajes</div>
+                        }
+                        else if (c.EstadoPostulacion == EstadoPostulacionAlta.Aprobada)
+                        {
+                            <span class="badge-estado badge-completado" title="Chofer aprobado y habilitado para operar">
+                                ✓ Habilitado para Viajes
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="badge-estado badge-cancelado" title="Chofer inactivo o dado de baja">
+                                ⛔ Dado de Baja / Inactivo
+                            </span>
+                        }
+                    </td>
+                    <td style="text-align: right;">
+                        @if (c.EstadoPostulacion != EstadoPostulacionAlta.Rechazada)
+                        {
+                            <button type="button" class="btn-lcp-outline btn-lcp-sm" style="color: #9D2424; border-color: #F3C7C7; background: #FDEDEC; font-weight: 700;"
+                                    onclick="confirmarBajaChofer(@c.Id, '@Html.Raw(c.NombreCompleto)', '@c.PatenteCamion')">
+                                🗑️ Dar de Baja
+                            </button>
+                        }
+                        else
+                        {
+                            <span style="font-size: 12px; color: var(--lcp-text-muted);">Sin acciones</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<!-- MODAL DE CONFIRMACIÓN DE BAJA DE CHOFER -->
+<div id="modalConfirmarBaja" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(22, 46, 59, 0.65); z-index: 10000; align-items: center; justify-content: center; backdrop-filter: blur(2px);">
+    <div style="background: #FFFFFF; border-radius: 12px; max-width: 460px; width: 90%; padding: 24px; box-shadow: 0 16px 40px rgba(0,0,0,0.25); border: 1px solid #E2E8F0;">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px;">
+            <div style="width: 40px; height: 40px; border-radius: 50%; background: #FDEDEC; color: #C0392B; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                ⚠️
+            </div>
+            <div>
+                <h3 style="margin: 0; font-size: 17px; color: #192A33;">Dar de Baja a Chofer Propio</h3>
+                <span style="font-size: 12px; color: var(--lcp-text-muted);">Confirmación de desvinculación de transporte</span>
+            </div>
+        </div>
+
+        <p style="font-size: 13.5px; color: #4B5A63; line-height: 1.5; margin: 0 0 18px;">
+            ¿Estás seguro de que querés dar de baja a <strong id="bajaChoferNombre" style="color: #192A33;"></strong> (Camión <strong id="bajaChoferPatente"></strong>)?
+            El chofer ya no podrá ser asignado a movimientos de tu empresa ni acceder a la plataforma.
+        </p>
+
+        <form asp-action="DarDeBajaChofer" method="post" style="margin: 0;">
+            @Html.AntiForgeryToken()
+            <input type="hidden" id="bajaChoferId" name="id" value="" />
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn-lcp-outline" onclick="cerrarModalBaja()">
+                    Cancelar
+                </button>
+                <button type="submit" class="btn-lcp-primary" style="background-color: #C0392B; border-color: #A93226; color: #FFFFFF;">
+                    Sí, dar de baja
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    function confirmarBajaChofer(id, nombre, patente) {
+        document.getElementById("bajaChoferId").value = id;
+        document.getElementById("bajaChoferNombre").textContent = nombre;
+        document.getElementById("bajaChoferPatente").textContent = patente;
+        document.getElementById("modalConfirmarBaja").style.display = "flex";
+    }
+
+    function cerrarModalBaja() {
+        document.getElementById("modalConfirmarBaja").style.display = "none";
+    }
+</script>
+}

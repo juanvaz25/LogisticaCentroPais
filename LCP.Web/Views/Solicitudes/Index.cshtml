@@ -1,0 +1,557 @@
+@model List<SolicitudOperacionDto>
+@using LCP.Shared.Constants
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = "Solicitudes - Pedidos y despachos del nodo";
+    var filtro = ViewBag.FiltroActual as EstadoSolicitud?;
+    var choferes = ViewBag.Conductores as List<ConductorViewModel> ?? new();
+    var darsenas = ViewBag.Darsenas as List<DarsenaDto> ?? new();
+
+    var pendientes = Model.Where(s => s.Estado == EstadoSolicitud.Pendiente).ToList();
+    var programadasYEnCurso = Model.Where(s => s.Estado == EstadoSolicitud.Programada || s.Estado == EstadoSolicitud.EnCurso).ToList();
+    var completadas = Model.Where(s => s.Estado == EstadoSolicitud.Completada || s.Estado == EstadoSolicitud.Cancelada).ToList();
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Solicitudes de Operación</h1>
+        <p class="page-subtitle">Bandeja de pedidos de arribo, despachos de stock y programación de turnos</p>
+    </div>
+
+    @if (User.IsInRole(Roles.Cliente))
+    {
+        <div>
+            <a asp-action="Nueva" class="btn-lcp-primary">
+                + Nueva solicitud
+            </a>
+        </div>
+    }
+</div>
+
+<!-- BANDEJA DE ENTRADA: SOLICITUDES PENDIENTES DE PROGRAMACIÓN (Especial para Operador y Admin) -->
+@if (pendientes.Any() && (User.IsInRole(Roles.Operador) || User.IsInRole(Roles.Administrador)))
+{
+    <div class="lcp-card" style="border: 2px solid #C2821E; background-color: #FFFDF9; margin-bottom: 28px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+            <div>
+                <h2 class="lcp-card-title" style="color: #946712; display: flex; align-items: center; gap: 8px; margin: 0;">
+                    📥 Bandeja de Entrada: Solicitudes Pendientes de Programación
+                    <span class="badge-estado badge-turno" style="font-size: 12px;">@pendientes.Count requerimiento(s) nuevo(s)</span>
+                </h2>
+                <p style="font-size: 13px; color: var(--lcp-text-muted); margin: 4px 0 0;">
+                    Clientes han solicitado arribos o despachos. Revisá la fecha de salida informada por el cliente y asigná el día y hora oficial de muelle y chofer.
+                </p>
+            </div>
+        </div>
+
+        <div class="lcp-table-container">
+            <table class="lcp-table">
+                <thead>
+                    <tr>
+                        <th style="width: 100px;">Código</th>
+                        <th>Tipo / Mercadería</th>
+                        <th>Cliente / Dársena</th>
+                        <th>Ruta e Informado por Cliente</th>
+                        <th style="width: 220px; text-align: right;">Acción Operativa</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var s in pendientes)
+                    {
+                        <tr style="background-color: #FAF5EB;">
+                            <td style="font-weight: 800; color: #192A33;">@s.CodigoSolicitud</td>
+                            <td style="max-width: 280px; min-width: 220px;">
+                                <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+                                    <span class="badge-estado @(s.TipoOperacion == TipoOperacionSolicitud.ArriboIngreso ? "badge-encurso" : "badge-ocupada")" style="font-size: 10px; padding: 2px 6px; flex-shrink: 0;">
+                                        @(s.TipoOperacion == TipoOperacionSolicitud.ArriboIngreso ? "📥 Arribo" : "📤 Retiro")
+                                    </span>
+                                    <span style="font-weight: 700; color: #192A33; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; display: inline-block;" title="@s.DescripcionMercaderia">
+                                        @s.DescripcionMercaderia
+                                    </span>
+                                </div>
+                                <div style="font-size: 12px; color: var(--lcp-text-muted); line-height: 1.3;">
+                                    Modalidad: <strong>@s.ModalidadNombre</strong> · @s.PesoTotalKg.ToString("N0") kg · @s.VolumenTotalM3 m³
+                                    @if (s.LoteInventarioId.HasValue)
+                                    {
+                                        <span style="color: #2B7A4B; font-weight: 600;"> · Stock: @s.CantidadRetirada u.</span>
+                                    }
+                                </div>
+                                <div style="margin-top: 5px;">
+                                    <button type="button" class="btn-lcp-outline btn-lcp-sm" style="font-size: 11px; padding: 2px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; background: #FFF;"
+                                            onclick="verFichaSolicitud(@s.Id)">
+                                        📋 Ver detalles en ficha
+                                    </button>
+                                </div>
+                            </td>
+                            <td>
+                                <div style="font-weight: 600;">@s.ClienteRazonSocial</div>
+                                <div style="font-size: 12px; color: var(--lcp-text-muted);">@s.DarsenaCodigo</div>
+                            </td>
+                            <td>
+                                <div style="font-size: 12px; font-weight: 600; color: #28536B;">
+                                    @(string.IsNullOrEmpty(s.CiudadOrigen) ? "Origen" : s.CiudadOrigen) ➔ @(string.IsNullOrEmpty(s.CiudadDestino) ? "Destino" : s.CiudadDestino)
+                                </div>
+                                <div style="font-size: 12px; color: #946712;">
+                                    Sale: <strong>@(s.FechaSalidaCliente?.ToString("dd/MM/yyyy HH:mm") ?? "Sin fecha") hs</strong>
+                                </div>
+                            </td>
+                            <td style="text-align: right;">
+                                <div style="display: inline-flex; gap: 6px;">
+                                    <button type="button" class="btn-lcp-primary btn-lcp-sm" 
+                                            onclick="abrirModalProgramar(@s.Id, '@s.CodigoSolicitud', '@s.ClienteRazonSocial', @s.DarsenaId, '@s.DarsenaCodigo', '@(s.FechaSalidaCliente?.ToString("yyyy-MM-ddTHH:mm") ?? DateTime.Now.ToString("yyyy-MM-ddTHH:mm"))', @((int)s.ModalidadTransporte), '@(s.ConductorNombreCompleto ?? "")', '@(s.FechaHoraEstimadaLlegada?.ToString("dd/MM/yyyy HH:mm") ?? "")', '@(s.FechaHoraEstimadaRetornoLCP?.ToString("dd/MM/yyyy HH:mm") ?? "")', @s.DistanciaEstimadaKm)">
+                                        📅 Asignar Turno
+                                    </button>
+                                    <button type="button" class="btn-lcp-outline btn-lcp-sm" style="color: #9D2424; border-color: #F3C7C7;"
+                                            onclick="abrirModalRechazarIndex(@s.Id, '@s.CodigoSolicitud', '@s.ClienteRazonSocial', 'Rechazar Solicitud')">
+                                        ⛔ Rechazar
+                                    </button>
+                                    <a asp-action="Detalle" asp-route-id="@s.Id" class="btn-lcp-outline btn-lcp-sm">
+                                        Ver
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+<!-- TABS DE FILTRO GENERAL -->
+<div class="filter-tabs">
+    <a asp-action="Index" class="tab-btn @(!filtro.HasValue ? "active" : "")">Todas (@Model.Count)</a>
+    <a asp-action="Index" asp-route-filtro="@((int)EstadoSolicitud.Pendiente)" class="tab-btn @(filtro == EstadoSolicitud.Pendiente ? "active" : "")">Pendientes (@pendientes.Count)</a>
+    <a asp-action="Index" asp-route-filtro="@((int)EstadoSolicitud.Programada)" class="tab-btn @(filtro == EstadoSolicitud.Programada ? "active" : "")">Programadas</a>
+    <a asp-action="Index" asp-route-filtro="@((int)EstadoSolicitud.EnCurso)" class="tab-btn @(filtro == EstadoSolicitud.EnCurso ? "active" : "")">En curso</a>
+    <a asp-action="Index" asp-route-filtro="@((int)EstadoSolicitud.Completada)" class="tab-btn @(filtro == EstadoSolicitud.Completada ? "active" : "")">Completadas</a>
+    <a asp-action="Index" asp-route-filtro="@((int)EstadoSolicitud.Cancelada)" class="tab-btn @(filtro == EstadoSolicitud.Cancelada ? "active" : "")">Canceladas / Rechazadas</a>
+</div>
+
+<!-- TABLA GENERAL DE SOLICITUDES -->
+<div class="lcp-table-container">
+    <table class="lcp-table">
+        <thead>
+            <tr>
+                <th style="width: 100px;">N.º</th>
+                <th>Pedido / Mercadería / Ruta</th>
+                <th style="width: 200px;">Cliente / Dársena</th>
+                <th style="width: 180px;">Turno Programado</th>
+                <th style="width: 180px;">Personal Asignado</th>
+                <th style="width: 130px;">Estado</th>
+                <th style="width: 130px; text-align: right;">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!Model.Any())
+            {
+                <tr>
+                    <td colspan="7" style="text-align: center; color: var(--lcp-text-muted); padding: 32px;">
+                        No se encontraron solicitudes registradas para el criterio seleccionado.
+                    </td>
+                </tr>
+            }
+            @foreach (var s in Model)
+            {
+                <tr>
+                    <td style="font-weight: 800; color: #192A33;">@s.CodigoSolicitud</td>
+                    <td style="max-width: 280px; min-width: 220px;">
+                        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+                            <span class="badge-estado @(s.TipoOperacion == TipoOperacionSolicitud.ArriboIngreso ? "badge-encurso" : "badge-ocupada")" style="font-size: 10px; padding: 1px 5px; flex-shrink: 0;">
+                                @(s.TipoOperacion == TipoOperacionSolicitud.ArriboIngreso ? "Arribo" : "Retiro")
+                            </span>
+                            <span style="font-weight: 600; color: #192A33; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 190px; display: inline-block;" title="@s.DescripcionMercaderia">
+                                @s.DescripcionMercaderia
+                            </span>
+                        </div>
+                        <div style="font-size: 12px; color: var(--lcp-text-muted); line-height: 1.3;">
+                            @if (!string.IsNullOrEmpty(s.CiudadOrigen) && !string.IsNullOrEmpty(s.CiudadDestino))
+                            {
+                                <span>@s.CiudadOrigen ➔ @s.CiudadDestino · </span>
+                            }
+                            @if (s.EsDobleViaje)
+                            {
+                                <span style="color: #946712; font-weight: 700;">🔁 Doble Viaje Flota</span>
+                            }
+                            else
+                            {
+                                <span style="color: #1E663B; font-weight: 700;">➡️ Simple Propio</span>
+                            }
+                            · @s.PesoTotalKg.ToString("N0") kg
+                        </div>
+                        <div style="margin-top: 5px; display: flex; gap: 6px;">
+                            <button type="button" class="btn-lcp-outline btn-lcp-sm" style="font-size: 11px; padding: 2px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; background: #FFF;"
+                                    onclick="verFichaSolicitud(@s.Id)">
+                                📋 Ficha
+                            </button>
+                            <a asp-controller="Conductor" asp-action="HojaDeRuta" asp-route-id="@s.Id" class="btn-lcp-outline btn-lcp-sm" style="font-size: 11px; padding: 2px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; background: #FFF; text-decoration: none;">
+                                🗺️ Hoja de Ruta
+                            </a>
+                        </div>
+                    </td>
+                    <td>
+                        <div style="font-weight: 600;">@s.ClienteRazonSocial</div>
+                        <div style="font-size: 12px; color: var(--lcp-text-muted);">@s.DarsenaCodigo</div>
+                    </td>
+                    <td>
+                        @if (s.Estado == EstadoSolicitud.Pendiente)
+                        {
+                            <div style="font-size: 12px; color: #946712; font-weight: 700;">
+                                ⏳ Pendiente asignación
+                            </div>
+                            <div style="font-size: 11px; color: var(--lcp-text-muted);">
+                                Salida: @(s.FechaSalidaCliente?.ToString("dd/MM HH:mm") ?? "-")
+                            </div>
+                        }
+                        else
+                        {
+                            <div style="font-weight: 700; color: #192A33;">@s.FechaHoraTurnoProgramado.ToString("dd/MM/yyyy")</div>
+                            <div style="font-size: 12px; color: #2B7A4B; font-weight: 600;">@s.FechaHoraTurnoProgramado.ToString("HH:mm") hs</div>
+                        }
+                    </td>
+                    <td>
+                        <div style="font-size: 12px;"><strong>Chofer:</strong> @(s.ConductorNombreCompleto ?? "A designar")</div>
+                        <div style="font-size: 12px; color: var(--lcp-text-muted);">Depósito: @(s.ResponsableDepositoNombre ?? "Por asignar")</div>
+                    </td>
+                    <td>
+                        <span class="badge-estado @(s.Estado == EstadoSolicitud.Completada ? "badge-completada" : s.Estado == EstadoSolicitud.EnCurso ? "badge-encurso" : s.Estado == EstadoSolicitud.Programada ? "badge-turno" : s.Estado == EstadoSolicitud.Cancelada ? "badge-rechazada" : "badge-pendiente")">
+                            @s.EstadoNombre
+                        </span>
+                    </td>
+                    <td style="text-align: right;">
+                        <div style="display: inline-flex; gap: 6px; align-items: center; justify-content: flex-end;">
+                            <a asp-action="Detalle" asp-route-id="@s.Id" class="btn-lcp-outline btn-lcp-sm">
+                                Ver
+                            </a>
+                            @if (s.Estado != EstadoSolicitud.Completada && s.Estado != EstadoSolicitud.Cancelada)
+                            {
+                                @if (User.IsInRole(Roles.Operador) || User.IsInRole(Roles.Administrador))
+                                {
+                                    <button type="button" class="btn-lcp-outline btn-lcp-sm" style="color: #9D2424; border-color: #F3C7C7;"
+                                            onclick="abrirModalRechazarIndex(@s.Id, '@s.CodigoSolicitud', '@s.ClienteRazonSocial', '@(s.Estado == EstadoSolicitud.Pendiente ? "Rechazar Solicitud" : "Cancelar Operación")')">
+                                        @(s.Estado == EstadoSolicitud.Pendiente ? "⛔ Rechazar" : "✕ Cancelar")
+                                    </button>
+                                }
+                                else if (User.IsInRole(Roles.Cliente) && (s.Estado == EstadoSolicitud.Pendiente || s.Estado == EstadoSolicitud.Programada))
+                                {
+                                    <button type="button" class="btn-lcp-outline btn-lcp-sm" style="color: #9D2424; border-color: #F3C7C7;"
+                                            onclick="abrirModalRechazarIndex(@s.Id, '@s.CodigoSolicitud', '@s.ClienteRazonSocial', 'Cancelar Solicitud')">
+                                        ✕ Cancelar
+                                    </button>
+                                }
+                            }
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<!-- MODAL ASIGNAR Y PROGRAMAR TURNO (OPERADOR) -->
+<div id="modalProgramarTurno" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; align-items: center; justify-content: center;">
+    <div style="background: #FAF8F5; border: 1px solid #DDD7CD; border-radius: 8px; max-width: 500px; width: 90%; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+        <h3 id="modalTituloProgramar" style="margin-top: 0; font-size: 18px; font-weight: 700; color: #192A33;">Programar Turno y Asignar Recursos</h3>
+        <p id="modalSubtituloProgramar" style="font-size: 13px; color: var(--lcp-text-muted); margin-top: -6px; margin-bottom: 18px;"></p>
+
+        <form asp-action="Asignar" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" id="modalSolicitudId" name="SolicitudId" value="" />
+
+            <div class="form-group">
+                <label class="form-label">Día y Hora Oficial del Turno en Muelle *</label>
+                <input type="datetime-local" id="modalFechaTurno" name="FechaHoraTurnoProgramado" class="form-input" required />
+                <span style="font-size: 11px; color: var(--lcp-text-muted); display: block; margin-top: 2px;">
+                    Esta es la franja oficial que se le confirmará al cliente.
+                </span>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Dársena Asignada (Alquiler del Cliente):</label>
+                <div style="display: flex; align-items: center; gap: 10px; background: #EFECE6; border: 1px solid #D5CEBE; border-radius: 6px; padding: 10px 14px;">
+                    <span style="font-size: 20px;">🔒</span>
+                    <div style="flex: 1;">
+                        <div id="modalDarsenaCodigoDisplay" style="font-weight: 800; color: #192A33; font-size: 15px;">Dársena</div>
+                        <div style="font-size: 11px; color: #2B7A4B; font-weight: 600;">
+                            ✓ Dársena fija vinculada al contrato de alquiler activo del cliente. No modificable.
+                        </div>
+                    </div>
+                </div>
+                <input type="hidden" name="DarsenaId" id="modalSelectDarsena" value="" />
+            </div>
+
+            <!-- ESTIMACIÓN DINÁMICA DE TIEMPOS VIALES SEGÚN MODALIDAD -->
+            <div id="modalPanelEstimacionTiempos" style="background-color: #F4EFE6; border: 1px solid #DDD7CD; border-radius: 6px; padding: 12px 14px; margin-bottom: 14px;">
+                <div style="font-weight: 700; font-size: 13px; color: #192A33; display: flex; align-items: center; gap: 6px;">
+                    <span>⏱️</span> <span id="modalEstimacionTitulo">Estimación de Horarios de Viaje:</span>
+                </div>
+                <div id="modalEstimacionDetalle" style="font-size: 13px; color: #28536B; font-weight: 600; margin-top: 4px;">
+                    Calculando según tramo carretero...
+                </div>
+            </div>
+
+            <!-- ASIGNACIÓN DE CHOFER SEGÚN MODALIDAD -->
+            <div class="form-group" id="modalGroupChoferFlota">
+                <label class="form-label">Chofer Oficial de Flota LCP a Designar *</label>
+                <select name="ConductorId" id="modalSelectConductorFlota" class="form-input">
+                    <option value="">-- Seleccionar Chofer Oficial de Flota LCP --</option>
+                    @foreach (var ch in choferes.Where(c => c.TipoConductor == TipoConductor.FlotaLCP))
+                    {
+                        <option value="@ch.Id">@ch.NombreCompleto - Camión: @ch.PatenteCamion (@ch.CapacidadCargaKg.ToString("N0") kg)</option>
+                    }
+                </select>
+                <span style="font-size: 11px; color: var(--lcp-text-muted); display: block; margin-top: 2px;">
+                    En modalidad Flota LCP, el operador asigna un chofer oficial de la dotación central.
+                </span>
+            </div>
+
+            <div class="form-group" id="modalGroupChoferPropio" style="display: none;">
+                <label class="form-label">Chofer Designado por el Cliente (Transporte Propio):</label>
+                <div style="display: flex; align-items: center; gap: 10px; background: #EBF8F0; border: 1px solid #C3E6D0; border-radius: 6px; padding: 10px 14px;">
+                    <span style="font-size: 20px;">🚛</span>
+                    <div>
+                        <div id="modalChoferPropioDisplay" style="font-weight: 800; color: #1E663B; font-size: 14.5px;">Chofer Propio</div>
+                        <div style="font-size: 11.5px; color: #192A33;">
+                            ✓ Designado directamente por el cliente en su solicitud. No se reemplaza por flota de LCP.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Mensaje / Indicaciones al Cliente:</label>
+                <input type="text" name="ObservacionesOperador" class="form-input" placeholder="Ej: Presentarse por Puerta Calle San Martín 245 con remito original." />
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                <button type="button" class="btn-lcp-outline" onclick="cerrarModalProgramar()">Cancelar</button>
+                <button type="submit" class="btn-lcp-primary">✓ Confirmar y Programar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL RECHAZAR / CANCELAR OPERACIÓN (INDEX) -->
+<div id="modalRechazarIndex" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; align-items: center; justify-content: center;">
+    <div style="background: #FAF8F5; border: 1px solid #DDD7CD; border-radius: 8px; max-width: 480px; width: 90%; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+        <h3 id="modalRechazarTitulo" style="margin-top: 0; font-size: 18px; font-weight: 700; color: #9D2424;">Rechazar Solicitud</h3>
+        <p id="modalRechazarSubtitulo" style="font-size: 13px; color: var(--lcp-text-muted); margin-top: -6px; margin-bottom: 16px;"></p>
+
+        <form asp-action="Cancelar" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" id="modalRechazarId" name="id" value="" />
+
+            <div class="form-group">
+                <label class="form-label">Motivo o Justificación *</label>
+                <textarea name="motivo" class="form-input" rows="3" required placeholder="Indique el motivo..."></textarea>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                <button type="button" class="btn-lcp-outline" onclick="cerrarModalRechazarIndex()">Volver</button>
+                <button type="submit" class="btn-lcp-primary" style="background-color: #9D2424; border-color: #9D2424;">Confirmar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL FICHA TÉCNICA DETALLADA DE SOLICITUD (CARD ORDENADA) -->
+<div id="modalFichaDetalle" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(2px);">
+    <div style="background: #FFFFFF; border: 1px solid #D1D5DB; border-radius: 10px; max-width: 650px; width: 92%; max-height: 90vh; overflow-y: auto; padding: 24px 28px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); position: relative;">
+        
+        <!-- Header -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #E5E7EB; padding-bottom: 14px; margin-bottom: 18px;">
+            <div>
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                    <span id="modalFichaBadgeTipo" class="badge-estado badge-encurso" style="font-size: 11px;">Arribo</span>
+                    <span id="modalFichaBadgeEstado" class="badge-estado badge-pendiente" style="font-size: 11px;">Pendiente</span>
+                </div>
+                <h3 id="modalFichaCodigo" style="margin: 0; font-size: 22px; font-weight: 800; color: #111827;">SOL-000000</h3>
+                <div id="modalFichaCliente" style="font-size: 13.5px; color: #4B5563; font-weight: 600; margin-top: 2px;">Cliente</div>
+            </div>
+            <button type="button" onclick="cerrarModalFicha()" style="background: none; border: none; font-size: 22px; color: #9CA3AF; cursor: pointer; padding: 0 4px; line-height: 1;">✕</button>
+        </div>
+
+        <!-- Card: Descripción Completa de Mercadería -->
+        <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px 16px; margin-bottom: 18px;">
+            <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: #64748B; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                <span>📦</span> DESCRIPCIÓN COMPLETA DE LA MERCADERÍA
+            </div>
+            <div id="modalFichaDescripcion" style="font-size: 14px; color: #1E293B; line-height: 1.6; white-space: pre-wrap; word-break: break-word; max-height: 140px; overflow-y: auto;">
+                --
+            </div>
+        </div>
+
+        <!-- Grid de Carga y Ubicación -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px;">
+            <div style="background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 6px; padding: 12px 14px;">
+                <div style="font-size: 11px; font-weight: 700; color: #6B7280; text-transform: uppercase;">Peso & Volumen</div>
+                <div id="modalFichaPesoVolumen" style="font-size: 15px; font-weight: 800; color: #111827; margin-top: 3px;">0 kg · 0 m³</div>
+                <div id="modalFichaModalidad" style="font-size: 12px; color: #4B5563; margin-top: 2px;">Modalidad: -</div>
+            </div>
+
+            <div style="background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 6px; padding: 12px 14px;">
+                <div style="font-size: 11px; font-weight: 700; color: #6B7280; text-transform: uppercase;">Dársena & Ubicación</div>
+                <div id="modalFichaDarsena" style="font-size: 15px; font-weight: 800; color: #111827; margin-top: 3px;">Dársena -</div>
+                <div id="modalFichaStockExtra" style="font-size: 12px; color: #059669; font-weight: 600; margin-top: 2px;"></div>
+            </div>
+        </div>
+
+        <!-- Grid de Ruta y Turnos -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px;">
+            <div style="background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 6px; padding: 12px 14px;">
+                <div style="font-size: 11px; font-weight: 700; color: #6B7280; text-transform: uppercase;">Ruta Estimada</div>
+                <div id="modalFichaRuta" style="font-size: 13.5px; font-weight: 700; color: #1E40AF; margin-top: 3px;">Origen ➔ Destino</div>
+                <div id="modalFichaDistancia" style="font-size: 12px; color: #6B7280; margin-top: 2px;">0 km</div>
+            </div>
+
+            <div style="background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 6px; padding: 12px 14px;">
+                <div style="font-size: 11px; font-weight: 700; color: #6B7280; text-transform: uppercase;">Programación de Muelle</div>
+                <div id="modalFichaTurno" style="font-size: 13.5px; font-weight: 700; color: #111827; margin-top: 3px;">--</div>
+                <div id="modalFichaSalidaCliente" style="font-size: 12px; color: #D97706; margin-top: 2px;">Salida informada: --</div>
+            </div>
+        </div>
+
+        <!-- Asignaciones de Personal -->
+        <div style="background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 6px; padding: 12px 14px; margin-bottom: 22px; font-size: 12.5px; color: #374151;">
+            <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                <div><strong>Chofer / Transportista:</strong> <span id="modalFichaChofer">A designar</span></div>
+                <div><strong>Operador de Depósito:</strong> <span id="modalFichaOperador">Por asignar</span></div>
+            </div>
+        </div>
+
+        <!-- Footer Actions -->
+        <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #E5E7EB; padding-top: 16px;">
+            <button type="button" class="btn-lcp-outline" onclick="cerrarModalFicha()">Cerrar Ficha</button>
+            <a id="modalFichaLinkGestion" href="#" class="btn-lcp-primary">
+                Ir a Gestión Completa →
+            </a>
+        </div>
+
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        var todasLasSolicitudes = Model.Concat(pendientes).GroupBy(x => x.Id).Select(g => g.First()).ToList();
+    }
+    <script>
+        const solicitudesMap = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(todasLasSolicitudes.ToDictionary(x => x.Id)));
+
+        function verFichaSolicitud(id) {
+            const s = solicitudesMap[id];
+            if (!s) return;
+
+            document.getElementById("modalFichaCodigo").textContent = s.CodigoSolicitud || `SOL-#${s.Id}`;
+            document.getElementById("modalFichaCliente").textContent = s.ClienteRazonSocial || "Cliente no especificado";
+            
+            // Badges
+            const badgeTipo = document.getElementById("modalFichaBadgeTipo");
+            badgeTipo.textContent = s.TipoOperacion === 1 ? "📥 Arribo a Dársena" : "📤 Retiro de Stock";
+            badgeTipo.className = "badge-estado " + (s.TipoOperacion === 1 ? "badge-encurso" : "badge-ocupada");
+
+            const badgeEstado = document.getElementById("modalFichaBadgeEstado");
+            badgeEstado.textContent = s.EstadoNombre || "Pendiente";
+            badgeEstado.className = "badge-estado " + (s.Estado === 4 ? "badge-completada" : s.Estado === 3 ? "badge-encurso" : s.Estado === 2 ? "badge-turno" : s.Estado === 5 ? "badge-rechazada" : "badge-pendiente");
+
+            // Descripción completa
+            document.getElementById("modalFichaDescripcion").textContent = s.DescripcionMercaderia || "Sin descripción informada.";
+
+            // Datos técnicos
+            const pesoKg = Number(s.PesoTotalKg || 0).toLocaleString();
+            document.getElementById("modalFichaPesoVolumen").textContent = `${pesoKg} kg · ${s.VolumenTotalM3 || 0} m³`;
+            document.getElementById("modalFichaModalidad").textContent = `Modalidad: ${s.ModalidadNombre || 'General'}`;
+
+            // Dársena y stock
+            document.getElementById("modalFichaDarsena").textContent = s.DarsenaCodigo || `Dársena #${s.DarsenaId}`;
+            const stockExtra = document.getElementById("modalFichaStockExtra");
+            if (s.CantidadRetirada) {
+                stockExtra.textContent = `✓ Stock: ${s.CantidadRetirada} unidades retiradas`;
+                stockExtra.style.display = "block";
+            } else {
+                stockExtra.style.display = "none";
+            }
+
+            // Ruta
+            const origen = s.CiudadOrigen || "Origen";
+            const destino = s.CiudadDestino || "Destino";
+            document.getElementById("modalFichaRuta").textContent = `${origen} ➔ ${destino}`;
+            document.getElementById("modalFichaDistancia").textContent = `${s.DistanciaEstimadaKm || 0} km estimados`;
+
+            // Turnos
+            if (s.FechaHoraTurnoProgramado && s.Estado !== 1) {
+                const f = new Date(s.FechaHoraTurnoProgramado);
+                document.getElementById("modalFichaTurno").textContent = f.toLocaleString();
+            } else {
+                document.getElementById("modalFichaTurno").textContent = "⏳ Pendiente de asignación de turno";
+            }
+
+            if (s.FechaSalidaCliente) {
+                const fs = new Date(s.FechaSalidaCliente);
+                document.getElementById("modalFichaSalidaCliente").textContent = `Salida informada por cliente: ${fs.toLocaleString()}`;
+            } else {
+                document.getElementById("modalFichaSalidaCliente").textContent = "Sin fecha de salida informada";
+            }
+
+            // Asignaciones
+            document.getElementById("modalFichaChofer").textContent = s.ConductorNombreCompleto || "A designar";
+            document.getElementById("modalFichaOperador").textContent = s.ResponsableDepositoNombre || "Por asignar";
+
+            // Link gestión
+            document.getElementById("modalFichaLinkGestion").href = `/Solicitudes/Detalle/${s.Id}`;
+
+            // Mostrar modal
+            document.getElementById("modalFichaDetalle").style.display = "flex";
+        }
+
+        function cerrarModalFicha() {
+            document.getElementById("modalFichaDetalle").style.display = "none";
+        }
+
+        function abrirModalProgramar(id, codigo, cliente, darsenaId, darsenaCodigo, fechaSugerida, modalidad, choferNombre, estimacionLlegada, estimacionRetorno, distanciaKm) {
+            document.getElementById("modalSolicitudId").value = id;
+            document.getElementById("modalTituloProgramar").textContent = `Programar Turno: Solicitud ${codigo}`;
+            document.getElementById("modalSubtituloProgramar").textContent = `Cliente: ${cliente}`;
+            document.getElementById("modalSelectDarsena").value = darsenaId;
+            document.getElementById("modalDarsenaCodigoDisplay").textContent = `${darsenaCodigo} (Alquiler vigente de ${cliente})`;
+            document.getElementById("modalFechaTurno").value = fechaSugerida;
+
+            const esPropio = (modalidad === 1); // 1 = ChoferPropio, 2 = FlotaLCP
+            const grpFlota = document.getElementById("modalGroupChoferFlota");
+            const grpPropio = document.getElementById("modalGroupChoferPropio");
+            const selConductor = document.getElementById("modalSelectConductorFlota");
+            const detalleEst = document.getElementById("modalEstimacionDetalle");
+
+            if (esPropio) {
+                grpFlota.style.display = "none";
+                selConductor.required = false;
+                grpPropio.style.display = "block";
+                document.getElementById("modalChoferPropioDisplay").textContent = choferNombre ? `🚛 ${choferNombre}` : "Chofer propio de la empresa";
+                
+                detalleEst.innerHTML = `🏁 Llegada Estimada a LCP: <strong>${estimacionLlegada || 'Según salida indicada por cliente'} hs</strong><br/><small style="color: #667085;">El cliente despacha con chofer propio hacia el nodo logístico (${distanciaKm} km directos).</small>`;
+            } else {
+                grpFlota.style.display = "block";
+                selConductor.required = true;
+                grpPropio.style.display = "none";
+
+                detalleEst.innerHTML = `📍 Llegada Estimada al Destino: <strong>${estimacionLlegada || 'A calcular'} hs</strong><br/>🔁 Retorno Estimado a Base LCP: <strong style="color: #946712;">${estimacionRetorno || 'A calcular'} hs</strong><br/><small style="color: #667085;">Circuito doble de Flota Oficial LCP (${distanciaKm} km totales ida y vuelta).</small>`;
+            }
+
+            document.getElementById("modalProgramarTurno").style.display = "flex";
+        }
+
+        function cerrarModalProgramar() {
+            document.getElementById("modalProgramarTurno").style.display = "none";
+        }
+
+        function abrirModalRechazarIndex(id, codigo, cliente, accion = "Rechazar Solicitud") {
+            document.getElementById("modalRechazarId").value = id;
+            document.getElementById("modalRechazarTitulo").textContent = `${accion}: ${codigo}`;
+            document.getElementById("modalRechazarSubtitulo").textContent = `Cliente: ${cliente}. Esta acción cancelará la solicitud y liberará la reserva en dársena.`;
+            document.getElementById("modalRechazarIndex").style.display = "flex";
+        }
+
+        function cerrarModalRechazarIndex() {
+            document.getElementById("modalRechazarIndex").style.display = "none";
+        }
+    </script>
+}

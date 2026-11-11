@@ -1,0 +1,38 @@
+@inherits LayoutComponentBase
+@inject NavigationManager Nav
+
+<div class="mobile-viewport-container">
+    <div class="mobile-phone-frame">
+        <div class="phone-notch-bar">
+            <span>09:41</span>
+            <div class="phone-island"></div>
+            <div style="display: flex; gap: 6px;">
+                <i class="fa-solid fa-signal" style="font-size: 10px;"></i>
+                <i class="fa-solid fa-wifi" style="font-size: 10px;"></i>
+                <i class="fa-solid fa-battery-full" style="font-size: 10px;"></i>
+            </div>
+        </div>
+
+        <MobileHeader />
+
+        <main class="mobile-body">
+            @Body
+        </main>
+
+        @if (!IsAuthPage)
+        {
+            <MobileBottomNav />
+        }
+
+        <ToastOverlay />
+    </div>
+</div>
+
+@code {
+    private bool IsAuthPage => Nav.Uri.ToLowerInvariant().Contains("/login");
+
+    protected override void OnInitialized()
+    {
+        Nav.LocationChanged += (s, e) => StateHasChanged();
+    }
+}

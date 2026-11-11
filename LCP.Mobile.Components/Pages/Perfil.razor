@@ -1,0 +1,165 @@
+@page "/perfil"
+@layout MobileLayout
+@inject IMobileApiClient ApiClient
+@inject ITokenStorage TokenStorage
+@inject NavigationManager Nav
+@inject UiNotificationService Notifier
+
+<div style="display: flex; flex-direction: column; gap: 14px; padding-bottom: 30px;">
+    <!-- Profile Card -->
+    <div class="card-lcp" style="text-align: center; padding: 22px 16px; border-top: 4px solid var(--lcp-gold);">
+        <div style="width: 72px; height: 72px; border-radius: 50%; background: linear-gradient(135deg, var(--lcp-teal) 0%, var(--lcp-navy) 100%); color: white; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; font-weight: 800; margin: 0 auto 10px; box-shadow: 0 4px 14px rgba(40, 83, 107, 0.3);">
+            @(CurrentUser?.Nombre.Substring(0, 1) ?? "U")@(CurrentUser?.Apellido?.Substring(0, 1) ?? "")
+        </div>
+
+        <h3 style="font-size: 1.2rem; font-weight: 800; color: var(--lcp-navy); margin-bottom: 2px;">
+            @(CurrentUser?.NombreCompleto ?? "Usuario")
+        </h3>
+        <div style="font-size: 0.8rem; color: var(--lcp-text-muted); margin-bottom: 8px;">
+            @(CurrentUser?.Email ?? "usuario@lcp.com")
+        </div>
+
+        <span class="badge-pill @GetRoleBadgeClass(CurrentUser?.Rol ?? RolUsuario.Operador)" style="font-size: 0.72rem;">
+            @CurrentUser?.Rol.ToString()
+        </span>
+
+        @if (!string.IsNullOrWhiteSpace(CurrentUser?.EmpresaRazonSocial))
+        {
+            <div style="font-size: 0.75rem; color: var(--lcp-teal); font-weight: 600; margin-top: 8px;">
+                <i class="fa-solid fa-building"></i> @CurrentUser.EmpresaRazonSocial
+            </div>
+        }
+    </div>
+
+    <!-- HR & Contact Details -->
+    <div class="card-lcp" style="padding: 16px;">
+        <div class="card-header-clean" style="margin-bottom: 10px;">
+            <span style="font-weight: 700; font-size: 0.85rem; color: var(--lcp-navy);">
+                <i class="fa-solid fa-id-card" style="color: var(--lcp-teal); margin-right: 6px;"></i>
+                Legajo y Contacto
+            </span>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.8rem;">
+            <div style="display: flex; justify-content: space-between;">
+                <span style="color: #64748B;">DNI / Identificación:</span>
+                <strong>@(CurrentUser?.Dni ?? "34.567.890")</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+                <span style="color: #64748B;">Teléfono de contacto:</span>
+                <strong>@(CurrentUser?.Telefono ?? "2954-412233")</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+                <span style="color: #64748B;">Localidad / Provincia:</span>
+                <strong>Santa Rosa, La Pampa</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+                <span style="color: #64748B;">Estado de cuenta:</span>
+                <strong style="color: #10B981;"><i class="fa-solid fa-circle-check"></i> Activo & Verificado</strong>
+            </div>
+        </div>
+    </div>
+
+    <!-- Backend API Server Configuration -->
+    <div class="card-lcp" style="padding: 16px;">
+        <div class="card-header-clean" style="margin-bottom: 10px;">
+            <span style="font-weight: 700; font-size: 0.85rem; color: var(--lcp-navy);">
+                <i class="fa-solid fa-server" style="color: var(--lcp-gold); margin-right: 6px;"></i>
+                Configuración del Servidor API
+            </span>
+        </div>
+
+        <p style="font-size: 0.75rem; color: var(--lcp-text-muted); margin-bottom: 10px;">
+            Dirección del backend API (.NET Web API). Puede usar localhost o el hosting remoto en Somee.
+        </p>
+
+        <div class="form-group-lcp">
+            <input type="text" class="form-input-lcp" @bind="ApiUrlInput" placeholder="http://localhost:5147 o https://...somee.com" />
+        </div>
+
+        <button class="btn-lcp-outline btn-lcp-sm" style="width: 100%; font-size: 0.78rem;" @onclick="GuardarApiUrl">
+            <i class="fa-solid fa-floppy-disk"></i>
+            <span>Guardar Dirección de Servidor</span>
+        </button>
+    </div>
+
+    <!-- Switch Persona (Quick Demo) -->
+    <div class="card-lcp" style="padding: 16px;">
+        <div class="card-header-clean" style="margin-bottom: 10px;">
+            <span style="font-weight: 700; font-size: 0.85rem; color: var(--lcp-navy);">
+                <i class="fa-solid fa-arrows-split-up-and-left" style="color: #6366F1; margin-right: 6px;"></i>
+                Cambio Rápido de Perfil
+            </span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;">
+            <button class="btn-lcp-outline btn-lcp-sm" style="font-size: 0.72rem; justify-content: flex-start;" @onclick='() => CambiarUsuario("operador@lcp.com")'>
+                <i class="fa-solid fa-people-carry-box" style="color: #C2821E;"></i>
+                <span>Operador</span>
+            </button>
+            <button class="btn-lcp-outline btn-lcp-sm" style="font-size: 0.72rem; justify-content: flex-start;" @onclick='() => CambiarUsuario("auditor@lcp.com")'>
+                <i class="fa-solid fa-clipboard-check" style="color: #8B5CF6;"></i>
+                <span>Auditor</span>
+            </button>
+            <button class="btn-lcp-outline btn-lcp-sm" style="font-size: 0.72rem; justify-content: flex-start;" @onclick='() => CambiarUsuario("conductor@flota.com")'>
+                <i class="fa-solid fa-truck" style="color: #10B981;"></i>
+                <span>Conductor</span>
+            </button>
+            <button class="btn-lcp-outline btn-lcp-sm" style="font-size: 0.72rem; justify-content: flex-start;" @onclick='() => CambiarUsuario("admin@lcp.com")'>
+                <i class="fa-solid fa-shield-halved" style="color: #EF4444;"></i>
+                <span>Administrador</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Logout Button -->
+    <button class="btn-lcp-outline" style="border-color: #FECACA; color: #DC2626;" @onclick="CerrarSesion">
+        <i class="fa-solid fa-right-from-bracket"></i>
+        <span>Cerrar Sesión</span>
+    </button>
+</div>
+
+@code {
+    private UsuarioDto? CurrentUser;
+    private string ApiUrlInput = "http://localhost:5147";
+
+    protected override async Task OnInitializedAsync()
+    {
+        CurrentUser = await TokenStorage.GetUserAsync();
+        ApiUrlInput = await TokenStorage.GetApiBaseUrlAsync();
+    }
+
+    private async Task GuardarApiUrl()
+    {
+        await TokenStorage.SetApiBaseUrlAsync(ApiUrlInput);
+        Notifier.Success("URL de API guardada correctamente.");
+    }
+
+    private async Task CambiarUsuario(string email)
+    {
+        var res = await ApiClient.LoginAsync(new LoginRequestDto { Email = email, Password = "123" });
+        if (res.Exitoso)
+        {
+            CurrentUser = res.Usuario;
+            Notifier.Success($"Perfil cambiado a {res.Usuario?.Rol}");
+            Nav.NavigateTo("/");
+        }
+    }
+
+    private async Task CerrarSesion()
+    {
+        await TokenStorage.ClearTokenAsync();
+        Notifier.Info("Sesión finalizada");
+        Nav.NavigateTo("/login");
+    }
+
+    private string GetRoleBadgeClass(RolUsuario rol) => rol switch
+    {
+        RolUsuario.Administrador => "badge-admin",
+        RolUsuario.Operador => "badge-operador",
+        RolUsuario.Auditor => "badge-auditor",
+        RolUsuario.Cliente => "badge-cliente",
+        RolUsuario.Conductor => "badge-conductor",
+        _ => "badge-operador"
+    };
+}

@@ -1,0 +1,543 @@
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = "Bandeja de Aprobaciones - Administrador";
+    var empresas = ViewBag.EmpresasPendientes as List<ClienteEmpresaViewModel> ?? new();
+    var choferes = ViewBag.ChoferesPendientes as List<ConductorViewModel> ?? new();
+}
+
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+    <div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 26px;">⚖️</span>
+            <h1 class="page-title" style="margin: 0;">Bandeja de Aprobaciones</h1>
+        </div>
+        <p class="page-subtitle" style="margin-top: 6px;">
+            Revisión de solicitudes de alta de empresas clientes y postulaciones de conductores para la red operativa de LCP.
+        </p>
+    </div>
+    <div style="display: flex; gap: 10px;">
+        <span class="badge-estado badge-pendiente" style="font-size: 13px; padding: 6px 14px;">
+            ⏳ @(empresas.Count + choferes.Count) solicitudes pendientes
+        </span>
+    </div>
+</div>
+
+<!-- 1. EMPRESAS CLIENTES PENDIENTES DE ALTA -->
+<div class="lcp-card" style="margin-bottom: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+        <div>
+            <h2 class="lcp-card-title" style="margin: 0; display: flex; align-items: center; gap: 8px;">
+                <span>🏢</span> Empresas Clientes Pendientes de Alta
+            </h2>
+            <p style="font-size: 13px; color: var(--lcp-text-muted); margin: 4px 0 0;">
+                Solicitudes de registro de empresas clientes a la espera de validación de CUIT y habilitación de cuenta.
+            </p>
+        </div>
+        <span class="badge-estado @(empresas.Any() ? "badge-pendiente" : "badge-completado")">
+            @empresas.Count pendiente(s)
+        </span>
+    </div>
+
+    @if (!empresas.Any())
+    {
+        <div style="text-align: center; padding: 36px 20px; background-color: #F8F6F0; border-radius: 8px; border: 1px dashed #CCC5B7;">
+            <div style="font-size: 32px; margin-bottom: 8px;">✓</div>
+            <div style="font-weight: 700; color: var(--lcp-text-dark);">No hay solicitudes de empresas pendientes</div>
+            <div style="font-size: 13px; color: var(--lcp-text-muted); margin-top: 4px;">Todas las solicitudes de alta de clientes han sido revisadas.</div>
+        </div>
+    }
+    else
+    {
+        <div class="lcp-table-container">
+            <table class="lcp-table">
+                <thead>
+                    <tr>
+                        <th>Razón Social</th>
+                        <th>CUIT</th>
+                        <th>Rubro</th>
+                        <th>Ubicación</th>
+                        <th>Fecha Solicitud</th>
+                        <th style="text-align: right; width: 220px;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var e in empresas)
+                    {
+                        <tr>
+                            <td>
+                                <div style="font-weight: 800; color: #192A33; font-size: 14px;">@e.RazonSocial</div>
+                                <div style="font-size: 12px; color: var(--lcp-text-muted); display: flex; align-items: center; gap: 6px; margin-top: 2px;">
+                                    <span>✉️ @e.EmailContacto</span>
+                                    @if (e.EmailConfirmado)
+                                    {
+                                        <span class="badge-estado badge-completado" style="font-size: 10px; padding: 2px 6px; background-color: #E8F5E9; color: #1E663B; border-color: #C8E6C9;" title="Email validado por el cliente">✓ Email Verificado</span>
+                                    }
+                                </div>
+                            </td>
+                            <td>
+                                <span style="font-weight: 700; font-family: monospace; background: #F8F6F0; padding: 3px 8px; border-radius: 4px; border: 1px solid #E5DFD5;">
+                                    @e.CUIT
+                                </span>
+                            </td>
+                            <td>
+                                <span style="font-weight: 600; color: #28536B;">@e.Rubro</span>
+                            </td>
+                            <td>
+                                <div style="font-weight: 600;">@e.Localidad</div>
+                                <div style="font-size: 11px; color: var(--lcp-text-muted);">@e.Provincia</div>
+                            </td>
+                            <td>
+                                <div style="font-weight: 600;">@e.FechaSolicitud.ToString("dd/MM/yyyy")</div>
+                                <div style="font-size: 11px; color: var(--lcp-text-muted);">@e.FechaSolicitud.ToString("HH:mm") hs</div>
+                            </td>
+                            <td style="text-align: right;">
+                                <div style="display: inline-flex; gap: 8px; align-items: center;">
+                                    <button type="button" class="btn-lcp-primary btn-lcp-sm" style="display: inline-flex; align-items: center; gap: 4px; font-weight: 700;"
+                                            onclick="abrirFichaEmpresaModal(@e.Id, '@Html.Raw(e.RazonSocial)', '@e.CUIT', '@Html.Raw(e.Rubro)', '@e.EmailContacto', '@e.TelefonoContacto', '@Html.Raw(e.Domicilio)', '@Html.Raw(e.Localidad)', '@Html.Raw(e.Provincia)', '@e.FechaSolicitud.ToString("dd/MM/yyyy HH:mm")')">
+                                        <span>📋</span> Ver Ficha
+                                    </button>
+
+                                    <form asp-action="AprobarEmpresa" method="post" style="margin: 0; display: inline;">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@e.Id" />
+                                        <button type="submit" class="btn-lcp-outline btn-lcp-sm" style="color: #1E663B; border-color: #A5D6A7; background: #E8F5E9; font-weight: 700;" title="Aprobar directamente">
+                                            ✓ Aprobar
+                                        </button>
+                                    </form>
+
+                                    <form asp-action="RechazarEmpresa" method="post" style="margin: 0; display: inline;">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@e.Id" />
+                                        <button type="submit" class="btn-lcp-outline btn-lcp-sm" style="color: #9D2424; border-color: #F3C7C7; background: #FDEDEC;" title="Rechazar">
+                                            ✕
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<!-- 2. POSTULACIONES DE CHOFERES PENDIENTES -->
+<div class="lcp-card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+        <div>
+            <h2 class="lcp-card-title" style="margin: 0; display: flex; align-items: center; gap: 8px;">
+                <span>🚛</span> Postulaciones de Choferes Pendientes de Validación
+            </h2>
+            <p style="font-size: 13px; color: var(--lcp-text-muted); margin: 4px 0 0;">
+                Conductores que enviaron su postulación a través de la plataforma y aguardan aprobación para operar.
+            </p>
+        </div>
+        <span class="badge-estado @(choferes.Any() ? "badge-pendiente" : "badge-completado")">
+            @choferes.Count pendiente(s)
+        </span>
+    </div>
+
+    @if (!choferes.Any())
+    {
+        <div style="text-align: center; padding: 36px 20px; background-color: #F8F6F0; border-radius: 8px; border: 1px dashed #CCC5B7;">
+            <div style="font-size: 32px; margin-bottom: 8px;">✓</div>
+            <div style="font-weight: 700; color: var(--lcp-text-dark);">No hay postulaciones de choferes pendientes</div>
+            <div style="font-size: 13px; color: var(--lcp-text-muted); margin-top: 4px;">El padrón de postulantes se encuentra completamente al día.</div>
+        </div>
+    }
+    else
+    {
+        <div class="lcp-table-container">
+            <table class="lcp-table">
+                <thead>
+                    <tr>
+                        <th>Conductor</th>
+                        <th>CUIL</th>
+                        <th>Patente Camión</th>
+                        <th>Capacidad</th>
+                        <th>Localidad</th>
+                        <th>Fecha Postulación</th>
+                        <th style="text-align: right; width: 220px;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var ch in choferes)
+                    {
+                        <tr>
+                            <td>
+                                <div style="font-weight: 800; color: #192A33; font-size: 14px;">@ch.NombreCompleto</div>
+                                <div style="font-size: 12px; color: var(--lcp-text-muted); display: flex; align-items: center; gap: 6px; margin-top: 2px; flex-wrap: wrap;">
+                                    <span>📱 @ch.CelularWhatsApp</span>
+                                    @if (!string.IsNullOrEmpty(ch.ClienteRazonSocial))
+                                    {
+                                        <span class="badge-estado badge-programada" style="font-size: 10px; padding: 2px 6px;" title="Chofer de transporte propio cargado por cliente/operador">🏢 @ch.ClienteRazonSocial</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge-estado badge-encurso" style="font-size: 10px; padding: 2px 6px;">🚛 Postulación LCP</span>
+                                    }
+                                    @if (ch.EmailConfirmado)
+                                    {
+                                        <span class="badge-estado badge-completado" style="font-size: 10px; padding: 2px 6px; background-color: #E8F5E9; color: #1E663B; border-color: #C8E6C9;" title="Email validado por el chofer">✓ Email Verificado</span>
+                                    }
+                                </div>
+                            </td>
+                            <td>
+                                <span style="font-weight: 700; font-family: monospace; background: #F8F6F0; padding: 3px 8px; border-radius: 4px; border: 1px solid #E5DFD5;">
+                                    @ch.CUIL
+                                </span>
+                            </td>
+                            <td>
+                                <span style="background-color: #162E3B; color: #FFFFFF; font-family: monospace; font-size: 12px; font-weight: 800; padding: 3px 8px; border-radius: 4px; letter-spacing: 1px; display: inline-block;">
+                                    @ch.PatenteCamion
+                                </span>
+                            </td>
+                            <td>
+                                <div style="font-weight: 700; color: var(--lcp-text-dark);">@ch.CapacidadCargaKg.ToString("N0") kg</div>
+                                <div style="font-size: 11px; color: var(--lcp-text-muted);">@ch.CapacidadVolumenM3.ToString("N1") m³</div>
+                            </td>
+                            <td>
+                                <div style="font-weight: 600;">@ch.Localidad</div>
+                                <div style="font-size: 11px; color: var(--lcp-text-muted);">@ch.Provincia</div>
+                            </td>
+                            <td>
+                                <div style="font-weight: 600;">@ch.FechaPostulacion.ToString("dd/MM/yyyy")</div>
+                                <div style="font-size: 11px; color: var(--lcp-text-muted);">@ch.FechaPostulacion.ToString("HH:mm") hs</div>
+                            </td>
+                            <td style="text-align: right;">
+                                <div style="display: inline-flex; gap: 8px; align-items: center;">
+                                    <button type="button" class="btn-lcp-primary btn-lcp-sm" style="display: inline-flex; align-items: center; gap: 4px; font-weight: 700;"
+                                            onclick="abrirFichaPostulanteModal(@ch.Id, '@Html.Raw(ch.NombreCompleto)', '@ch.CUIL', '@ch.FechaNacimiento.ToString("dd/MM/yyyy")', '@ch.PatenteCamion', '@ch.Email', '@ch.CelularWhatsApp', '@Html.Raw(ch.Domicilio)', '@Html.Raw(ch.Localidad)', '@Html.Raw(ch.Provincia)', '@ch.CapacidadCargaKg.ToString("N0")', '@ch.CapacidadVolumenM3.ToString("N1")', '@ch.FechaPostulacion.ToString("dd/MM/yyyy HH:mm")', '@(ch.LicenciaArchivoUrl ?? "")', '@(ch.SeguroCamionArchivoUrl ?? "")')">
+                                        <span>📋</span> Ver Ficha
+                                    </button>
+
+                                    <form asp-action="AprobarChofer" method="post" style="margin: 0; display: inline;">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@ch.Id" />
+                                        <button type="submit" class="btn-lcp-outline btn-lcp-sm" style="color: #1E663B; border-color: #A5D6A7; background: #E8F5E9; font-weight: 700;" title="Aprobar">
+                                            ✓ Aprobar
+                                        </button>
+                                    </form>
+
+                                    <form asp-action="RechazarChofer" method="post" style="margin: 0; display: inline;">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@ch.Id" />
+                                        <button type="submit" class="btn-lcp-outline btn-lcp-sm" style="color: #9D2424; border-color: #F3C7C7; background: #FDEDEC;" title="Rechazar">
+                                            ✕
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<!-- MODAL: FICHA DETALLADA DE EMPRESA CLIENTE -->
+<div id="modalFichaEmpresa" class="lcp-modal-backdrop" style="display: none;">
+    <div class="lcp-modal" style="max-width: 650px;">
+        <div class="lcp-modal-header" style="background: linear-gradient(135deg, #162E3B 0%, #28536B 100%); color: #FFF; padding: 18px 24px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span style="font-size: 26px;">🏢</span>
+                <div>
+                    <h3 id="mfeRazonSocial" style="font-size: 18px; font-weight: 800; color: #FFF; margin: 0;">Ficha de Empresa Cliente</h3>
+                    <div style="font-size: 12px; color: #D5E1DF; margin-top: 2px;">Solicitud de Registro en Logística Centro País</div>
+                </div>
+            </div>
+            <button type="button" class="lcp-modal-close" style="color: #FFF; font-size: 26px;" onclick="cerrarFichaEmpresaModal()">&times;</button>
+        </div>
+
+        <div class="lcp-modal-body" style="padding: 22px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; font-size: 13px; line-height: 1.8;">
+                <div style="background: #F8F6F0; border: 1px solid var(--lcp-card-border); border-radius: 8px; padding: 14px;">
+                    <div style="font-weight: 700; color: var(--lcp-text-muted); font-size: 11px; text-transform: uppercase; margin-bottom: 6px;">Identificación Fiscal</div>
+                    <div><strong>CUIT:</strong> <span id="mfeCuit" style="font-family: monospace; font-weight: 800;">-</span></div>
+                    <div><strong>Rubro:</strong> <span id="mfeRubro">-</span></div>
+                    <div><strong>Fecha Solicitud:</strong> <span id="mfeFecha">-</span></div>
+                </div>
+
+                <div style="background: #F8F6F0; border: 1px solid var(--lcp-card-border); border-radius: 8px; padding: 14px;">
+                    <div style="font-weight: 700; color: var(--lcp-text-muted); font-size: 11px; text-transform: uppercase; margin-bottom: 6px;">Contacto & Ubicación</div>
+                    <div><strong>Email:</strong> <a id="mfeEmailLink" href="#" style="color: #28536B; font-weight: 600;"><span id="mfeEmail">-</span></a></div>
+                    <div><strong>Teléfono:</strong> <span id="mfeTelefono">-</span></div>
+                    <div><strong>Domicilio:</strong> <span id="mfeDomicilio">-</span></div>
+                </div>
+            </div>
+
+            <div style="margin-top: 16px; background-color: #EBF8F0; border-left: 4px solid #2ECC71; padding: 12px 16px; border-radius: 6px; font-size: 12.5px; color: #1E663B;">
+                <strong>ℹ️ Al aprobar:</strong> Se generará automáticamente la cuenta de usuario para el cliente con contraseña provisional enviada por correo electrónico.
+            </div>
+        </div>
+
+        <div class="lcp-modal-footer" style="padding: 14px 24px; background: #F8F6F0; border-top: 1px solid var(--lcp-card-border); display: flex; justify-content: space-between; align-items: center;">
+            <button type="button" class="btn-lcp-outline btn-lcp-sm" onclick="cerrarFichaEmpresaModal()">Cerrar</button>
+            <div style="display: flex; gap: 8px;">
+                <form id="formAprobarEmpresaModal" asp-action="AprobarEmpresa" method="post" style="margin: 0;">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" id="mfeInputIdAprobar" value="" />
+                    <button type="submit" class="btn-lcp-primary btn-lcp-sm" style="background-color: #2B7A4B; border-color: #2B7A4B; font-weight: 700;">
+                        ✓ Aprobar Empresa
+                    </button>
+                </form>
+                <form id="formRechazarEmpresaModal" asp-action="RechazarEmpresa" method="post" style="margin: 0;">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" id="mfeInputIdRechazar" value="" />
+                    <button type="submit" class="btn-lcp-outline btn-lcp-sm" style="color: #9D2424; border-color: #9D2424;">
+                        ✕ Rechazar
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: FICHA DETALLADA DE CHOFER POSTULANTE -->
+<div id="modalFichaPostulante" class="lcp-modal-backdrop" style="display: none;">
+    <div class="lcp-modal" style="max-width: 680px;">
+        <div class="lcp-modal-header" style="background: linear-gradient(135deg, #162E3B 0%, #28536B 100%); color: #FFF; padding: 18px 24px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span style="font-size: 26px;">🚛</span>
+                <div>
+                    <h3 id="mfpNombre" style="font-size: 18px; font-weight: 800; color: #FFF; margin: 0;">Ficha del Chofer Postulante</h3>
+                    <div style="font-size: 12px; color: #D5E1DF; margin-top: 2px;">Postulación Externa a la Red Logística Centro País</div>
+                </div>
+            </div>
+            <button type="button" class="lcp-modal-close" style="color: #FFF; font-size: 26px;" onclick="cerrarFichaPostulanteModal()">&times;</button>
+        </div>
+
+        <div class="lcp-modal-body" style="padding: 22px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; font-size: 13px; line-height: 1.8;">
+                <div style="background: #F8F6F0; border: 1px solid var(--lcp-card-border); border-radius: 8px; padding: 14px;">
+                    <div style="font-weight: 700; color: var(--lcp-text-muted); font-size: 11px; text-transform: uppercase; margin-bottom: 6px;">Datos Personales y Contacto</div>
+                    <div><strong>CUIL:</strong> <span id="mfpCuil" style="font-family: monospace; font-weight: 800;">-</span></div>
+                    <div><strong>Fecha Nacimiento:</strong> <span id="mfpNac">-</span></div>
+                    <div><strong>Celular:</strong> <span id="mfpTel">-</span></div>
+                    <div><strong>Email:</strong> <span id="mfpEmail">-</span></div>
+                    <div><strong>Domicilio:</strong> <span id="mfpDomicilio">-</span></div>
+                </div>
+
+                <div style="background: #F8F6F0; border: 1px solid var(--lcp-card-border); border-radius: 8px; padding: 14px;">
+                    <div style="font-weight: 700; color: var(--lcp-text-muted); font-size: 11px; text-transform: uppercase; margin-bottom: 6px;">Unidad y Capacidad</div>
+                    <div><strong>Patente Camión:</strong> <span id="mfpPatente" style="background: #162E3B; color: #FFF; padding: 2px 8px; border-radius: 4px; font-family: monospace; font-weight: 800;">-</span></div>
+                    <div><strong>Capacidad Carga:</strong> <span id="mfpCarga" style="font-weight: 700; color: #C2821E;">-</span> kg</div>
+                    <div><strong>Capacidad Volumen:</strong> <span id="mfpVolumen" style="font-weight: 700; color: #28536B;">-</span> m³</div>
+                    <div><strong>Fecha Postulación:</strong> <span id="mfpFecha">-</span></div>
+                </div>
+            </div>
+
+            <!-- SECCIÓN DOCUMENTACIÓN ADJUNTA Y FOTOS -->
+            <div style="margin-top: 16px; background: #FFFFFF; border: 1px solid var(--lcp-card-border); border-radius: 8px; padding: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #ECE7DE; padding-bottom: 8px;">
+                    <div style="font-weight: 800; color: #192A33; font-size: 12px; text-transform: uppercase; display: flex; align-items: center; gap: 6px;">
+                        <span>📁</span> Documentación Digital y Fotos Respaldatorias
+                    </div>
+                    <span id="mfpDocsBadge" class="badge-estado badge-info" style="font-size: 11px;">Consultando...</span>
+                </div>
+
+                <div id="mfpDocsContainer" style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                    <!-- Se carga dinámicamente con las imágenes y archivos -->
+                </div>
+            </div>
+
+            <div style="margin-top: 16px; background-color: #EBF8F0; border-left: 4px solid #2ECC71; padding: 12px 16px; border-radius: 6px; font-size: 12.5px; color: #1E663B;">
+                <strong>ℹ️ Al aprobar:</strong> El chofer quedará registrado con acceso al sistema y habilitado para asignación operativa.
+            </div>
+        </div>
+
+        <div class="lcp-modal-footer" style="padding: 14px 24px; background: #F8F6F0; border-top: 1px solid var(--lcp-card-border); display: flex; justify-content: space-between; align-items: center;">
+            <button type="button" class="btn-lcp-outline btn-lcp-sm" onclick="cerrarFichaPostulanteModal()">Cerrar</button>
+            <div style="display: flex; gap: 8px;">
+                <form id="formAprobarChoferModal" asp-action="AprobarChofer" method="post" style="margin: 0;">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" id="mfpInputIdAprobar" value="" />
+                    <button type="submit" class="btn-lcp-primary btn-lcp-sm" style="background-color: #2B7A4B; border-color: #2B7A4B; font-weight: 700;">
+                        ✓ Aprobar Chofer
+                    </button>
+                </form>
+                <form id="formRechazarChoferModal" asp-action="RechazarChofer" method="post" style="margin: 0;">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" id="mfpInputIdRechazar" value="" />
+                    <button type="submit" class="btn-lcp-outline btn-lcp-sm" style="color: #9D2424; border-color: #9D2424;">
+                        ✕ Rechazar
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <style>
+        .lcp-modal-backdrop {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(22, 46, 59, 0.65);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            backdrop-filter: blur(2px);
+        }
+        .lcp-modal {
+            background: #FFFFFF;
+            border-radius: 10px;
+            width: 90%;
+            box-shadow: 0 12px 36px rgba(0,0,0,0.28);
+            overflow: hidden;
+            animation: lcpModalFadeIn 0.2s ease-out;
+        }
+        @@keyframes lcpModalFadeIn {
+            from { opacity: 0; transform: translateY(-10px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .lcp-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .lcp-modal-close {
+            background: none; border: none; cursor: pointer; line-height: 1;
+        }
+    </style>
+
+    <script>
+        function abrirFichaEmpresaModal(id, razon, cuit, rubro, email, tel, dom, loc, prov, fecha) {
+            document.getElementById("mfeRazonSocial").textContent = razon;
+            document.getElementById("mfeCuit").textContent = cuit;
+            document.getElementById("mfeRubro").textContent = rubro;
+            document.getElementById("mfeEmail").textContent = email;
+            document.getElementById("mfeEmailLink").href = `mailto:${email}`;
+            document.getElementById("mfeTelefono").textContent = tel || "-";
+            document.getElementById("mfeDomicilio").textContent = `${dom}, ${loc} (${prov})`;
+            document.getElementById("mfeFecha").textContent = fecha;
+            
+            document.getElementById("mfeInputIdAprobar").value = id;
+            document.getElementById("mfeInputIdRechazar").value = id;
+
+            document.getElementById("modalFichaEmpresa").style.display = "flex";
+        }
+
+        function cerrarFichaEmpresaModal() {
+            document.getElementById("modalFichaEmpresa").style.display = "none";
+        }
+
+        async function abrirFichaPostulanteModal(id, nombre, cuil, nac, patente, email, tel, dom, loc, prov, carga, vol, fecha, licUrl, segUrl) {
+            document.getElementById("mfpNombre").textContent = nombre;
+            document.getElementById("mfpCuil").textContent = cuil;
+            document.getElementById("mfpNac").textContent = nac || "-";
+            document.getElementById("mfpPatente").textContent = patente;
+            document.getElementById("mfpEmail").textContent = email;
+            document.getElementById("mfpTel").textContent = tel;
+            document.getElementById("mfpDomicilio").textContent = `${dom}, ${loc} (${prov})`;
+            document.getElementById("mfpCarga").textContent = carga;
+            document.getElementById("mfpVolumen").textContent = vol;
+            document.getElementById("mfpFecha").textContent = fecha;
+
+            document.getElementById("mfpInputIdAprobar").value = id;
+            document.getElementById("mfpInputIdRechazar").value = id;
+
+            // Cargar y mostrar los documentos y fotos adjuntas
+            await cargarDocumentosChofer(id, licUrl, segUrl);
+
+            document.getElementById("modalFichaPostulante").style.display = "flex";
+        }
+
+        async function cargarDocumentosChofer(conductorId, licUrl, segUrl) {
+            const container = document.getElementById("mfpDocsContainer");
+            const badge = document.getElementById("mfpDocsBadge");
+            container.innerHTML = '<div style="grid-column: 1 / -1; color: var(--lcp-text-muted); font-size: 12px; text-align: center; padding: 14px;">Cargando archivos del postulante...</div>';
+            badge.textContent = "Buscando...";
+            badge.className = "badge-estado badge-pendiente";
+
+            let docs = [];
+            try {
+                const res = await fetch(`/Admin/DocumentosChofer?id=${conductorId}`);
+                if (res.ok) {
+                    docs = await res.json();
+                }
+            } catch (e) {
+                console.error(e);
+            }
+
+            // Si existen URLs directas en la ficha y no están en docs, agregarlas
+            if (licUrl && !docs.some(d => d.rutaUrl === licUrl)) {
+                docs.push({ tipoDocumento: 'Licencia de Conducir / LINTI', rutaUrl: licUrl, nombreArchivo: 'LicenciaConducir' });
+            }
+            if (segUrl && !docs.some(d => d.rutaUrl === segUrl)) {
+                docs.push({ tipoDocumento: 'Póliza Seguro / ART', rutaUrl: segUrl, nombreArchivo: 'SeguroCamion' });
+            }
+
+            if (!docs || docs.length === 0) {
+                container.innerHTML = '<div style="grid-column: 1 / -1; color: #888; font-size: 12.5px; text-align: center; padding: 20px; background: #FAF9F5; border-radius: 6px; border: 1px dashed #D5CFBD;">⚠️ El postulante no adjuntó imágenes ni comprobantes digitalizados en su solicitud.</div>';
+                badge.textContent = "0 archivos";
+                badge.className = "badge-estado badge-cancelado";
+                return;
+            }
+
+            badge.textContent = `${docs.length} archivo(s)`;
+            badge.className = "badge-estado badge-completado";
+
+            let html = '';
+            docs.forEach(doc => {
+                const url = doc.rutaUrl;
+                const isImg = /\.(jpg|jpeg|png|webp|gif|bmp)$/i.test(url);
+                const isPdf = /\.pdf$/i.test(url);
+                const titulo = doc.tipoDocumento || 'Documento Respaldatorio';
+
+                html += `
+                    <div style="background: #FDFCF9; border: 1px solid var(--lcp-card-border); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <div style="font-weight: 800; font-size: 12.5px; color: #192A33; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                                <span>${titulo}</span>
+                                <span style="font-size: 10px; font-weight: 700; background: #ECE7DE; padding: 2px 6px; border-radius: 3px; font-family: monospace;">${isPdf ? 'PDF' : isImg ? 'IMAGEN' : 'ARCHIVO'}</span>
+                            </div>
+                            ${isImg ? `
+                                <div style="text-align: center; margin-bottom: 10px; background: #07090C; border-radius: 4px; padding: 6px; overflow: hidden;">
+                                    <a href="${url}" target="_blank" title="Abrir imagen completa">
+                                        <img src="${url}" alt="${titulo}" style="max-height: 150px; max-width: 100%; object-fit: contain; border-radius: 4px; display: block; margin: 0 auto; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.03)'" onmouseout="this.style.transform='scale(1)'" />
+                                    </a>
+                                </div>
+                            ` : isPdf ? `
+                                <div style="text-align: center; padding: 22px 10px; background: #FFF5F5; border-radius: 4px; margin-bottom: 10px; border: 1px dashed #FEB2B2;">
+                                    <div style="font-size: 32px;">📄</div>
+                                    <div style="font-size: 12px; font-weight: 700; color: #9B2C2C; margin-top: 4px;">Documento PDF</div>
+                                </div>
+                            ` : `
+                                <div style="text-align: center; padding: 22px 10px; background: #F7FAFC; border-radius: 4px; margin-bottom: 10px;">
+                                    <div style="font-size: 32px;">📎</div>
+                                    <div style="font-size: 12px; font-weight: 700; color: #4A5568; margin-top: 4px;">Archivo adjunto</div>
+                                </div>
+                            `}
+                        </div>
+                        <a href="${url}" target="_blank" class="btn-lcp-outline btn-lcp-sm" style="text-align: center; font-size: 12px; font-weight: 700; text-decoration: none; padding: 8px 12px; display: block; background: #FFFFFF;">
+                            🔍 Ver archivo original ↗
+                        </a>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function cerrarFichaPostulanteModal() {
+            document.getElementById("modalFichaPostulante").style.display = "none";
+        }
+
+        document.addEventListener("keydown", function(e) {
+            if (e.key === "Escape") {
+                cerrarFichaEmpresaModal();
+                cerrarFichaPostulanteModal();
+            }
+        });
+        document.getElementById("modalFichaEmpresa")?.addEventListener("click", function(e) {
+            if (e.target === this) cerrarFichaEmpresaModal();
+        });
+        document.getElementById("modalFichaPostulante")?.addEventListener("click", function(e) {
+            if (e.target === this) cerrarFichaPostulanteModal();
+        });
+    </script>
+}

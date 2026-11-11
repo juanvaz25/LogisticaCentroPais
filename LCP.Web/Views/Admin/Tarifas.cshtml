@@ -1,0 +1,92 @@
+@model List<TarifaConfiguracionDto>
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = "Configuración Tarifaria - Administrador";
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Configuración de Tarifas</h1>
+        <p class="page-subtitle">Parámetros del cuadro tarifario: planes de dársena, fletes por peso, volumen, distancia y depósito</p>
+    </div>
+</div>
+
+<div class="lcp-card">
+    <h2 class="lcp-card-title">Matriz de Tarifas Activa</h2>
+
+    <div class="lcp-table-container">
+        <table class="lcp-table">
+            <thead>
+                <tr>
+                    <th style="width: 220px;">Código Concepto</th>
+                    <th>Descripción</th>
+                    <th style="width: 180px;">Valor Unitario ($)</th>
+                    <th style="width: 160px;">Última Modificación</th>
+                    <th style="width: 140px; text-align: right;">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var t in Model)
+                {
+                    <tr>
+                        <td style="font-weight: 700; color: #192A33;">@t.CodigoConcepto</td>
+                        <td>@t.Descripcion</td>
+                        <td style="font-size: 16px; font-weight: 800; color: #192A33;">
+                            $ @t.ValorUnitario.ToString("N2")
+                        </td>
+                        <td style="font-size: 12px; color: var(--lcp-text-muted);">
+                            @t.UltimaActualizacion.ToString("dd/MM/yyyy HH:mm") <br />
+                            Por @t.ActualizadoPorNombre
+                        </td>
+                        <td style="text-align: right;">
+                            <button type="button" class="btn-lcp-outline btn-lcp-sm" onclick="editarTarifa('@t.CodigoConcepto', '@t.Descripcion', @t.ValorUnitario.ToString(System.Globalization.CultureInfo.InvariantCulture))">
+                                Modificar
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- MODAL MODIFICAR TARIFA -->
+<div id="modalTarifa" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; align-items: center; justify-content: center;">
+    <div style="background: #FAF8F5; border: 1px solid #DDD7CD; border-radius: 8px; max-width: 440px; width: 90%; padding: 24px;">
+        <h3 id="modalTarifaTitulo" style="margin-top: 0; font-size: 18px; font-weight: 700;">Modificar Tarifa</h3>
+
+        <form asp-action="ActualizarTarifa" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" id="modalCodigoConcepto" name="CodigoConcepto" value="" />
+
+            <div class="form-group">
+                <label id="modalTarifaDesc" class="form-label" style="font-weight: 500;"></label>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Nuevo Valor Unitario ($):</label>
+                <input type="number" step="0.01" id="modalNuevoValor" name="NuevoValor" class="form-input" required />
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                <button type="button" class="btn-lcp-outline" onclick="cerrarModalTarifa()">Cancelar</button>
+                <button type="submit" class="btn-lcp-primary">Guardar Tarifa</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function editarTarifa(codigo, desc, valor) {
+            document.getElementById("modalCodigoConcepto").value = codigo;
+            document.getElementById("modalTarifaTitulo").textContent = `Modificar ${codigo}`;
+            document.getElementById("modalTarifaDesc").textContent = desc;
+            document.getElementById("modalNuevoValor").value = valor;
+            document.getElementById("modalTarifa").style.display = "flex";
+        }
+        function cerrarModalTarifa() {
+            document.getElementById("modalTarifa").style.display = "none";
+        }
+    </script>
+}

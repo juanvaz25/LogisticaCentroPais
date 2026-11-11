@@ -1,0 +1,1244 @@
+@model List<DarsenaDto>
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = "LCP · Nodo Logístico Centro del País | Santa Rosa, La Pampa";
+}
+
+    <!-- ========================================================================= -->
+    <!-- CINEMATIC FULLSCREEN INTRO: LCP LOGO MORPHING INTO LA PAMPA 2D MAP        -->
+    <!-- Opens first on page load, runs full sequence, then smoothly reveals landing-->
+    <!-- ========================================================================= -->
+    <div id="lcp-fullscreen-intro">
+        <script>
+            // Si ya se ejecutó la animación en una visita anterior, ocultar inmediatamente sin parpadeos
+            (function() {
+                try {
+                    if (localStorage.getItem('lcp_intro_shown')) {
+                        var introEl = document.getElementById('lcp-fullscreen-intro');
+                        if (introEl) {
+                            introEl.classList.add('intro-dismissed');
+                            introEl.style.display = 'none';
+                        }
+                    }
+                } catch(e) {}
+            })();
+        </script>
+        <!-- Top Telemetry & Skip Control -->
+        <div class="intro-top-bar">
+            <div class="intro-brand-box">
+                <span class="intro-brand-badge">LCP</span>
+                <span class="intro-brand-text">LOGÍSTICA CENTRO PAÍS · HUB PAMPA CENTRAL</span>
+            </div>
+            <div class="intro-top-meta">
+                <span class="intro-coords">36°37′00″S 64°17′00″W · SANTA ROSA, LA PAMPA</span>
+                <button type="button" class="btn-intro-skip" onclick="dismissIntro()" title="Omitir animación y entrar directamente">
+                    Saltar Intro [ESC] ✕
+                </button>
+            </div>
+        </div>
+
+        <!-- Center Stage: Scaled Cartographic SVG Canvas -->
+        <div class="intro-center-stage">
+            <div class="intro-svg-wrapper">
+                <svg id="pampa-intro-map" class="intro-animating" viewBox="0 0 940 600" style="width: 100%; height: auto; max-height: 65vh;" preserveAspectRatio="xMidYMid meet">
+                    <defs>
+                        <pattern id="grid-intro" width="40" height="40" patternUnits="userSpaceOnUse">
+                            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#18222C" stroke-width="0.8" />
+                        </pattern>
+                    </defs>
+
+                    <!-- Background Grid -->
+                    <rect width="940" height="600" fill="url(#grid-intro)" opacity="0.8" />
+
+                    <!-- Destinations -->
+                    <g class="map-dest-card" transform="translate(530, 16)">
+                        <rect x="0" y="0" width="220" height="28" rx="3" fill="#141C24" stroke="#2B3846" stroke-width="1.2" />
+                        <text x="12" y="19" fill="#CBD5E1" font-size="12" font-weight="700" font-family="JetBrains Mono, monospace">▲ CÓRDOBA / SAN LUIS (RN 35)</text>
+                    </g>
+
+                    <g class="map-dest-card" transform="translate(735, 195)">
+                        <rect x="0" y="0" width="185" height="42" rx="4" fill="#141C24" stroke="#38495A" stroke-width="1.4" />
+                        <text x="14" y="20" fill="#FFFFFF" font-size="14" font-weight="800" font-family="Plus Jakarta Sans, sans-serif" letter-spacing="0.5">BUENOS AIRES ➔</text>
+                        <text x="14" y="34" fill="#94A3B8" font-size="12" font-weight="700" font-family="JetBrains Mono, monospace">RN 5 · 615 KM</text>
+                    </g>
+
+                    <g class="map-dest-card" transform="translate(480, 560)">
+                        <rect x="0" y="0" width="310" height="28" rx="3" fill="#141C24" stroke="#2B3846" stroke-width="1.2" />
+                        <text x="12" y="19" fill="#CBD5E1" font-size="12" font-weight="700" font-family="JetBrains Mono, monospace">▼ BAHÍA BLANCA & PATAGONIA (RN 35 · 330 KM)</text>
+                    </g>
+
+                    <g class="map-dest-card" transform="translate(35, 460)">
+                        <rect x="0" y="0" width="235" height="28" rx="3" fill="#141C24" stroke="#2B3846" stroke-width="1.2" />
+                        <text x="12" y="19" fill="#CBD5E1" font-size="12" font-weight="700" font-family="JetBrains Mono, monospace">◀ NEUQUÉN / VACA MUERTA (RN 152)</text>
+                    </g>
+
+                    <g class="map-dest-card" transform="translate(45, 130)">
+                        <rect x="0" y="0" width="150" height="26" rx="3" fill="#141C24" stroke="#2B3846" stroke-width="1.2" />
+                        <text x="12" y="18" fill="#94A3B8" font-size="12" font-weight="700" font-family="JetBrains Mono, monospace">◀ MENDOZA / CUYO</text>
+                    </g>
+
+                    <!-- Exact La Pampa Silhouette -->
+                    <g id="la-pampa-contour-intro" transform="translate(140, 20)">
+                        <path class="la-pampa-path-anim" 
+                              d="M 85,385 
+                                 L 85,135 
+                                 L 92,135 
+                                 L 92,126 
+                                 L 82,126 
+                                 L 82,118 
+                                 L 380,118 
+                                 L 380,18 
+                                 L 540,18 
+                                 L 540,545 
+                                 C 530,540 518,528 505,515 
+                                 C 490,503 470,495 448,490 
+                                 C 425,485 395,480 365,478 
+                                 C 335,476 305,466 280,452 
+                                 C 255,438 230,424 205,412 
+                                 C 180,400 150,392 120,384 
+                                 C 105,381 92,382 85,385 Z" 
+                              fill="#131B22" 
+                              stroke="#FFFFFF" 
+                              stroke-width="2.6" 
+                              stroke-linejoin="round" />
+
+                        <!-- Internal Graticule -->
+                        <line class="map-node-element" x1="85" y1="230" x2="540" y2="230" stroke="#1F2C38" stroke-width="1.2" stroke-dasharray="4,4" />
+                        <line class="map-node-element" x1="85" y1="340" x2="540" y2="340" stroke="#1F2C38" stroke-width="1.2" stroke-dasharray="4,4" />
+                        <line class="map-node-element" x1="380" y1="118" x2="380" y2="478" stroke="#1F2C38" stroke-width="1.2" stroke-dasharray="4,4" />
+
+                        <!-- Highways -->
+                        <line class="map-route-line" x1="30" y1="75" x2="590" y2="75" stroke="#475569" stroke-width="2" />
+                        <g class="map-node-element" transform="translate(310, 64)">
+                            <rect x="0" y="0" width="70" height="22" rx="3" fill="#1E293B" stroke="#64748B" stroke-width="1" />
+                            <text x="12" y="15" fill="#E2E8F0" font-size="12" font-weight="700" font-family="JetBrains Mono, monospace">RN 188</text>
+                        </g>
+
+                        <line class="map-route-line" x1="460" y1="0" x2="460" y2="560" stroke="#94A3B8" stroke-width="2.5" stroke-dasharray="6 4" />
+                        <g class="map-node-element" transform="translate(385, 129)">
+                            <rect x="0" y="0" width="65" height="22" rx="3" fill="#1E293B" stroke="#64748B" stroke-width="1" />
+                            <text x="10" y="15" fill="#E2E8F0" font-size="12" font-weight="700" font-family="JetBrains Mono, monospace">RN 35</text>
+                        </g>
+
+                        <path class="map-route-line" d="M 460,240 L 400,320 L 285,360 L 120,380 L 20,410" fill="none" stroke="#94A3B8" stroke-width="2.5" stroke-dasharray="7 4" />
+                        <g class="map-node-element" transform="translate(290, 335)">
+                            <rect x="0" y="0" width="72" height="22" rx="3" fill="#1E293B" stroke="#64748B" stroke-width="1" />
+                            <text x="10" y="15" fill="#E2E8F0" font-size="12" font-weight="700" font-family="JetBrains Mono, monospace">RN 152</text>
+                        </g>
+
+                        <line class="map-route-line" x1="460" y1="240" x2="620" y2="240" stroke="#FFFFFF" stroke-width="3.5" />
+                        <g class="map-node-element" transform="translate(548, 250)">
+                            <rect x="0" y="0" width="72" height="22" rx="3" fill="#FFFFFF" />
+                            <text x="10" y="15" fill="#0E1114" font-size="12" font-weight="800" font-family="JetBrains Mono, monospace">RN 5 ➔</text>
+                        </g>
+
+                        <!-- Cities -->
+                        <circle class="map-node-element" cx="460" cy="75" r="4.5" fill="#94A3B8" />
+                        <text class="map-node-element" x="472" y="70" fill="#CBD5E1" font-size="13" font-weight="700" font-family="Plus Jakarta Sans, sans-serif">Realicó</text>
+
+                        <circle class="map-node-element" cx="490" cy="140" r="5" fill="#FFFFFF" />
+                        <text class="map-node-element" x="502" y="144" fill="#FFFFFF" font-size="13" font-weight="700" font-family="Plus Jakarta Sans, sans-serif">Gral. Pico</text>
+
+                        <circle class="map-node-element" cx="400" cy="320" r="4.5" fill="#94A3B8" />
+                        <text class="map-node-element" x="412" y="322" fill="#CBD5E1" font-size="13" font-weight="700" font-family="Plus Jakarta Sans, sans-serif">Gral. Acha</text>
+
+                        <circle class="map-node-element" cx="120" cy="380" r="4.5" fill="#94A3B8" />
+                        <text class="map-node-element" x="132" y="375" fill="#CBD5E1" font-size="13" font-weight="700" font-family="Plus Jakarta Sans, sans-serif">25 de Mayo</text>
+
+                        <circle class="map-node-element" cx="280" cy="165" r="4" fill="#64748B" />
+                        <text class="map-node-element" x="292" y="170" fill="#94A3B8" font-size="12" font-weight="600" font-family="Plus Jakarta Sans, sans-serif">Victorica</text>
+
+                        <!-- Santa Rosa Central Hub Target -->
+                        <g class="map-node-element" transform="translate(460, 240)">
+                            <circle cx="0" cy="0" r="24" fill="none" stroke="#FFFFFF" stroke-width="1.5" class="radar-ping-ring" />
+                            <circle cx="0" cy="0" r="12" fill="none" stroke="#FFFFFF" stroke-width="1.5" opacity="0.7" />
+                            <circle cx="0" cy="0" r="6" fill="#FFFFFF" />
+                            <circle cx="0" cy="0" r="2.5" fill="#0E1114" />
+                            <line x1="-18" y1="0" x2="-8" y2="0" stroke="#FFFFFF" stroke-width="1.8" />
+                            <line x1="8" y1="0" x2="18" y2="0" stroke="#FFFFFF" stroke-width="1.8" />
+                            <line x1="0" y1="-18" x2="0" y2="-8" stroke="#FFFFFF" stroke-width="1.8" />
+                            <line x1="0" y1="8" x2="0" y2="18" stroke="#FFFFFF" stroke-width="1.8" />
+
+                            <rect x="-195" y="-36" width="185" height="30" rx="3" fill="#0E1114" stroke="#FFFFFF" stroke-width="1.5" />
+                            <text x="-187" y="-16" fill="#FFFFFF" font-size="13" font-weight="800" font-family="Plus Jakarta Sans, sans-serif">SANTA ROSA [LCP NODO]</text>
+                            <text x="-195" y="16" fill="#94A3B8" font-size="12" font-weight="700" font-family="JetBrains Mono, monospace">36°37'S 64°17'W · PREDIO BASE</text>
+                        </g>
+                    </g>
+
+                    <!-- LCP Intro Badge (Morphs and dissolves into the map) -->
+                    <g id="lcp-intro-badge">
+                        <circle cx="470" cy="285" r="90" fill="none" stroke="#FFFFFF" stroke-width="1" opacity="0.25" />
+                        <circle cx="470" cy="285" r="140" fill="none" stroke="#FFFFFF" stroke-width="0.8" opacity="0.15" />
+                        
+                        <rect x="360" y="240" width="220" height="90" rx="6" fill="#FFFFFF" stroke="#0E1114" stroke-width="3" />
+                        <text x="470" y="302" fill="#0E1114" font-size="44" font-weight="900" font-family="Plus Jakarta Sans, sans-serif" text-anchor="middle" letter-spacing="4">LCP</text>
+                        
+                        <rect x="330" y="342" width="280" height="26" rx="3" fill="#141C24" stroke="#334155" stroke-width="1" />
+                        <text x="470" y="359" fill="#E2E8F0" font-size="11.5" font-weight="700" font-family="JetBrains Mono, monospace" text-anchor="middle" letter-spacing="2">LOGÍSTICA CENTRO PAÍS</text>
+                    </g>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Bottom Telemetry Status & Enter Action -->
+        <div class="intro-bottom-bar">
+            <div class="intro-phase-tracker">
+                <div class="phase-step active" id="phase-1">
+                    <span class="phase-dot"></span>
+                    <span>1. IDENTIDAD LCP</span>
+                </div>
+                <div class="phase-step" id="phase-2">
+                    <span class="phase-dot"></span>
+                    <span>2. CARTOGRAFÍA LA PAMPA</span>
+                </div>
+                <div class="phase-step" id="phase-3">
+                    <span class="phase-dot"></span>
+                    <span>3. CORREDORES HABILITADOS</span>
+                </div>
+            </div>
+
+            <button type="button" class="btn-intro-enter" onclick="dismissIntro()">
+                <span>Entrar a la Plataforma</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                    <polyline points="12 5 19 12 12 19"></polyline>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Dynamic Timeline Line -->
+        <div id="intro-progress-bar" class="intro-progress-line"></div>
+    </div>
+
+<div class="landing-wrap">
+
+    <!-- 1. TECHNICAL MONOCHROME NAV -->
+    <header class="lcp-landing-bar">
+        <div style="display: flex; align-items: center; gap: 18px;">
+            <a href="/" class="lcp-landing-logo">
+                <span class="lcp-brand-tag">LCP</span>
+                <span style="font-weight: 800; font-size: 16px; letter-spacing: -0.3px; color: #FFFFFF;">Logística Centro País</span>
+            </a>
+            <div class="lcp-landing-coords">
+                36°37′00″S 64°17′00″W · HUB PAMPA CENTRAL
+            </div>
+        </div>
+
+        <nav class="lcp-landing-links">
+            <a href="#nodo-estrategico">Nodo Central</a>
+            <a href="#matriz-rutas">Rutas & Envíos</a>
+            <a href="#darsenas-en-vivo">Dársenas</a>
+            <a href="#arquitectura-operativa">Servicios</a>
+            <button type="button" onclick="openFullscreenIntro()" class="btn-lcp-ghost-mono" style="font-size: 12px; padding: 6px 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;" title="Ver introducción animada en pantalla completa">
+                ↺ Ver Intro
+            </button>
+            <a asp-controller="Auth" asp-action="Login" class="btn-lcp-monochrome">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                    <polyline points="10 17 15 12 10 7"></polyline>
+                    <line x1="15" y1="12" x2="3" y2="12"></line>
+                </svg>
+                Ingresar al Sistema
+            </a>
+        </nav>
+    </header>
+
+    <!-- 2. HERO: CENTRALIZED EDITORIAL & EXACT 2D MAP OF LA PAMPA WITH LOGO INTRO TRANSFORMATION -->
+    <section class="hero-editorial" id="nodo-estrategico">
+        <!-- Headline & Value Proposition -->
+        <div class="hero-editorial-top">
+            <div class="hero-pill-tech">
+                <span class="dot"></span>
+                <span>Infraestructura Física & Telemática · Santa Rosa, La Pampa</span>
+            </div>
+
+            <h1 class="hero-editorial-title">
+                El centro neurálgico del transporte terrestre argentino.
+            </h1>
+
+            <p class="hero-editorial-desc">
+                La Pampa es el vértice natural de convergencia entre Buenos Aires, los puertos de aguas profundas, Cuyo y la cuenca de Vaca Muerta. Centralizamos el patio de maniobras, dársenas dedicadas por empresa y la trazabilidad de envíos en tiempo real.
+            </p>
+
+            <div class="hero-actions">
+                <a asp-action="RegistroEmpresa" class="btn-lcp-monochrome" style="font-size: 15px; padding: 12px 24px;">
+                    Registrar Empresa Cliente
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                        <polyline points="12 5 19 12 12 19"></polyline>
+                    </svg>
+                </a>
+                <a asp-action="PostulacionChofer" class="btn-lcp-ghost-mono" style="font-size: 15px; padding: 12px 24px;">
+                    Postulación de Transportistas
+                </a>
+            </div>
+
+            <!-- CORPORATE CLIENTS CAROUSEL (EMPRESAS SATISFECHAS) -->
+            <div class="hero-clients-carousel-wrap">
+                <div class="clients-carousel-header">
+                    <span class="clients-carousel-title">
+                        <span class="verified-dot"></span>
+                        Empresas e Industrias en Santa Rosa · Clientes Satisfechos
+                    </span>
+                    <div class="clients-carousel-controls">
+                        <button type="button" class="carousel-nav-btn" onclick="prevClientSlide()" aria-label="Cliente anterior">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="15 18 9 12 15 6"></polyline>
+                            </svg>
+                        </button>
+                        <button type="button" class="carousel-nav-btn" onclick="nextClientSlide()" aria-label="Cliente siguiente">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="clients-carousel-viewport" id="clientsCarouselViewport" onmouseenter="pauseClientCarousel()" onmouseleave="resumeClientCarousel()">
+                    <div class="clients-carousel-track" id="clientsCarouselTrack">
+                        <!-- Card 1: Hidrocarburos & Oil/Gas (Vaca Muerta) -->
+                        <div class="corporate-client-card">
+                            <div class="corporate-card-inner">
+                                <div class="client-card-top">
+                                    <div class="client-company-info">
+                                        <div class="client-company-badge">PS</div>
+                                        <div>
+                                            <div class="client-company-name">PetroSur Hidrocarburos S.A.</div>
+                                            <div class="client-company-sub">Insumos & Tuberías Petroleras</div>
+                                        </div>
+                                    </div>
+                                    <span class="client-sector-pill">Oil & Gas · Añelo / RN 152</span>
+                                </div>
+                                <div class="client-card-quote">
+                                    Santa Rosa es nuestro nodo de transferencia crítico hacia Vaca Muerta. El cross-docking y pesaje en muelle nos eliminó 14 horas de espera en el abastecimiento continuo a pozos de perforación.
+                                </div>
+                                <div class="client-card-footer">
+                                    <span class="client-dock-tag">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <rect x="1" y="3" width="15" height="13"></rect>
+                                            <polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon>
+                                            <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                                            <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                                        </svg>
+                                        Dársena 03 y 04 · Muelle Pesado
+                                    </span>
+                                    <span class="client-metric-pill">+2.400 Tn/mes · 0% pérdidas</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card 2: Metalúrgica Pesada & Maquinaria Agrícola -->
+                        <div class="corporate-client-card">
+                            <div class="corporate-card-inner">
+                                <div class="client-card-top">
+                                    <div class="client-company-info">
+                                        <div class="client-company-badge">MP</div>
+                                        <div>
+                                            <div class="client-company-name">Metalúrgica Pampeana & Estructuras</div>
+                                            <div class="client-company-sub">Tolvas, Vigas & Chasis Industriales</div>
+                                        </div>
+                                    </div>
+                                    <span class="client-sector-pill">Metalmecánica · RN 35 / RN 5</span>
+                                </div>
+                                <div class="client-card-quote">
+                                    Despachamos tolvas y perfiles pesados para agro e infraestructura. Tener muelles dedicados con turnos fijados digitalmente redujo un 32% los tiempos muertos de nuestra flota tercerizada.
+                                </div>
+                                <div class="client-card-footer">
+                                    <span class="client-dock-tag">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <rect x="1" y="3" width="15" height="13"></rect>
+                                            <polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon>
+                                            <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                                            <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                                        </svg>
+                                        Dársena 01 · Maniobra Sobredimensionada
+                                    </span>
+                                    <span class="client-metric-pill">99.2% Puntualidad en Muelle</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card 3: Agroindustria & Graneles de Exportación -->
+                        <div class="corporate-client-card">
+                            <div class="corporate-card-inner">
+                                <div class="client-card-top">
+                                    <div class="client-company-info">
+                                        <div class="client-company-badge">MC</div>
+                                        <div>
+                                            <div class="client-company-name">Molinos Cerealeros del Centro S.A.</div>
+                                            <div class="client-company-sub">Harinas & Graneles Exportación</div>
+                                        </div>
+                                    </div>
+                                    <span class="client-sector-pill">Agroindustria · Puerto Bahía Blanca</span>
+                                </div>
+                                <div class="client-card-quote">
+                                    Coordinar el despacho de harinas y graneles finos hacia el puerto marítimo requería precisión horaria. La sincronización telemática de LCP asegura que cada camión llegue a tiempo para el buque.
+                                </div>
+                                <div class="client-card-footer">
+                                    <span class="client-dock-tag">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <rect x="1" y="3" width="15" height="13"></rect>
+                                            <polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon>
+                                            <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                                            <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                                        </svg>
+                                        Dársena 05 · Enlace RN 35 Sur
+                                    </span>
+                                    <span class="client-metric-pill">45 Despachos Semanales</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card 4: Química & Fertilizantes -->
+                        <div class="corporate-client-card">
+                            <div class="corporate-card-inner">
+                                <div class="client-card-top">
+                                    <div class="client-company-info">
+                                        <div class="client-company-badge">QA</div>
+                                        <div>
+                                            <div class="client-company-name">Química Austral Insumos S.R.L.</div>
+                                            <div class="client-company-sub">Nutrición Vegetal & Fitosanitarios</div>
+                                        </div>
+                                    </div>
+                                    <span class="client-sector-pill">Química Industrial · SENASA</span>
+                                </div>
+                                <div class="client-card-quote">
+                                    El control volumétrico y estricto registro de remitos por chofer nos brinda la trazabilidad y seguridad operativa exigida para agroquímicos. Centro de distribución clave para todo el interior.
+                                </div>
+                                <div class="client-card-footer">
+                                    <span class="client-dock-tag">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <rect x="1" y="3" width="15" height="13"></rect>
+                                            <polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon>
+                                            <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                                            <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                                        </svg>
+                                        Dársena 02 · Almacén Auditado
+                                    </span>
+                                    <span class="client-metric-pill">Trazabilidad Lote 100% Digital</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card 5: Siderurgia & Logística Pesada -->
+                        <div class="corporate-client-card">
+                            <div class="corporate-card-inner">
+                                <div class="client-card-top">
+                                    <div class="client-company-info">
+                                        <div class="client-company-badge">SP</div>
+                                        <div>
+                                            <div class="client-company-name">Siderúrgica del Plata Corp.</div>
+                                            <div class="client-company-sub">Perfiles de Acero & Bobinas Laminadas</div>
+                                        </div>
+                                    </div>
+                                    <span class="client-sector-pill">Siderurgia · Corredor Cuyo/Patagonia</span>
+                                </div>
+                                <div class="client-card-quote">
+                                    El patio de maniobras en Santa Rosa es inmejorable para cargas sobredimensionadas. Los transportistas ingresan con código de turno, descargan sin demoras y salen a ruta con remito digital validado.
+                                </div>
+                                <div class="client-card-footer">
+                                    <span class="client-dock-tag">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <rect x="1" y="3" width="15" height="13"></rect>
+                                            <polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon>
+                                            <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                                            <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                                        </svg>
+                                        Dársena 06 · Patio de Maniobras
+                                    </span>
+                                    <span class="client-metric-pill">Turnaround &lt; 35 min</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pagination Dots -->
+                <div class="clients-carousel-dots" id="clientsCarouselDots"></div>
+            </div>
+        </div>
+
+        <!-- 2D CARTOGRAPHIC MASTER CANVAS: INTRO TRANSFORMATION FROM LCP LOGO INTO LA PAMPA MAP -->
+        <div class="hero-2d-canvas-box">
+            <div class="hero-canvas-header">
+                <span class="canvas-live-indicator">
+                    <span style="display: inline-block; width: 10px; height: 10px; background: #FFF; border-radius: 50%;"></span>
+                    CARTOGRAFÍA 2D OPERATIVA · PROVINCIA DE LA PAMPA & CORREDORES NACIONALES
+                </span>
+                <div style="display: flex; align-items: center; gap: 14px;">
+                    <button type="button" onclick="openFullscreenIntro()" class="btn-lcp-ghost-mono" style="font-size: 11.5px; padding: 4px 10px; cursor: pointer;" title="Reproducir introducción cinemática en pantalla completa">
+                        ↺ Ver Intro Cinemática
+                    </button>
+                    <span style="font-weight: 600;">ESC 1:2.000.000</span>
+                </div>
+            </div>
+
+            <!-- SVG CANVAS OF LA PAMPA MAP -->
+            <div style="width: 100%; height: auto; min-height: 480px; background: #0B0E12; border-radius: 4px; border: 1px solid #1E2732; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; padding: 20px 10px;">
+                <svg id="pampa-master-map" viewBox="0 0 940 600" style="width: 100%; height: auto; max-height: 560px;" preserveAspectRatio="xMidYMid meet">
+                    <defs>
+                        <!-- Architectural Blueprint Grid -->
+                        <pattern id="grid-master" width="40" height="40" patternUnits="userSpaceOnUse">
+                            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#18222C" stroke-width="0.8" />
+                        </pattern>
+                    </defs>
+
+                    <!-- Background Grid -->
+                    <rect width="940" height="600" fill="url(#grid-master)" opacity="0.8" />
+
+                    <!-- ========================================================================= -->
+                    <!-- EXTERNAL DESTINATIONS - CLEARLY POSITIONED AWAY FROM ALL HIGHWAYS        -->
+                    <!-- ========================================================================= -->
+                    <!-- Córdoba / San Luis (North) -->
+                    <g class="map-dest-card" transform="translate(530, 16)">
+                        <rect x="0" y="0" width="220" height="28" rx="3" fill="#141C24" stroke="#2B3846" stroke-width="1.2" />
+                        <text x="12" y="19" fill="#CBD5E1" font-size="12" font-weight="700" font-family="JetBrains Mono, monospace">▲ CÓRDOBA / SAN LUIS (RN 35)</text>
+                    </g>
+
+                    <!-- Buenos Aires (East) - Isolated cleanly above RN 5 with NO collision -->
+                    <g class="map-dest-card" transform="translate(735, 195)">
+                        <rect x="0" y="0" width="185" height="42" rx="4" fill="#141C24" stroke="#38495A" stroke-width="1.4" />
+                        <text x="14" y="20" fill="#FFFFFF" font-size="14" font-weight="800" font-family="Plus Jakarta Sans, sans-serif" letter-spacing="0.5">BUENOS AIRES ➔</text>
+                        <text x="14" y="34" fill="#94A3B8" font-size="12" font-weight="700" font-family="JetBrains Mono, monospace">RN 5 · 615 KM</text>
+                    </g>
+
+                    <!-- Bahía Blanca & Patagonia (South) - Below the Colorado River -->
+                    <g class="map-dest-card" transform="translate(480, 560)">
+                        <rect x="0" y="0" width="310" height="28" rx="3" fill="#141C24" stroke="#2B3846" stroke-width="1.2" />
+                        <text x="12" y="19" fill="#CBD5E1" font-size="12" font-weight="700" font-family="JetBrains Mono, monospace">▼ BAHÍA BLANCA & PATAGONIA (RN 35 · 330 KM)</text>
+                    </g>
+
+                    <!-- Neuquén / Vaca Muerta (Southwest) -->
+                    <g class="map-dest-card" transform="translate(35, 460)">
+                        <rect x="0" y="0" width="235" height="28" rx="3" fill="#141C24" stroke="#2B3846" stroke-width="1.2" />
+                        <text x="12" y="19" fill="#CBD5E1" font-size="12" font-weight="700" font-family="JetBrains Mono, monospace">◀ NEUQUÉN / VACA MUERTA (RN 152)</text>
+                    </g>
+
+                    <!-- Mendoza / Cuyo (West) -->
+                    <g class="map-dest-card" transform="translate(45, 130)">
+                        <rect x="0" y="0" width="150" height="26" rx="3" fill="#141C24" stroke="#2B3846" stroke-width="1.2" />
+                        <text x="12" y="18" fill="#94A3B8" font-size="12" font-weight="700" font-family="JetBrains Mono, monospace">◀ MENDOZA / CUYO</text>
+                    </g>
+
+                    <!-- ========================================================================= -->
+                    <!-- EXACT LA PAMPA SILHOUETTE (Matching user reference image 1-to-1)          -->
+                    <!-- Features: Upper-left notch, Northeast chimney step, Rio Colorado curves   -->
+                    <!-- ========================================================================= -->
+                    <g id="la-pampa-contour" transform="translate(140, 20)">
+                        <!-- Main Province Boundary Polygon (Draws dynamically in intro) -->
+                        <path id="la-pampa-path" 
+                              d="M 85,385 
+                                 L 85,135 
+                                 L 92,135 
+                                 L 92,126 
+                                 L 82,126 
+                                 L 82,118 
+                                 L 380,118 
+                                 L 380,18 
+                                 L 540,18 
+                                 L 540,545 
+                                 C 530,540 518,528 505,515 
+                                 C 490,503 470,495 448,490 
+                                 C 425,485 395,480 365,478 
+                                 C 335,476 305,466 280,452 
+                                 C 255,438 230,424 205,412 
+                                 C 180,400 150,392 120,384 
+                                 C 105,381 92,382 85,385 Z" 
+                              fill="#131B22" 
+                              stroke="#FFFFFF" 
+                              stroke-width="2.6" 
+                              stroke-linejoin="round" />
+
+                        <!-- Internal Department Graticule -->
+                        <line class="map-node-element" x1="85" y1="230" x2="540" y2="230" stroke="#1F2C38" stroke-width="1.2" stroke-dasharray="4,4" />
+                        <line class="map-node-element" x1="85" y1="340" x2="540" y2="340" stroke="#1F2C38" stroke-width="1.2" stroke-dasharray="4,4" />
+                        <line class="map-node-element" x1="380" y1="118" x2="380" y2="478" stroke="#1F2C38" stroke-width="1.2" stroke-dasharray="4,4" />
+
+                        <!-- National Highway Routes inside La Pampa -->
+                        <!-- RN 188 (Realicó / Northern Chimney) -->
+                        <line class="map-route-line" x1="30" y1="75" x2="590" y2="75" stroke="#475569" stroke-width="2" />
+                        <g class="map-node-element" transform="translate(310, 64)">
+                            <rect x="0" y="0" width="70" height="22" rx="3" fill="#1E293B" stroke="#64748B" stroke-width="1" />
+                            <text x="12" y="15" fill="#E2E8F0" font-size="12" font-weight="700" font-family="JetBrains Mono, monospace">RN 188</text>
+                        </g>
+
+                        <!-- RN 35 (North-South through Santa Rosa) -->
+                        <line id="route-rn35" class="map-route-line" x1="460" y1="0" x2="460" y2="560" stroke="#94A3B8" stroke-width="2.5" stroke-dasharray="6 4" />
+                        <g class="map-node-element" transform="translate(385, 129)">
+                            <rect x="0" y="0" width="65" height="22" rx="3" fill="#1E293B" stroke="#64748B" stroke-width="1" />
+                            <text x="10" y="15" fill="#E2E8F0" font-size="12" font-weight="700" font-family="JetBrains Mono, monospace">RN 35</text>
+                        </g>
+
+                        <!-- RN 152 (Southwest to General Acha and Neuquén) -->
+                        <path id="route-rn152" class="map-route-line" d="M 460,240 L 400,320 L 285,360 L 120,380 L 20,410" fill="none" stroke="#94A3B8" stroke-width="2.5" stroke-dasharray="7 4" />
+                        <g class="map-node-element" transform="translate(290, 335)">
+                            <rect x="0" y="0" width="72" height="22" rx="3" fill="#1E293B" stroke="#64748B" stroke-width="1" />
+                            <text x="10" y="15" fill="#E2E8F0" font-size="12" font-weight="700" font-family="JetBrains Mono, monospace">RN 152</text>
+                        </g>
+
+                        <!-- RN 5 (Direct East Highway to Buenos Aires) -->
+                        <line id="route-rn5" class="map-route-line" x1="460" y1="240" x2="620" y2="240" stroke="#FFFFFF" stroke-width="3.5" class="route-dash-flow" />
+                        <g class="map-node-element" transform="translate(548, 250)">
+                            <rect x="0" y="0" width="72" height="22" rx="3" fill="#FFFFFF" />
+                            <text x="10" y="15" fill="#0E1114" font-size="12" font-weight="800" font-family="JetBrains Mono, monospace">RN 5 ➔</text>
+                        </g>
+
+                        <!-- Key Urban Logistics Nodes -->
+                        <!-- Realicó (Inside the Chimney) -->
+                        <circle class="map-node-element" cx="460" cy="75" r="4.5" fill="#94A3B8" />
+                        <text class="map-node-element" x="472" y="70" fill="#CBD5E1" font-size="13" font-weight="700" font-family="Plus Jakarta Sans, sans-serif">Realicó</text>
+
+                        <!-- General Pico -->
+                        <circle class="map-node-element" cx="490" cy="140" r="5" fill="#FFFFFF" />
+                        <text class="map-node-element" x="502" y="144" fill="#FFFFFF" font-size="13" font-weight="700" font-family="Plus Jakarta Sans, sans-serif">Gral. Pico</text>
+
+                        <!-- General Acha -->
+                        <circle class="map-node-element" cx="400" cy="320" r="4.5" fill="#94A3B8" />
+                        <text class="map-node-element" x="412" y="322" fill="#CBD5E1" font-size="13" font-weight="700" font-family="Plus Jakarta Sans, sans-serif">Gral. Acha</text>
+
+                        <!-- 25 de Mayo (Río Colorado SW Bend) -->
+                        <circle class="map-node-element" cx="120" cy="380" r="4.5" fill="#94A3B8" />
+                        <text class="map-node-element" x="132" y="375" fill="#CBD5E1" font-size="13" font-weight="700" font-family="Plus Jakarta Sans, sans-serif">25 de Mayo</text>
+
+                        <!-- Victorica -->
+                        <circle class="map-node-element" cx="280" cy="165" r="4" fill="#64748B" />
+                        <text class="map-node-element" x="292" y="170" fill="#94A3B8" font-size="12" font-weight="600" font-family="Plus Jakarta Sans, sans-serif">Victorica</text>
+
+                        <!-- SANTA ROSA: THE CENTRAL LOGISTICS HUB (PROMINENT TARGET & RADAR) -->
+                        <g class="map-node-element" transform="translate(460, 240)">
+                            <circle cx="0" cy="0" r="24" fill="none" stroke="#FFFFFF" stroke-width="1.5" class="radar-ping-ring" />
+                            <circle cx="0" cy="0" r="12" fill="none" stroke="#FFFFFF" stroke-width="1.5" opacity="0.7" />
+                            <circle cx="0" cy="0" r="6" fill="#FFFFFF" />
+                            <circle cx="0" cy="0" r="2.5" fill="#0E1114" />
+                            <line x1="-18" y1="0" x2="-8" y2="0" stroke="#FFFFFF" stroke-width="1.8" />
+                            <line x1="8" y1="0" x2="18" y2="0" stroke="#FFFFFF" stroke-width="1.8" />
+                            <line x1="0" y1="-18" x2="0" y2="-8" stroke="#FFFFFF" stroke-width="1.8" />
+                            <line x1="0" y1="8" x2="0" y2="18" stroke="#FFFFFF" stroke-width="1.8" />
+
+                            <!-- Hub Badge - Cleanly positioned above with dark backing -->
+                            <rect x="-195" y="-36" width="185" height="30" rx="3" fill="#0E1114" stroke="#FFFFFF" stroke-width="1.5" />
+                            <text x="-187" y="-16" fill="#FFFFFF" font-size="13" font-weight="800" font-family="Plus Jakarta Sans, sans-serif">SANTA ROSA [LCP NODO]</text>
+                            <text x="-195" y="16" fill="#94A3B8" font-size="12" font-weight="700" font-family="JetBrains Mono, monospace">36°37'S 64°17'W · PREDIO BASE</text>
+                        </g>
+                    </g>
+
+                </svg>
+            </div>
+        </div>
+    </section>
+
+    <!-- 3. INTERACTIVE CORRIDOR MATRIX (PERFECTLY ALIGNED COLUMNS) -->
+    <section class="landing-section-dark" id="matriz-rutas">
+        <div class="section-container-max">
+            <span class="section-tag-mono">CONECTIVIDAD REGIONAL · ORIGEN Y DESTINO</span>
+            <h2 class="section-title-mono" style="color: #FFFFFF;">
+                La encrucijada del país: Rutas directas desde Santa Rosa.
+            </h2>
+            <p style="color: #94A3B8; max-width: 760px; font-size: 16px; margin: 0;">
+                Seleccioná los corredores estratégicos para visualizar las distancias operativas, tipología de carga predominante y tiempos estimados de despacho desde el predio.
+            </p>
+
+            <div class="route-matrix-grid">
+                <!-- Selector List (Stretches equally to match height) -->
+                <div class="route-selector-list" id="routeSelectorList">
+                    <div class="route-item-btn active" onclick="selectCorridor('caba', this)">
+                        <div>
+                            <div style="font-weight: 800; font-size: 16px;">Corredor Este · Buenos Aires (CABA / Puerto)</div>
+                            <div style="font-size: 13px; opacity: 0.8; margin-top: 3px;">Ruta Nacional 5 directa · Sin pasos de montaña</div>
+                        </div>
+                        <span class="route-tag-pill">RN 5 · 615 KM</span>
+                    </div>
+
+                    <div class="route-item-btn" onclick="selectCorridor('bahia', this)">
+                        <div>
+                            <div style="font-weight: 800; font-size: 16px;">Corredor Sur · Bahía Blanca & Patagonia</div>
+                            <div style="font-size: 13px; opacity: 0.8; margin-top: 3px;">Ruta Nacional 35 · Salida a terminal marítima de aguas profundas</div>
+                        </div>
+                        <span class="route-tag-pill">RN 35 · 330 KM</span>
+                    </div>
+
+                    <div class="route-item-btn" onclick="selectCorridor('neuquen', this)">
+                        <div>
+                            <div style="font-weight: 800; font-size: 16px;">Corredor Sudoeste · Neuquén / Vaca Muerta</div>
+                            <div style="font-size: 13px; opacity: 0.8; margin-top: 3px;">Ruta Nacional 152 & 151 · Logística petrolera, insumos & químicas</div>
+                        </div>
+                        <span class="route-tag-pill">RN 152 · 540 KM</span>
+                    </div>
+
+                    <div class="route-item-btn" onclick="selectCorridor('cordoba', this)">
+                        <div>
+                            <div style="font-weight: 800; font-size: 16px;">Corredor Norte · Córdoba & Región Centro</div>
+                            <div style="font-size: 13px; opacity: 0.8; margin-top: 3px;">Ruta Nacional 35 · Conexión agroindustrial y autopartes</div>
+                        </div>
+                        <span class="route-tag-pill">RN 35 · 605 KM</span>
+                    </div>
+                </div>
+
+                <!-- Live Corridor Data Sheet Display (Aligned Height) -->
+                <div class="route-detail-display" id="routeDataSheet">
+                    <div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #28333E; padding-bottom: 14px; margin-bottom: 16px;">
+                            <span style="font-family: 'JetBrains Mono', Consolas, monospace; font-size: 13px; color: #94A3B8; text-transform: uppercase;">
+                                FICHA TÉCNICA <span id="route-id-badge" style="color: #FFF; font-weight: 800;">#LCP-R01</span>
+                            </span>
+                            <span id="route-status-pill" style="font-family: 'JetBrains Mono', Consolas, monospace; font-size: 12px; background: #25303B; color: #FFF; padding: 4px 10px; border-radius: 3px; font-weight: 700;">
+                                TRÁNSITO HABILITADO
+                            </span>
+                        </div>
+
+                        <h3 id="route-headline" style="font-size: 22px; font-weight: 800; color: #FFFFFF; margin: 0 0 10px;">
+                            Santa Rosa (LP) ⇄ Buenos Aires (CABA / Puerto)
+                        </h3>
+                        <p id="route-narrative" style="font-size: 14.5px; color: #CBD5E1; line-height: 1.6; margin: 0 0 18px;">
+                            Eje troncal de conexión con centros de consumo masivo, retail y terminales portuarias metropolitanas por Ruta Nacional 5 pasando por Pellegrini, Trenque Lauquen, Pehuajó, Nueve de Julio y Luján.
+                        </p>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-family: 'JetBrains Mono', Consolas, monospace;">
+                            <div style="background: #171F27; border: 1px solid #2B3846; padding: 12px 14px; border-radius: 4px;">
+                                <span style="font-size: 11px; color: #94A3B8; display: block; font-weight: 600;">DISTANCIA TOTAL</span>
+                                <strong id="route-metric-dist" style="font-size: 18px; color: #FFFFFF;">615 KM</strong>
+                            </div>
+                            <div style="background: #171F27; border: 1px solid #2B3846; padding: 12px 14px; border-radius: 4px;">
+                                <span style="font-size: 11px; color: #94A3B8; display: block; font-weight: 600;">TIEMPO EN CAMIÓN</span>
+                                <strong id="route-metric-time" style="font-size: 18px; color: #FFFFFF;">7.5 HORAS</strong>
+                            </div>
+                            <div style="background: #171F27; border: 1px solid #2B3846; padding: 12px 14px; border-radius: 4px;">
+                                <span style="font-size: 11px; color: #94A3B8; display: block; font-weight: 600;">CARGA PREDOMINANTE</span>
+                                <strong id="route-metric-type" style="font-size: 13px; color: #FFFFFF;">Consumo Masivo, Alimentos</strong>
+                            </div>
+                            <div style="background: #171F27; border: 1px solid #2B3846; padding: 12px 14px; border-radius: 4px;">
+                                <span style="font-size: 11px; color: #94A3B8; display: block; font-weight: 600;">DOCUMENTACIÓN</span>
+                                <strong id="route-metric-docs" style="font-size: 13px; color: #FFFFFF;">Remito Electrónico + Hoja</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="border-top: 1px solid #28333E; padding-top: 16px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                        <span style="font-size: 13px; color: #94A3B8;">
+                            Despachos periódicos por este corredor:
+                        </span>
+                        <a asp-action="RegistroEmpresa" class="btn-lcp-monochrome" style="font-size: 13px; padding: 8px 16px;">
+                            Solicitar Dársena o Despacho
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 4. LIVE DÁRSENAS HUD - CONCISE & ESSENTIAL INFO -->
+    <section class="landing-section-light" id="darsenas-en-vivo">
+        <div class="section-container-max">
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px; margin-bottom: 20px;">
+                <div>
+                    <span class="section-tag-mono" style="color: #6C7A82;">PATIO & ALQUILERES</span>
+                    <h2 class="section-title-mono" style="color: #192A33; margin: 0;">
+                        Estado de las dársenas del predio.
+                    </h2>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono', Consolas, monospace; font-size: 12px; background: #EAE6DF; border: 1px solid #D1CAC0; padding: 6px 14px; border-radius: 4px;">
+                    <span class="signalr-pulse"></span>
+                    <span style="font-weight: 700; color: #1E293B;">SignalR en vivo</span>
+                </div>
+            </div>
+
+            <!-- Concise Dársenas Grid from Model -->
+            <div class="darsenas-telemetry-grid">
+                @if (Model != null && Model.Any())
+                {
+                    @foreach (var d in Model)
+                    {
+                        var estaAlquilada = d.ClienteAlquilerActualId != null || !string.IsNullOrWhiteSpace(d.ClienteRazonSocial);
+                        var isOcupada = d.EstadoActual == EstadoDarsena.Ocupada;
+                        var isTurno = d.EstadoActual == EstadoDarsena.TurnoAsignado;
+
+                        <div class="darsena-telemetry-card @(estaAlquilada ? "card-alquilada" : "card-libre-alquiler")">
+                            <div>
+                                <!-- Header: Darsena Name + Badges -->
+                                <div class="darsena-card-head">
+                                    <span class="darsena-card-title">@d.Codigo</span>
+
+                                    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                                        @if (estaAlquilada)
+                                        {
+                                            <span class="badge-contrato-alquilada">Alquilada</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge-contrato-disponible">Alquilable</span>
+                                        }
+
+                                        @if (isOcupada)
+                                        {
+                                            <span class="badge-muelle-ocupado">Camión en Muelle</span>
+                                        }
+                                        else if (isTurno)
+                                        {
+                                            <span class="badge-muelle-turno">Turno Asignado</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge-muelle-libre">Muelle Libre</span>
+                                        }
+                                    </div>
+                                </div>
+
+                                <!-- Essential Info -->
+                                <div style="font-size: 13.5px; color: #475569; margin-bottom: 12px;">
+                                    @if (estaAlquilada)
+                                    {
+                                        <div>Inquilino: <strong style="color: #0F172A;">@d.ClienteRazonSocial</strong></div>
+                                    }
+                                    else
+                                    {
+                                        <div style="color: #15803D; font-weight: 700;">Habilitada para nuevo contrato de alquiler</div>
+                                    }
+                                </div>
+                            </div>
+
+                            <!-- Concise Capacity & Storage metrics -->
+                            <div style="background: #F4F1EA; border: 1px solid #E2DDD5; border-radius: 4px; padding: 10px 14px; font-family: 'JetBrains Mono', Consolas, monospace; font-size: 12.5px;">
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: #64748B;">Capacidad:</span>
+                                    <strong style="color: #192A33;">@d.CapacidadMaximaM3 m³ · @d.CapacidadMaximaPallets pallets</strong>
+                                </div>
+                                @if (estaAlquilada)
+                                {
+                                    <div style="display: flex; justify-content: space-between; font-size: 11.5px; color: #64748B; border-top: 1px dashed #DDD7CD; padding-top: 4px; margin-top: 4px;">
+                                        <span>Ocupado: @d.VolumenOcupadoM3 m³</span>
+                                        <span>Libre: <strong style="color: #192A33;">@d.VolumenDisponibleM3 m³</strong></span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    @for (int i = 1; i <= 6; i++)
+                    {
+                        var isAlquiladaMock = i == 1 || i == 3;
+                        <div class="darsena-telemetry-card @(isAlquiladaMock ? "card-alquilada" : "card-libre-alquiler")">
+                            <div class="darsena-card-head">
+                                <span class="darsena-card-title">Dársena @i</span>
+                                <div style="display: flex; gap: 6px;">
+                                    <span class="@(isAlquiladaMock ? "badge-contrato-alquilada" : "badge-contrato-disponible")">
+                                        @(isAlquiladaMock ? "Alquilada" : "Alquilable")
+                                    </span>
+                                    <span class="@(i == 1 ? "badge-muelle-ocupado" : "badge-muelle-libre")">
+                                        @(i == 1 ? "Camión en Muelle" : "Muelle Libre")
+                                    </span>
+                                </div>
+                            </div>
+                            <div style="font-size: 13.5px; color: #475569; margin-bottom: 12px;">
+                                @(isAlquiladaMock ? "Inquilino: Empresa Demostración S.A." : "Habilitada para nuevo contrato")
+                            </div>
+                            <div style="background: #F4F1EA; border: 1px solid #E2DDD5; border-radius: 4px; padding: 10px 14px; font-family: 'JetBrains Mono', Consolas, monospace; font-size: 12.5px;">
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: #64748B;">Capacidad:</span>
+                                    <strong>3.000 m³ · 100 pallets</strong>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </section>
+
+    <!-- 5. ARCHITECTURAL PILLARS (BLUEPRINT STYLE) -->
+    <section class="landing-section-dark" id="arquitectura-operativa">
+        <div class="section-container-max">
+            <span class="section-tag-mono">ARQUITECTURA DE SERVICIOS LCP</span>
+            <h2 class="section-title-mono" style="color: #FFFFFF;">
+                Digitalización integral de la cadena de suministro.
+            </h2>
+            <p style="color: #94A3B8; max-width: 720px; font-size: 16px; margin: 0;">
+                Diseñado para eliminar cuellos de botella en muelles, pérdidas de remitos y tiempos muertos entre transportistas y centros de acopio.
+            </p>
+
+            <div class="pillars-grid-mono">
+                <div class="pillar-card-mono">
+                    <span class="pillar-num">01 / PATIO & DÁRSENAS</span>
+                    <h3 class="pillar-title">Gestión de Muelles</h3>
+                    <p class="pillar-text">
+                        Reserva exclusiva de dársenas para empresas cliente, turnos preasignados de arribo/despacho y liberación instantánea con pesaje digital verificado.
+                    </p>
+                </div>
+
+                <div class="pillar-card-mono">
+                    <span class="pillar-num">02 / VIAJES & ENVÍOS</span>
+                    <h3 class="pillar-title">Flota & Conectividad</h3>
+                    <p class="pillar-text">
+                        Asignación de choferes calificados con validación previa de seguro y licencia nacional de transporte interjurisdiccional.
+                    </p>
+                </div>
+
+                <div class="pillar-card-mono">
+                    <span class="pillar-num">03 / INVENTARIO PAMPEANO</span>
+                    <h3 class="pillar-title">Cross-Docking & Stock</h3>
+                    <p class="pillar-text">
+                        Control de inventario por dársena asignada, con límites físicos de volumen (m³) y peso (kg) que resguardan la seguridad operativa.
+                    </p>
+                </div>
+
+                <div class="pillar-card-mono">
+                    <span class="pillar-num">04 / AUDITORÍA & LIQUIDACIÓN</span>
+                    <h3 class="pillar-title">Liquidación Automática</h3>
+                    <p class="pillar-text">
+                        Cálculo tarifario transparente por kilómetro recorrido, toneladas transportadas y días de depósito, con carga y auditoría de facturas electrónicas.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 6. HIGH-CONTRAST CALL TO ACTION (CLIENTE / CHOFER) -->
+    <section class="landing-section-light">
+        <div class="section-container-max">
+            <div style="text-align: center; max-width: 780px; margin: 0 auto 40px;">
+                <span class="section-tag-mono" style="color: #6C7A82;">ACCESO FORMAL AL NODO</span>
+                <h2 class="section-title-mono" style="color: #161D22; margin-bottom: 12px;">
+                    Integrate al ecosistema de Logística Centro País.
+                </h2>
+                <p style="font-size: 16px; color: #55626D; line-height: 1.6; margin: 0;">
+                    Cada cuenta se audita y valida rigurosamente antes de otorgar credenciales operativas. Elegí tu modalidad de vinculación:
+                </p>
+            </div>
+
+            <div class="cta-split-container">
+                <!-- Empresas B2B -->
+                <div class="cta-box-mono cta-box-dark">
+                    <div>
+                        <div style="font-family: 'JetBrains Mono', Consolas, monospace; font-size: 13px; color: #94A3B8; margin-bottom: 10px; font-weight: 700;">MODALIDAD B2B</div>
+                        <h3 style="font-size: 26px; font-weight: 800; color: #FFFFFF; margin: 0 0 14px;">Para Empresas e Industrias</h3>
+                        <p style="font-size: 15px; color: #CBD5E1; line-height: 1.65; margin: 0 0 28px;">
+                            Alquilá dársenas dedicadas en Santa Rosa, gestioná tus órdenes de arribo o despacho, administrá tu stock de mercadería y controlá tus liquidaciones en un solo tablero.
+                        </p>
+                    </div>
+                    <a asp-action="RegistroEmpresa" class="btn-lcp-monochrome" style="align-self: flex-start; font-size: 14px; padding: 10px 20px;">
+                        Registrar Empresa Cliente
+                    </a>
+                </div>
+
+                <!-- Transportistas / Choferes -->
+                <div class="cta-box-mono cta-box-light">
+                    <div>
+                        <div style="font-family: 'JetBrains Mono', Consolas, monospace; font-size: 13px; color: #64748B; margin-bottom: 10px; font-weight: 700;">TRANSPORTISTAS INDEPENDIENTES</div>
+                        <h3 style="font-size: 26px; font-weight: 800; color: #161D22; margin: 0 0 14px;">Para Choferes de Carga Pesada</h3>
+                        <p style="font-size: 15px; color: #475569; line-height: 1.65; margin: 0 0 28px;">
+                            Recibí hojas de ruta digitales en tu teléfono móvil, coordiná arribos sin filas de espera y conectate con las cargas de las principales PyMEs de la región.
+                        </p>
+                    </div>
+                    <a asp-action="PostulacionChofer" class="btn-lcp-monochrome" style="background-color: #161D22; color: #FFFFFF !important; border-color: #161D22; align-self: flex-start; font-size: 14px; padding: 10px 20px;">
+                        Postularme como Chofer
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 7. TECHNICAL MINIMALIST FOOTER -->
+    <footer style="background-color: #080A0C; color: #738493; padding: 40px; border-top: 1px solid #1A2128; font-size: 13px;">
+        <div class="section-container-max" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
+            <div>
+                <strong style="color: #FFFFFF; font-size: 14px;">LCP · LOGÍSTICA CENTRO PAÍS</strong>
+                <div style="font-family: 'JetBrains Mono', Consolas, monospace; font-size: 12px; color: #64748B; margin-top: 4px;">
+                    Parque Industrial · Santa Rosa, La Pampa · Lat: -36.6200, Lon: -64.2900
+                </div>
+            </div>
+            <div style="display: flex; gap: 24px; align-items: center;">
+                <a href="#nodo-estrategico" style="color: #94A3B8; text-decoration: none;">Inicio</a>
+                <a href="#matriz-rutas" style="color: #94A3B8; text-decoration: none;">Matriz de Rutas</a>
+                <a href="#darsenas-en-vivo" style="color: #94A3B8; text-decoration: none;">Dársenas</a>
+                <a asp-controller="Auth" asp-action="Login" style="color: #FFFFFF; text-decoration: none; font-weight: 700;">Acceso Interno</a>
+            </div>
+        </div>
+    </footer>
+
+</div>
+
+<!-- SCRIPT FOR INTRO TRANSFORMATION & INTERACTIVE CORRIDOR MATRIX -->
+<script>
+    // Fullscreen Intro Controller
+    let introTimer = null;
+    let phaseTimers = [];
+
+    function dismissIntro() {
+        try {
+            localStorage.setItem('lcp_intro_shown', 'true');
+        } catch (e) {}
+
+        const introElem = document.getElementById('lcp-fullscreen-intro');
+        if (introElem) {
+            introElem.classList.add('intro-dismissed');
+            setTimeout(() => {
+                if (introElem.classList.contains('intro-dismissed')) {
+                    introElem.style.display = 'none';
+                }
+            }, 800);
+        }
+        document.body.classList.remove('intro-locked');
+        if (introTimer) clearTimeout(introTimer);
+        phaseTimers.forEach(t => clearTimeout(t));
+        phaseTimers = [];
+    }
+
+    function openFullscreenIntro() {
+        const introElem = document.getElementById('lcp-fullscreen-intro');
+        const progressBar = document.getElementById('intro-progress-bar');
+        const mapSvg = document.getElementById('pampa-intro-map');
+        if (!introElem) return;
+
+        // Mostrar elemento si estaba oculto
+        introElem.style.display = 'flex';
+        void introElem.offsetWidth; // Forzar reflow
+
+        // Clear ongoing timers
+        if (introTimer) clearTimeout(introTimer);
+        phaseTimers.forEach(t => clearTimeout(t));
+        phaseTimers = [];
+
+        // Lock body scrolling and show fullscreen overlay
+        document.body.classList.add('intro-locked');
+        introElem.classList.remove('intro-dismissed');
+
+        // Reset phases indicator
+        const p1 = document.getElementById('phase-1');
+        const p2 = document.getElementById('phase-2');
+        const p3 = document.getElementById('phase-3');
+        if (p1) p1.classList.add('active');
+        if (p2) p2.classList.remove('active');
+        if (p3) p3.classList.remove('active');
+
+        // Reset progress bar animation
+        if (progressBar) {
+            progressBar.style.transition = 'none';
+            progressBar.style.width = '0%';
+            void progressBar.offsetWidth; // Force reflow
+            progressBar.style.transition = 'width 3.6s linear';
+            progressBar.style.width = '100%';
+        }
+
+        // Restart SVG animations
+        if (mapSvg) {
+            mapSvg.classList.remove('intro-animating');
+            void mapSvg.offsetWidth;
+            mapSvg.classList.add('intro-animating');
+        }
+
+        // Phase progression schedule
+        phaseTimers.push(setTimeout(() => {
+            if (p2) p2.classList.add('active');
+        }, 1200));
+
+        phaseTimers.push(setTimeout(() => {
+            if (p3) p3.classList.add('active');
+        }, 2200));
+
+        // Auto transition into the landing page after 3.8s
+        introTimer = setTimeout(() => {
+            dismissIntro();
+        }, 3800);
+    }
+
+    // Keyboard shortcut: ESC to dismiss immediately
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            dismissIntro();
+        }
+    });
+
+    // ==========================================
+    // CORPORATE CLIENTS CAROUSEL CONTROLLER
+    // ==========================================
+    let currentClientSlide = 0;
+    let clientAutoplayTimer = null;
+
+    function getVisibleCardsCount() {
+        return window.innerWidth <= 900 ? 1 : 2;
+    }
+
+    function getMaxClientSlides() {
+        const totalCards = document.querySelectorAll('.corporate-client-card').length;
+        const visible = getVisibleCardsCount();
+        return Math.max(0, totalCards - visible);
+    }
+
+    function updateClientCarousel() {
+        const track = document.getElementById('clientsCarouselTrack');
+        const dotsContainer = document.getElementById('clientsCarouselDots');
+        if (!track) return;
+
+        const visible = getVisibleCardsCount();
+        const totalCards = document.querySelectorAll('.corporate-client-card').length;
+        const maxSlides = Math.max(0, totalCards - visible);
+
+        if (currentClientSlide > maxSlides) {
+            currentClientSlide = 0;
+        }
+
+        const stepPercentage = 100 / visible;
+        track.style.transform = `translateX(-${currentClientSlide * stepPercentage}%)`;
+
+        // Update dots
+        if (dotsContainer) {
+            const totalDots = maxSlides + 1;
+            let dotsHtml = '';
+            for (let i = 0; i < totalDots; i++) {
+                dotsHtml += `<button type="button" class="carousel-dot ${i === currentClientSlide ? 'active' : ''}" onclick="goToClientSlide(${i})" aria-label="Ir a diapositiva ${i + 1}"></button>`;
+            }
+            dotsContainer.innerHTML = dotsHtml;
+        }
+    }
+
+    function nextClientSlide() {
+        const maxSlides = getMaxClientSlides();
+        if (currentClientSlide >= maxSlides) {
+            currentClientSlide = 0;
+        } else {
+            currentClientSlide++;
+        }
+        updateClientCarousel();
+    }
+
+    function prevClientSlide() {
+        const maxSlides = getMaxClientSlides();
+        if (currentClientSlide <= 0) {
+            currentClientSlide = maxSlides;
+        } else {
+            currentClientSlide--;
+        }
+        updateClientCarousel();
+    }
+
+    function goToClientSlide(index) {
+        currentClientSlide = index;
+        updateClientCarousel();
+    }
+
+    function pauseClientCarousel() {
+        if (clientAutoplayTimer) {
+            clearInterval(clientAutoplayTimer);
+            clientAutoplayTimer = null;
+        }
+    }
+
+    function resumeClientCarousel() {
+        pauseClientCarousel();
+        clientAutoplayTimer = setInterval(() => {
+            nextClientSlide();
+        }, 5500);
+    }
+
+    function initClientCarousel() {
+        updateClientCarousel();
+        resumeClientCarousel();
+    }
+
+    window.addEventListener('resize', () => {
+        updateClientCarousel();
+    });
+
+    // Auto-launch fullscreen intro sólo la primera vez; iniciar carrusel corporativo
+    document.addEventListener('DOMContentLoaded', () => {
+        let hasSeenIntro = false;
+        try {
+            hasSeenIntro = !!localStorage.getItem('lcp_intro_shown');
+        } catch (e) {}
+
+        if (!hasSeenIntro) {
+            try {
+                localStorage.setItem('lcp_intro_shown', 'true');
+            } catch (e) {}
+            openFullscreenIntro();
+        } else {
+            dismissIntro();
+        }
+
+        initClientCarousel();
+    });
+
+    // Corridors Data Matrix
+    const corridorsData = {
+        'caba': {
+            id: '#LCP-R01',
+            status: 'TRÁNSITO HABILITADO',
+            headline: 'Santa Rosa (LP) ⇄ Buenos Aires (CABA / Puerto)',
+            narrative: 'Eje troncal de conexión con centros de consumo masivo, retail y terminales portuarias metropolitanas por Ruta Nacional 5 pasando por Pellegrini, Trenque Lauquen, Pehuajó, Nueve de Julio y Luján.',
+            dist: '615 KM',
+            time: '7.5 HORAS',
+            type: 'Consumo Masivo, Alimentos',
+            docs: 'Remito Electrónico + Hoja',
+            routeElemId: 'route-rn5'
+        },
+        'bahia': {
+            id: '#LCP-R02',
+            status: 'CONEXIÓN MARÍTIMA ACTIVA',
+            headline: 'Santa Rosa (LP) ⇄ Puerto Bahía Blanca & Ing. White',
+            narrative: 'Salida directa a terminal de aguas profundas del Atlántico Sur. Crucial para graneles agrícolas, fertilizantes y transferencia multimodal hacia la Patagonia.',
+            dist: '330 KM',
+            time: '4.2 HORAS',
+            type: 'Granos, Fertilizantes, Exportación',
+            docs: 'Carta Porte Automotor + Remito',
+            routeElemId: 'route-rn35'
+        },
+        'neuquen': {
+            id: '#LCP-R03',
+            status: 'CORREDOR ENERGÉTICO EN EXPANSIÓN',
+            headline: 'Santa Rosa (LP) ⇄ Neuquén Capital & Vaca Muerta',
+            narrative: 'Abastecimiento continuo de la industria hidrocarburífera no convencional por Ruta Nacional 152 pasando por General Acha, Puelches y empalme RN 151.',
+            dist: '540 KM',
+            time: '6.8 HORAS',
+            type: 'Arenas, Tubos, Químicos, Insumos Oil & Gas',
+            docs: 'Guía de Tránsito + Certificados',
+            routeElemId: 'route-rn152'
+        },
+        'cordoba': {
+            id: '#LCP-R04',
+            status: 'CONEXIÓN AGROINDUSTRIAL',
+            headline: 'Santa Rosa (LP) ⇄ Córdoba Capital & Eje Centro',
+            narrative: 'Conecta con el polo metalmecánico y autopartista del centro del país a través de RN 35 hacia el norte, cruzando Eduardo Castex, Realicó y Río Cuarto.',
+            dist: '605 KM',
+            time: '7.2 HORAS',
+            type: 'Maquinaria Agrícola, Repuestos',
+            docs: 'Remito Electrónico + Inspección',
+            routeElemId: 'route-rn35'
+        }
+    };
+
+    function selectCorridor(key, buttonElem) {
+        // Update active class on buttons
+        const allButtons = document.querySelectorAll('#routeSelectorList .route-item-btn');
+        allButtons.forEach(btn => btn.classList.remove('active'));
+        if (buttonElem) buttonElem.classList.add('active');
+
+        const data = corridorsData[key];
+        if (!data) return;
+
+        // Update technical datasheet display
+        document.getElementById('route-id-badge').textContent = data.id;
+        document.getElementById('route-status-pill').textContent = data.status;
+        document.getElementById('route-headline').textContent = data.headline;
+        document.getElementById('route-narrative').textContent = data.narrative;
+        document.getElementById('route-metric-dist').textContent = data.dist;
+        document.getElementById('route-metric-time').textContent = data.time;
+        document.getElementById('route-metric-type').textContent = data.type;
+        document.getElementById('route-metric-docs').textContent = data.docs;
+
+        // Highlight corresponding 2D SVG vector route
+        const allRoutes = ['route-rn5', 'route-rn35', 'route-rn152'];
+        allRoutes.forEach(rId => {
+            const el = document.getElementById(rId);
+            if (el) {
+                if (rId === data.routeElemId) {
+                    el.setAttribute('stroke', '#FFFFFF');
+                    el.setAttribute('stroke-width', '4');
+                } else {
+                    el.setAttribute('stroke', '#94A3B8');
+                    el.setAttribute('stroke-width', '2.5');
+                }
+            }
+        });
+    }
+</script>

@@ -1,0 +1,1343 @@
+@model SolicitudOperacionDto
+@{
+    ViewData["Title"] = $"Hoja de Ruta #{Model.CodigoSolicitud} - Logística Centro País";
+
+    var estadoViaje = Model.EstadoViaje ?? EstadoViaje.Asignado;
+    bool esDoble = Model.EsDobleViaje;
+    bool esDespacho = Model.TipoOperacion == TipoOperacionSolicitud.DespachoRetiro;
+    bool esConductor = User.IsInRole(Roles.Conductor);
+    string ciudadCliente = !string.IsNullOrEmpty(Model.CiudadDestino) && !Model.CiudadDestino.Contains("Santa Rosa")
+        ? Model.CiudadDestino
+        : (!string.IsNullOrEmpty(Model.CiudadOrigen) && !Model.CiudadOrigen.Contains("Santa Rosa") ? Model.CiudadOrigen : "Buenos Aires (CABA)");
+
+    decimal kmTramo = Model.DistanciaEstimadaKm > 0 ? Model.DistanciaEstimadaKm : 615;
+    decimal kmTotales = esDoble ? kmTramo * 2 : kmTramo;
+
+    var hitoActual = Model.ViajeInfo?.ObservacionesChofer ?? "";
+    int pasoDobleActual = 1;
+    if (Model.Estado == EstadoSolicitud.Completada || estadoViaje == EstadoViaje.DescargadoCompletado)
+    {
+        pasoDobleActual = 6;
+    }
+    else if (hitoActual.Contains("Paso 5") || estadoViaje == EstadoViaje.EnPredioDarsena)
+    {
+        // En Guardado / Ingreso: Chofer ya reportó llegada a LCP (Paso 5). El paso activo en curso es el Paso 6 (descarga del operador)
+        pasoDobleActual = 6;
+    }
+    else if (hitoActual.Contains("Paso 4"))
+    {
+        // Chofer en retorno: el siguiente hito activo a presionar es el Paso 5
+        pasoDobleActual = 5;
+    }
+    else if (hitoActual.Contains("Paso 3"))
+    {
+        // Chofer cargó en cliente: el siguiente hito activo es el Paso 4 (retorno)
+        pasoDobleActual = 4;
+    }
+    else if (hitoActual.Contains("Paso 2"))
+    {
+        // Chofer llegó a cliente: el siguiente hito activo es el Paso 3 (carga)
+        pasoDobleActual = 3;
+    }
+    else if (hitoActual.Contains("Paso 1") || estadoViaje == EstadoViaje.EnRuta)
+    {
+        // Chofer salió a ruta: el siguiente hito activo es el Paso 2 (llegada cliente)
+        pasoDobleActual = 2;
+    }
+    else
+    {
+        pasoDobleActual = 1;
+    }
+
+    int pasoPropioActual = 1;
+    if (esDespacho)
+    {
+        if (Model.Estado == EstadoSolicitud.Completada || estadoViaje == EstadoViaje.DescargadoCompletado || hitoActual.Contains("Paso 4"))
+        {
+            pasoPropioActual = 5;
+        }
+        else if (hitoActual.Contains("Paso 3") || (estadoViaje == EstadoViaje.EnRuta && (hitoActual.Contains("tránsito") || hitoActual.Contains("transito"))))
+        {
+            pasoPropioActual = 4;
+        }
+        else if (hitoActual.Contains("Paso 2") || (estadoViaje == EstadoViaje.EnRuta && hitoActual.Contains("despachado")))
+        {
+            pasoPropioActual = 3;
+        }
+        else if (estadoViaje >= EstadoViaje.EnPredioDarsena || hitoActual.Contains("Paso 1"))
+        {
+            pasoPropioActual = 2;
+        }
+        else
+        {
+            pasoPropioActual = 1;
+        }
+    }
+    else
+    {
+        if (Model.Estado == EstadoSolicitud.Completada || estadoViaje == EstadoViaje.DescargadoCompletado || hitoActual.Contains("Paso 4"))
+        {
+            pasoPropioActual = 5;
+        }
+        else if (estadoViaje >= EstadoViaje.EnPredioDarsena || hitoActual.Contains("Paso 3") || hitoActual.Contains("Arrib") || hitoActual.Contains("Calle San Martín"))
+        {
+            pasoPropioActual = 4;
+        }
+        else if (hitoActual.Contains("Paso 2") || (estadoViaje == EstadoViaje.EnRuta && (hitoActual.Contains("tránsito") || hitoActual.Contains("transito"))))
+        {
+            pasoPropioActual = 3;
+        }
+        else if (estadoViaje >= EstadoViaje.EnRuta || hitoActual.Contains("Paso 1"))
+        {
+            pasoPropioActual = 2;
+        }
+        else
+        {
+            pasoPropioActual = 1;
+        }
+    }
+}
+
+<!-- LEAFLET CSS & JS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+    <div>
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+            @if (esConductor)
+            {
+                <a asp-action="Index" style="color: var(--lcp-primary); text-decoration: none; font-size: 13px; font-weight: 700;">
+                    ⬅ Volver a Mis Viajes
+                </a>
+            }
+            else
+            {
+                <a asp-controller="Solicitudes" asp-action="Detalle" asp-route-id="@Model.Id" style="color: var(--lcp-primary); text-decoration: none; font-size: 13px; font-weight: 700;">
+                    ⬅ Volver al Detalle de Solicitud
+                </a>
+            }
+            <span style="color: var(--lcp-text-muted);">/</span>
+            <span style="font-size: 13px; color: var(--lcp-text-muted);">Hoja de Ruta Oficial</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <h1 class="page-title" style="margin: 0;">Hoja de Ruta @Model.CodigoSolicitud</h1>
+            <span class="badge-estado @(Model.Estado == EstadoSolicitud.EnCurso ? "badge-encurso" : (Model.Estado == EstadoSolicitud.Completada ? "badge-completada" : "badge-programada"))" style="font-size: 13px; padding: 4px 12px;">
+                @Model.EstadoNombre
+            </span>
+            <span id="badgeEstadoViajeVivo" style="background-color: #162E3B; color: #FFF; font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 6px;">
+                Viaje: @estadoViaje.ToString()
+            </span>
+        </div>
+        <p class="page-subtitle" style="margin-top: 6px;">
+            Cliente: <strong>@Model.ClienteRazonSocial</strong> · Operación: <strong>@Model.TipoOperacionNombre</strong> · Dársena: <strong>@Model.DarsenaCodigo</strong>
+        </p>
+    </div>
+
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        @if (esConductor)
+        {
+            <button type="button" class="btn-lcp-outline btn-lcp-sm" style="border-color: #C0392B; color: #C0392B;" onclick="abrirModalIncidente()">
+                🚨 Reportar Demora / Incidente
+            </button>
+        }
+        <a asp-controller="Inbox" asp-action="Index" class="btn-lcp-outline btn-lcp-sm">
+            💬 Chat con Operador y Cliente
+        </a>
+        <a asp-controller="Solicitudes" asp-action="Detalle" asp-route-id="@Model.Id" class="btn-lcp-outline btn-lcp-sm">
+            📄 Ficha Completa
+        </a>
+    </div>
+</div>
+
+<!-- BANNER DE MODALIDAD (DOBLE VIAJE FLOTA LCP vs VIAJE SIMPLE CHOFER PROPIO) -->
+@if (esDoble)
+{
+    <div class="lcp-card" style="background: linear-gradient(135deg, #1A3644 0%, #28536B 100%); color: #FFFFFF; border: none; padding: 20px 24px; margin-bottom: 24px; box-shadow: 0 4px 18px rgba(22, 46, 59, 0.15);">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+            <div>
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                    <span style="font-size: 22px;">🔁</span>
+                    <span style="font-size: 17px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: #FFD54F;">
+                        DOBLE VIAJE - FLOTA LCP (Ida y Vuelta)
+                    </span>
+                    <span style="background-color: rgba(255,255,255,0.2); padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 700;">
+                        Unidad Oficial Asignada
+                    </span>
+                </div>
+                <p style="font-size: 13px; color: #E0EBF0; margin: 0; line-height: 1.6; max-width: 820px;">
+                    Como conductor designado de <strong>Flota LCP</strong>, esta misión contempla el circuito de <strong>doble viaje</strong>: Salida desde la base central en Santa Rosa cargado con los productos del cliente almacenados en <strong>@Model.DarsenaCodigo</strong> rumbo a <strong>@ciudadCliente</strong> para despachar y entregar la mercadería, y posterior retorno por carretera hacia la Base LCP completando la misión.
+                </p>
+            </div>
+            <div style="background-color: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 12px 18px; text-align: right;">
+                <div style="font-size: 11px; text-transform: uppercase; color: #ADC2CE; font-weight: 700;">Distancia Total Circuito</div>
+                <div style="font-size: 24px; font-weight: 800; color: #FFFFFF;">
+                    @kmTotales.ToString("N0") km
+                </div>
+                <div style="font-size: 11px; color: #A5D6A7; font-weight: 600;">
+                    (@kmTramo.ToString("N0") km ida + @kmTramo.ToString("N0") km vuelta)
+                </div>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="lcp-card" style="background: linear-gradient(135deg, #1E462E 0%, #2B7A4B 100%); color: #FFFFFF; border: none; padding: 20px 24px; margin-bottom: 24px; box-shadow: 0 4px 18px rgba(30, 70, 46, 0.15);">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+            <div>
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                    <span style="font-size: 22px;">➡️</span>
+                    <span style="font-size: 17px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: #A5D6A7;">
+                        VIAJE SIMPLE DIRECTO - CHOFER PROPIO
+                    </span>
+                    <span style="background-color: rgba(255,255,255,0.2); padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 700;">
+                        Transporte del Cliente
+                    </span>
+                </div>
+                <p style="font-size: 13px; color: #E0EBF0; margin: 0; line-height: 1.6; max-width: 820px;">
+                    Operación con <strong>camión propio del cliente</strong>. El viaje comprende un único tramo carretero directo desde <strong>@ciudadCliente</strong> hacia el nodo logístico de Santa Rosa para ingresar por <strong>Calle San Martín 245</strong> hacia la <strong>@Model.DarsenaCodigo</strong>.
+                </p>
+            </div>
+            <div style="background-color: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 12px 18px; text-align: right;">
+                <div style="font-size: 11px; text-transform: uppercase; color: #ADC2CE; font-weight: 700;">Distancia Directa</div>
+                <div style="font-size: 24px; font-weight: 800; color: #FFFFFF;">
+                    @kmTramo.ToString("N0") km
+                </div>
+                <div style="font-size: 11px; color: #A5D6A7; font-weight: 600;">
+                    Tramo único carretero
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- MAIN GRID: CHECKLIST & ITINERARIO A LA IZQUIERDA, MAPA LEAFLET A LA DERECHA -->
+<div style="display: grid; grid-template-columns: 1fr 1.35fr; gap: 24px; align-items: start;">
+
+    <!-- COLUMNA IZQUIERDA: CHECKLIST DE TAREAS Y ACCIONES RÁPIDAS -->
+    <div style="display: flex; flex-direction: column; gap: 20px;">
+
+        <!-- STEPPER INTERACTIVO DE HITOS -->
+        <div class="lcp-card" style="margin: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                <h2 class="lcp-card-title" style="margin: 0;">📋 Cronograma de Tareas en Ruta</h2>
+                <span style="font-size: 11px; color: var(--lcp-text-muted); font-weight: 700;">ACTUALIZACIÓN EN VIVO</span>
+            </div>
+
+            @if (esConductor)
+            {
+                <p style="font-size: 12px; color: var(--lcp-text-muted); margin: 0 0 16px;">
+                    Tocá cada botón a medida que cumplas cada etapa del viaje para mantener informados al Operador de Patio y al Cliente.
+                </p>
+            }
+            else
+            {
+                <div style="background-color: #E8F4F8; border-left: 4px solid var(--lcp-primary); padding: 12px 14px; border-radius: 4px; margin-bottom: 16px; font-size: 12.5px; color: #162E3B; line-height: 1.5;">
+                    <strong>👁️ Modo Monitoreo / Solo Lectura (Operador de Patio):</strong>
+                    Visualización del itinerario y avance de la unidad en tiempo real. Los pasos e hitos carreteros son reportados exclusivamente por el conductor asignado a la unidad desde su dispositivo.
+                </div>
+            }
+
+            <div class="milestones-container" style="display: flex; flex-direction: column; gap: 14px;">
+                @if (esDoble && !esDespacho)
+                {
+                    <!-- FLOTA LCP: GUARDADO / INGRESO DE STOCK (CIRCUITO COMPLETO DOBLE VIAJE) -->
+                    <!-- PASO 1: SALIDA DESDE BASE LCP HACIA EL CLIENTE -->
+                    <div class="milestone-box @(pasoDobleActual > 1 ? "milestone-done" : (pasoDobleActual == 1 ? "milestone-current" : "milestone-pending"))" id="stepFlota1">
+                        <div class="milestone-icon">@(pasoDobleActual > 1 ? "✓" : "1")</div>
+                        <div class="milestone-content">
+                            <div class="milestone-title">1. Salida hacia @ciudadCliente</div>
+                            <div class="milestone-desc">Partida con camión desde Base Central LCP (Santa Rosa) rumbo a las instalaciones del cliente en @ciudadCliente para retirar los productos.</div>
+                            <div style="margin-top: 8px;">
+                                @if (pasoDobleActual > 1)
+                                {
+                                    <span style="font-size: 11.5px; font-weight: 700; color: #2B7A4B;">✓ Salida a la ruta hacia origen efectuada</span>
+                                }
+                                else if (pasoDobleActual == 1)
+                                {
+                                    if (esConductor)
+                                    {
+                                        <button type="button" class="btn-lcp-primary btn-lcp-sm" onclick="marcarHito(2, 'Paso 1: Salida a la ruta desde Base LCP hacia @ciudadCliente a retirar carga')">
+                                            🚗 1. Salir hacia @ciudadCliente
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <span style="font-size: 11.5px; font-weight: 700; color: #8C5311; background-color: #FEF3C7; padding: 4px 8px; border-radius: 4px;">
+                                            🔒 En espera de salida del chofer
+                                        </span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span style="font-size: 11.5px; color: var(--lcp-text-muted);">⏳ Pendiente</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PASO 2: LLEGAR A ORIGEN / CLIENTE -->
+                    <div class="milestone-box @(pasoDobleActual > 2 ? "milestone-done" : (pasoDobleActual == 2 ? "milestone-current" : "milestone-pending"))" id="stepFlota2">
+                        <div class="milestone-icon">@(pasoDobleActual > 2 ? "✓" : "2")</div>
+                        <div class="milestone-content">
+                            <div class="milestone-title">2. Llegar a instalaciones del cliente</div>
+                            <div class="milestone-desc">Arribo al establecimiento del cliente en @ciudadCliente para iniciar la carga (@Model.PesoTotalKg.ToString("N0") kg).</div>
+                            <div style="margin-top: 8px;">
+                                @if (pasoDobleActual > 2)
+                                {
+                                    <span style="font-size: 11.5px; font-weight: 700; color: #2B7A4B;">✓ Llegada a cliente confirmada</span>
+                                }
+                                else if (pasoDobleActual == 2)
+                                {
+                                    if (esConductor)
+                                    {
+                                        <button type="button" class="btn-lcp-primary btn-lcp-sm" style="background-color: #C2821E; border-color: #C2821E;" onclick="marcarHito(2, 'Paso 2: Llegada a instalaciones del cliente en @ciudadCliente')">
+                                            📍 2. Llegar a @ciudadCliente
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <span style="font-size: 11.5px; font-weight: 700; color: #8C5311; background-color: #FEF3C7; padding: 4px 8px; border-radius: 4px;">
+                                            🔒 En tránsito hacia el cliente
+                                        </span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span style="font-size: 11.5px; color: var(--lcp-text-muted);">⏳ Pendiente</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PASO 3: CARGA DE MERCADERÍA EN CLIENTE -->
+                    <div class="milestone-box @(pasoDobleActual > 3 ? "milestone-done" : (pasoDobleActual == 3 ? "milestone-current" : "milestone-pending"))" id="stepFlota3">
+                        <div class="milestone-icon">@(pasoDobleActual > 3 ? "✓" : "3")</div>
+                        <div class="milestone-content">
+                            <div class="milestone-title">3. Mercadería cargada en el camión</div>
+                            <div class="milestone-desc">Carga física completada en las instalaciones del cliente. Remito de carga conformado.</div>
+                            <div style="margin-top: 8px;">
+                                @if (pasoDobleActual > 3)
+                                {
+                                    <span style="font-size: 11.5px; font-weight: 700; color: #2B7A4B;">✓ Mercadería cargada en origen</span>
+                                }
+                                else if (pasoDobleActual == 3)
+                                {
+                                    if (esConductor)
+                                    {
+                                        <button type="button" class="btn-lcp-primary btn-lcp-sm" style="background-color: #2ECC71; border-color: #2ECC71; color: #162E3B; font-weight: 800;" onclick="marcarHito(2, 'Paso 3: Carga de mercadería completada en @ciudadCliente')">
+                                            📦 3. Carga completada en cliente
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <span style="font-size: 11.5px; font-weight: 700; color: #8C5311; background-color: #FEF3C7; padding: 4px 8px; border-radius: 4px;">
+                                            🔒 En proceso de carga en origen
+                                        </span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span style="font-size: 11.5px; color: var(--lcp-text-muted);">⏳ Pendiente</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PASO 4: EN VIAJE DE RETORNO A BASE LCP -->
+                    <div class="milestone-box @(pasoDobleActual > 4 ? "milestone-done" : (pasoDobleActual == 4 ? "milestone-current" : "milestone-pending"))" id="stepFlota4">
+                        <div class="milestone-icon">@(pasoDobleActual > 4 ? "✓" : "4")</div>
+                        <div class="milestone-content">
+                            <div class="milestone-title">4. En viaje de retorno a Base LCP</div>
+                            <div class="milestone-desc">Tránsito carretero de regreso hacia el Nodo Central Logística Centro País en Santa Rosa con la carga a bordo.</div>
+                            <div style="margin-top: 8px;">
+                                @if (pasoDobleActual > 4)
+                                {
+                                    <span style="font-size: 11.5px; font-weight: 700; color: #2B7A4B;">✓ En viaje de retorno hacia Base LCP</span>
+                                }
+                                else if (pasoDobleActual == 4)
+                                {
+                                    if (esConductor)
+                                    {
+                                        <button type="button" class="btn-lcp-primary btn-lcp-sm" style="background-color: #162E3B; border-color: #162E3B; color: #FFF;" onclick="marcarHito(2, 'Paso 4: En viaje de retorno hacia Base Central LCP con la carga')">
+                                            🔄 4. Iniciar retorno a LCP
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <span style="font-size: 11.5px; font-weight: 700; color: #8C5311; background-color: #FEF3C7; padding: 4px 8px; border-radius: 4px;">
+                                            🔒 Esperando inicio de retorno
+                                        </span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span style="font-size: 11.5px; color: var(--lcp-text-muted);">⏳ Pendiente</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PASO 5: ARRIBO A BASE LCP Y ATRAQUE EN DÁRSENA -->
+                    <div class="milestone-box @(pasoDobleActual > 5 ? "milestone-done" : (pasoDobleActual == 5 ? "milestone-current" : "milestone-pending"))" id="stepFlota5">
+                        <div class="milestone-icon">@(pasoDobleActual > 5 ? "✓" : "5")</div>
+                        <div class="milestone-content">
+                            <div class="milestone-title">5. Arribo a Base LCP y atraque en dársena</div>
+                            <div class="milestone-desc">Ingreso al predio por Calle San Martín 245 y atraque en <strong>@Model.DarsenaCodigo</strong>. Al posicionar el camión, el Operador de Patio iniciará la descarga física y el guardado de stock.</div>
+                            <div style="margin-top: 8px;">
+                                @if (pasoDobleActual > 5)
+                                {
+                                    <span style="font-size: 11.5px; font-weight: 700; color: #2B7A4B;">✓ Camión arribado a LCP y posicionado en dársena</span>
+                                }
+                                else if (pasoDobleActual == 5)
+                                {
+                                    if (esConductor)
+                                    {
+                                        <button type="button" class="btn-lcp-primary btn-lcp-sm" style="background-color: #2ECC71; border-color: #2ECC71; color: #162E3B; font-weight: 800;" onclick="marcarHito(4, 'Paso 5: Llegada a Base LCP por Calle San Martín 245 - Posicionado en dársena @Model.DarsenaCodigo para descarga')">
+                                            🏁 5. Llegar a LCP - Posicionado en Dárcena
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <span style="font-size: 11.5px; font-weight: 700; color: #8C5311; background-color: #FEF3C7; padding: 4px 8px; border-radius: 4px;">
+                                            🔒 En ruta de regreso a LCP
+                                        </span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span style="font-size: 11.5px; color: var(--lcp-text-muted);">⏳ Pendiente</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PASO 6: DESCARGA FÍSICA Y GUARDADO EN DÁRSENA (OPERADOR DE PATIO) -->
+                    <div class="milestone-box @(Model.Estado == EstadoSolicitud.Completada ? "milestone-done" : (pasoDobleActual == 6 ? "milestone-current" : "milestone-pending"))" id="stepFlota6">
+                        <div class="milestone-icon">@(Model.Estado == EstadoSolicitud.Completada ? "✓" : "6")</div>
+                        <div class="milestone-content">
+                            <div class="milestone-title">6. Descarga y Guardado en Dársena</div>
+                            <div class="milestone-desc">Descarga física del camión, verificación de mercadería e ingreso al inventario (Lotes de stock) y emisión de liquidación por el Operador de Patio de LCP.</div>
+                            <div style="margin-top: 8px;">
+                                @if (Model.Estado == EstadoSolicitud.Completada)
+                                {
+                                    <span style="font-size: 11.5px; font-weight: 800; color: #2B7A4B;">✅ Descarga completada y nuevo stock registrado en dársena</span>
+                                }
+                                else if (pasoDobleActual == 6)
+                                {
+                                    <span style="font-size: 11.5px; font-weight: 700; color: #162E3B; background: #E8F4F8; padding: 4px 10px; border-radius: 4px; display: inline-block;">
+                                        📦 Camión en dársena. Descarga física y almacenamiento a cargo del Operador de Patio de LCP.
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span style="font-size: 11.5px; color: var(--lcp-text-muted);">⏳ Pendiente del arribo del camión</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+                else if (esDoble && esDespacho)
+                {
+                    <!-- FLOTA LCP: DESPACHO / RETIRO DE STOCK (5 PASOS) -->
+                    <!-- PASO 1: SALIR A LA RUTA CON CARGA DESPACHADA -->
+                    <div class="milestone-box @(pasoDobleActual > 1 ? "milestone-done" : (pasoDobleActual == 1 ? "milestone-current" : "milestone-pending"))" id="stepFlota1">
+                        <div class="milestone-icon">@(pasoDobleActual > 1 ? "✓" : "1")</div>
+                        <div class="milestone-content">
+                            <div class="milestone-title">1. Salir a la ruta</div>
+                            <div class="milestone-desc">Partida con camión cargado desde Base Central LCP (Santa Rosa) rumbo a @ciudadCliente.</div>
+                            <div style="margin-top: 8px;">
+                                @if (pasoDobleActual > 1)
+                                {
+                                    <span style="font-size: 11.5px; font-weight: 700; color: #2B7A4B;">✓ Salida a la ruta efectuada</span>
+                                }
+                                else if (pasoDobleActual == 1)
+                                {
+                                    if (esConductor)
+                                    {
+                                        <button type="button" class="btn-lcp-primary btn-lcp-sm" onclick="marcarHito(2, 'Paso 1: Salida a la ruta desde Base LCP hacia @ciudadCliente con carga')">
+                                            🚗 1. Salir a la ruta
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <span style="font-size: 11.5px; font-weight: 700; color: #8C5311; background-color: #FEF3C7; padding: 4px 8px; border-radius: 4px;">
+                                            🔒 En espera de salida del chofer
+                                        </span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span style="font-size: 11.5px; color: var(--lcp-text-muted);">⏳ Pendiente</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PASO 2: LLEGAR A DESTINO -->
+                    <div class="milestone-box @(pasoDobleActual > 2 ? "milestone-done" : (pasoDobleActual == 2 ? "milestone-current" : "milestone-pending"))" id="stepFlota2">
+                        <div class="milestone-icon">@(pasoDobleActual > 2 ? "✓" : "2")</div>
+                        <div class="milestone-content">
+                            <div class="milestone-title">2. Llegar a destino</div>
+                            <div class="milestone-desc">Arribo al establecimiento / punto de entrega en @ciudadCliente. Verificación de carga (@Model.PesoTotalKg.ToString("N0") kg).</div>
+                            <div style="margin-top: 8px;">
+                                @if (pasoDobleActual > 2)
+                                {
+                                    <span style="font-size: 11.5px; font-weight: 700; color: #2B7A4B;">✓ Llegada a destino confirmada</span>
+                                }
+                                else if (pasoDobleActual == 2)
+                                {
+                                    if (esConductor)
+                                    {
+                                        <button type="button" class="btn-lcp-primary btn-lcp-sm" style="background-color: #C2821E; border-color: #C2821E;" onclick="marcarHito(2, 'Paso 2: Llegada a destino en @ciudadCliente')">
+                                            📍 2. Llegar a destino
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <span style="font-size: 11.5px; font-weight: 700; color: #8C5311; background-color: #FEF3C7; padding: 4px 8px; border-radius: 4px;">
+                                            🔒 En tránsito hacia destino
+                                        </span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span style="font-size: 11.5px; color: var(--lcp-text-muted);">⏳ Pendiente</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PASO 3: SE DESPACHÓ LA MERCADERÍA -->
+                    <div class="milestone-box @(pasoDobleActual > 3 ? "milestone-done" : (pasoDobleActual == 3 ? "milestone-current" : "milestone-pending"))" id="stepFlota3">
+                        <div class="milestone-icon">@(pasoDobleActual > 3 ? "✓" : "3")</div>
+                        <div class="milestone-content">
+                            <div class="milestone-title">3. Se despachó la mercadería</div>
+                            <div class="milestone-desc">Descarga y entrega física de los productos finalizada en destino. Remito de entrega conformado.</div>
+                            <div style="margin-top: 8px;">
+                                @if (pasoDobleActual > 3)
+                                {
+                                    <span style="font-size: 11.5px; font-weight: 700; color: #2B7A4B;">✓ Mercadería despachada y entregada en destino</span>
+                                }
+                                else if (pasoDobleActual == 3)
+                                {
+                                    if (esConductor)
+                                    {
+                                        <button type="button" class="btn-lcp-primary btn-lcp-sm" style="background-color: #2ECC71; border-color: #2ECC71; color: #162E3B; font-weight: 800;" onclick="marcarHito(2, 'Paso 3: Se despachó la mercadería en destino')">
+                                            📦 3. Se despachó la mercadería
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <span style="font-size: 11.5px; font-weight: 700; color: #8C5311; background-color: #FEF3C7; padding: 4px 8px; border-radius: 4px;">
+                                            🔒 En descarga de productos en destino
+                                        </span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span style="font-size: 11.5px; color: var(--lcp-text-muted);">⏳ Pendiente</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PASO 4: VOLVER A LA RUTA (RETORNO A LCP) -->
+                    <div class="milestone-box @(pasoDobleActual > 4 ? "milestone-done" : (pasoDobleActual == 4 ? "milestone-current" : "milestone-pending"))" id="stepFlota4">
+                        <div class="milestone-icon">@(pasoDobleActual > 4 ? "✓" : "4")</div>
+                        <div class="milestone-content">
+                            <div class="milestone-title">4. Volver a la ruta</div>
+                            <div class="milestone-desc">Inicio del tramo de retorno por carretera hacia la Base Central LCP en Santa Rosa (camión vacío).</div>
+                            <div style="margin-top: 8px;">
+                                @if (pasoDobleActual > 4)
+                                {
+                                    <span style="font-size: 11.5px; font-weight: 700; color: #2B7A4B;">✓ En viaje de retorno hacia Base LCP</span>
+                                }
+                                else if (pasoDobleActual == 4)
+                                {
+                                    if (esConductor)
+                                    {
+                                        <button type="button" class="btn-lcp-primary btn-lcp-sm" style="background-color: #162E3B; border-color: #162E3B; color: #FFF;" onclick="marcarHito(2, 'Paso 4: Volver a la ruta hacia Base Central LCP')">
+                                            🔄 4. Volver a la ruta (Retorno a LCP)
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <span style="font-size: 11.5px; font-weight: 700; color: #8C5311; background-color: #FEF3C7; padding: 4px 8px; border-radius: 4px;">
+                                            🔒 Esperando inicio de retorno
+                                        </span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span style="font-size: 11.5px; color: var(--lcp-text-muted);">⏳ Pendiente</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PASO 5: LLEGAR A LCP, MISIÓN TERMINADA -->
+                    <div class="milestone-box @(pasoDobleActual >= 6 ? "milestone-done" : (pasoDobleActual == 5 ? "milestone-current" : "milestone-pending"))" id="stepFlota5">
+                        <div class="milestone-icon">@(pasoDobleActual >= 6 ? "✓" : "5")</div>
+                        <div class="milestone-content">
+                            <div class="milestone-title">5. Llegar a LCP, misión terminada</div>
+                            <div class="milestone-desc">Arribo final al predio central LCP por Calle San Martín 245. Circuito de doble viaje completado.</div>
+                            <div style="margin-top: 8px;">
+                                @if (pasoDobleActual >= 6)
+                                {
+                                    <span style="font-size: 11.5px; font-weight: 800; color: #2B7A4B;">✅ Misión de Doble Viaje Concluida Exitosamente</span>
+                                }
+                                else if (pasoDobleActual == 5)
+                                {
+                                    if (esConductor)
+                                    {
+                                        <button type="button" class="btn-lcp-primary btn-lcp-sm" style="background-color: #2ECC71; border-color: #2ECC71; color: #162E3B; font-weight: 800;" onclick="marcarHito(5, 'Paso 5: Llegar a LCP, misión terminada')">
+                                            🏁 5. Llegar a LCP - Misión terminada
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <span style="font-size: 11.5px; font-weight: 700; color: #8C5311; background-color: #FEF3C7; padding: 4px 8px; border-radius: 4px;">
+                                            🔒 En ruta de regreso a LCP
+                                        </span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span style="font-size: 11.5px; color: var(--lcp-text-muted);">⏳ Pendiente</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+                else if (!esDespacho)
+                {
+                    <!-- CHOFER PROPIO: ARRIBO / INGRESO DE STOCK (4 PASOS) -->
+                    <!-- PASO 1: SALIDA DESDE ORIGEN -->
+                    <div class="milestone-box @(pasoPropioActual > 1 ? "milestone-done" : (pasoPropioActual == 1 ? "milestone-current" : "milestone-pending"))" id="stepPropio1">
+                        <div class="milestone-icon">@(pasoPropioActual > 1 ? "✓" : "1")</div>
+                        <div class="milestone-content">
+                            <div class="milestone-title">1. Salida desde @ciudadCliente</div>
+                            <div class="milestone-desc">Partida con carga desde instalaciones del cliente rumbo a Santa Rosa.</div>
+                            <div style="margin-top: 8px;">
+                                @if (pasoPropioActual > 1)
+                                {
+                                    <span style="font-size: 11.5px; font-weight: 700; color: #2B7A4B;">✓ Salida desde origen efectuada</span>
+                                }
+                                else if (pasoPropioActual == 1)
+                                {
+                                    if (esConductor)
+                                    {
+                                        <button type="button" class="btn-lcp-primary btn-lcp-sm" onclick="marcarHito(2, 'Paso 1: Salida desde origen del cliente rumbo a LCP')">
+                                            🚗 1. Iniciar Viaje a Santa Rosa
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <span style="font-size: 11.5px; font-weight: 700; color: #8C5311; background-color: #FEF3C7; padding: 4px 8px; border-radius: 4px;">
+                                            🔒 Esperando partida del camión
+                                        </span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span style="font-size: 11.5px; color: var(--lcp-text-muted);">⏳ Pendiente</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PASO 2: EN TRÁNSITO -->
+                    <div class="milestone-box @(pasoPropioActual > 2 ? "milestone-done" : (pasoPropioActual == 2 ? "milestone-current" : "milestone-pending"))" id="stepPropio2">
+                        <div class="milestone-icon">@(pasoPropioActual > 2 ? "✓" : "2")</div>
+                        <div class="milestone-content">
+                            <div class="milestone-title">2. En Tránsito Carretero</div>
+                            <div class="milestone-desc">En ruta hacia el Nodo Central Logística Centro País en Santa Rosa.</div>
+                            <div style="margin-top: 8px;">
+                                @if (pasoPropioActual > 2)
+                                {
+                                    <span style="font-size: 11.5px; font-weight: 700; color: #2B7A4B;">✓ Tránsito notificado</span>
+                                }
+                                else if (pasoPropioActual == 2)
+                                {
+                                    if (esConductor)
+                                    {
+                                        <button type="button" class="btn-lcp-outline btn-lcp-sm" onclick="marcarHito(2, 'Paso 2: En tránsito por corredor vial hacia Base Central LCP')">
+                                            📡 2. Notificar En Ruta
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <span style="font-size: 11.5px; font-weight: 700; color: #8C5311; background-color: #FEF3C7; padding: 4px 8px; border-radius: 4px;">
+                                            🔒 Camión en tránsito carretero
+                                        </span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span style="font-size: 11.5px; color: var(--lcp-text-muted);">⏳ Pendiente</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PASO 3: ARRIBO A PREDIO Y DÁRSENA -->
+                    <div class="milestone-box @(pasoPropioActual > 3 ? "milestone-done" : (pasoPropioActual == 3 ? "milestone-current" : "milestone-pending"))" id="stepPropio3">
+                        <div class="milestone-icon">@(pasoPropioActual > 3 ? "✓" : "3")</div>
+                        <div class="milestone-content">
+                            <div class="milestone-title">3. Arribo a Predio LCP y Dársena</div>
+                            <div class="milestone-desc">Ingreso por Calle San Martín 245 y atraque en <strong>@Model.DarsenaCodigo</strong>. Al confirmar este paso, el operador podrá registrar la descarga de nuevo stock.</div>
+                            <div style="margin-top: 8px;">
+                                @if (pasoPropioActual > 3)
+                                {
+                                    <span style="font-size: 11.5px; font-weight: 700; color: #2B7A4B;">✓ Arribado y posicionado en dársena</span>
+                                }
+                                else if (pasoPropioActual == 3)
+                                {
+                                    if (esConductor)
+                                    {
+                                        <button type="button" class="btn-lcp-primary btn-lcp-sm" style="background-color: #2ECC71; border-color: #2ECC71; color: #162E3B; font-weight: 800;" onclick="marcarHito(4, 'Paso 3: Ingresado al predio LCP por Calle San Martín 245 - Posicionado en @Model.DarsenaCodigo')">
+                                            🏁 3. Arribado a Dárcena LCP
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <span style="font-size: 11.5px; font-weight: 700; color: #8C5311; background-color: #FEF3C7; padding: 4px 8px; border-radius: 4px;">
+                                            🔒 En aproximación al predio
+                                        </span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span style="font-size: 11.5px; color: var(--lcp-text-muted);">⏳ Pendiente</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PASO 4: DESCARGA Y GUARDADO EN DÁRSENA -->
+                    <div class="milestone-box @(pasoPropioActual >= 5 ? "milestone-done" : (pasoPropioActual == 4 ? "milestone-current" : "milestone-pending"))" id="stepPropio4">
+                        <div class="milestone-icon">@(pasoPropioActual >= 5 ? "✓" : "4")</div>
+                        <div class="milestone-content">
+                            <div class="milestone-title">4. Descarga y Guardado en Dársena</div>
+                            <div class="milestone-desc">Mercadería descargada en dársena e ingresada al inventario por el personal de patio de LCP.</div>
+                            <div style="margin-top: 8px;">
+                                @if (pasoPropioActual >= 5)
+                                {
+                                    <span style="font-size: 11.5px; font-weight: 800; color: #2B7A4B;">✅ Descarga Completada y Stock Almacenado</span>
+                                }
+                                else
+                                {
+                                    <span style="font-size: 11.5px; color: var(--lcp-text-muted);">📦 Descarga y guardado a cargo del operador de patio al ingresar el camión</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <!-- CHOFER PROPIO: DESPACHO / RETIRO DE STOCK (4 PASOS) -->
+                    <!-- PASO 1: POSICIONAMIENTO EN DÁRSENA -->
+                    <div class="milestone-box @(pasoPropioActual > 1 ? "milestone-done" : (pasoPropioActual == 1 ? "milestone-current" : "milestone-pending"))" id="stepPropioDesp1">
+                        <div class="milestone-icon">@(pasoPropioActual > 1 ? "✓" : "1")</div>
+                        <div class="milestone-content">
+                            <div class="milestone-title">1. Posicionamiento en Dárcena para Carga</div>
+                            <div class="milestone-desc">Presentación en muelle de <strong>@Model.DarsenaCodigo</strong> para iniciar la carga de los productos a retirar.</div>
+                            <div style="margin-top: 8px;">
+                                @if (pasoPropioActual > 1)
+                                {
+                                    <span style="font-size: 11.5px; font-weight: 700; color: #2B7A4B;">✓ Posicionado en dársena para carga</span>
+                                }
+                                else if (pasoPropioActual == 1)
+                                {
+                                    if (esConductor)
+                                    {
+                                        <button type="button" class="btn-lcp-primary btn-lcp-sm" onclick="marcarHito(4, 'Paso 1: Posicionado en dársena para carga de mercadería a despachar')">
+                                            🚚 1. Posicionado en Dárcena para Carga
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <span style="font-size: 11.5px; font-weight: 700; color: #8C5311; background-color: #FEF3C7; padding: 4px 8px; border-radius: 4px;">
+                                            🔒 Esperando posicionamiento del camión
+                                        </span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span style="font-size: 11.5px; color: var(--lcp-text-muted);">⏳ Pendiente</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PASO 2: CARGA Y DESPACHO EN DÁRSENA -->
+                    <div class="milestone-box @(pasoPropioActual > 2 ? "milestone-done" : (pasoPropioActual == 2 ? "milestone-current" : "milestone-pending"))" id="stepPropioDesp2">
+                        <div class="milestone-icon">@(pasoPropioActual > 2 ? "✓" : "2")</div>
+                        <div class="milestone-content">
+                            <div class="milestone-title">2. Carga y Despacho en Muelle LCP</div>
+                            <div class="milestone-desc">Mercadería cargada en camión y descontada del stock por el Operador de Patio.</div>
+                            <div style="margin-top: 8px;">
+                                @if (pasoPropioActual > 2)
+                                {
+                                    <span style="font-size: 11.5px; font-weight: 700; color: #2B7A4B;">✓ Mercadería cargada y despachada desde LCP</span>
+                                }
+                                else if (pasoPropioActual == 2)
+                                {
+                                    <span style="font-size: 11.5px; color: #C2821E; font-weight: 700;">📦 Carga física y descuento de inventario a cargo del Operador de Patio</span>
+                                }
+                                else
+                                {
+                                    <span style="font-size: 11.5px; color: var(--lcp-text-muted);">⏳ Pendiente</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PASO 3: SALIDA Y TRÁNSITO HACIA DESTINO -->
+                    <div class="milestone-box @(pasoPropioActual > 3 ? "milestone-done" : (pasoPropioActual == 3 ? "milestone-current" : "milestone-pending"))" id="stepPropioDesp3">
+                        <div class="milestone-icon">@(pasoPropioActual > 3 ? "✓" : "3")</div>
+                        <div class="milestone-content">
+                            <div class="milestone-title">3. En Tránsito Carretero hacia Destino</div>
+                            <div class="milestone-desc">En ruta desde Santa Rosa hacia las instalaciones del cliente en @ciudadCliente.</div>
+                            <div style="margin-top: 8px;">
+                                @if (pasoPropioActual > 3)
+                                {
+                                    <span style="font-size: 11.5px; font-weight: 700; color: #2B7A4B;">✓ En tránsito carretero hacia destino</span>
+                                }
+                                else if (pasoPropioActual == 3)
+                                {
+                                    if (esConductor)
+                                    {
+                                        <button type="button" class="btn-lcp-outline btn-lcp-sm" onclick="marcarHito(2, 'Paso 3: Salida a la ruta y en tránsito hacia @ciudadCliente')">
+                                            📡 3. Notificar En Ruta hacia Destino
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <span style="font-size: 11.5px; font-weight: 700; color: #8C5311; background-color: #FEF3C7; padding: 4px 8px; border-radius: 4px;">
+                                            🔒 En tránsito por carretera
+                                        </span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span style="font-size: 11.5px; color: var(--lcp-text-muted);">⏳ Pendiente</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PASO 4: LLEGADA A DESTINO Y ENTREGA -->
+                    <div class="milestone-box @(pasoPropioActual >= 5 ? "milestone-done" : (pasoPropioActual == 4 ? "milestone-current" : "milestone-pending"))" id="stepPropioDesp4">
+                        <div class="milestone-icon">@(pasoPropioActual >= 5 ? "✓" : "4")</div>
+                        <div class="milestone-content">
+                            <div class="milestone-title">4. Llegada a Destino y Entrega - Misión Terminada</div>
+                            <div class="milestone-desc">Arribo final a @ciudadCliente, descarga y entrega de mercadería conformada con remito.</div>
+                            <div style="margin-top: 8px;">
+                                @if (pasoPropioActual >= 5)
+                                {
+                                    <span style="font-size: 11.5px; font-weight: 800; color: #2B7A4B;">✅ Misión Concluida y Mercadería Entregada en Destino</span>
+                                }
+                                else if (pasoPropioActual == 4)
+                                {
+                                    if (esConductor)
+                                    {
+                                        <button type="button" class="btn-lcp-primary btn-lcp-sm" style="background-color: #2ECC71; border-color: #2ECC71; color: #162E3B; font-weight: 800;" onclick="marcarHito(5, 'Paso 4: Llegada a destino en @ciudadCliente y entrega de mercadería - Misión terminada')">
+                                            🏁 4. Llegada a Destino y Entrega - Misión Terminada
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <span style="font-size: 11.5px; font-weight: 700; color: #8C5311; background-color: #FEF3C7; padding: 4px 8px; border-radius: 4px;">
+                                            🔒 En viaje hacia punto final de entrega
+                                        </span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span style="font-size: 11.5px; color: var(--lcp-text-muted);">⏳ Pendiente</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- FICHA DE DATOS LOGÍSTICOS Y CARGA -->
+        <div class="lcp-card" style="margin: 0;">
+            <h2 class="lcp-card-title">📦 Ficha de la Mercadería y Muelle</h2>
+            <table style="width: 100%; font-size: 13px; line-height: 2.1;">
+                <tr>
+                    <td style="color: var(--lcp-text-muted); width: 140px;">Empresa Cliente:</td>
+                    <td style="font-weight: 700;">@Model.ClienteRazonSocial</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--lcp-text-muted);">Dársena Asignada:</td>
+                    <td style="font-weight: 800; color: var(--lcp-primary);">@Model.DarsenaCodigo</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--lcp-text-muted);">Puerta de Ingreso:</td>
+                    <td style="font-weight: 700; color: #C2821E;">Calle San Martín 245 (Predio Central LCP)</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--lcp-text-muted);">Turno Oficial:</td>
+                    <td style="font-weight: 700;">@Model.FechaHoraTurnoProgramado.ToString("dd/MM/yyyy HH:mm") hs</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--lcp-text-muted);">Mercadería:</td>
+                    <td style="font-weight: 600;">@Model.DescripcionMercaderia</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--lcp-text-muted);">Peso Total:</td>
+                    <td style="font-weight: 700;">@Model.PesoTotalKg.ToString("N1") kg</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--lcp-text-muted);">Volumen Total:</td>
+                    <td style="font-weight: 700;">@Model.VolumenTotalM3.ToString("N2") m³</td>
+                </tr>
+                @if (Model.ConductorPatente != null)
+                {
+                    <tr>
+                        <td style="color: var(--lcp-text-muted);">Patente Camión:</td>
+                        <td style="font-weight: 700;">@Model.ConductorPatente</td>
+                    </tr>
+                }
+            </table>
+        </div>
+
+        <!-- ADJUNTAR FACTURA / REMITO / CONSTANCIA FIRMADA -->
+        <div class="lcp-card" style="margin: 0;">
+            <h2 class="lcp-card-title">🧾 Cargar Factura / Remito de la Operación</h2>
+            <p style="font-size: 12px; color: var(--lcp-text-muted); margin: 0 0 12px;">
+                Cargá la <strong>factura comercial</strong> o remito firmado de la carga. Esto es un requisito obligatorio para que el auditor pueda validar la liquidación contable.
+            </p>
+            <form asp-controller="Solicitudes" asp-action="SubirDocumento" method="post" enctype="multipart/form-data">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="solicitudId" value="@Model.Id" />
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <select name="tipoDocumento" class="form-input" style="font-size: 12px; padding: 6px;">
+                        <option value="Factura">🧾 Factura Comercial / Comprobante</option>
+                        <option value="RemitoConformado" selected>📄 Remito Conformado / Firma</option>
+                        <option value="CartaDePorte">📜 Carta de Porte Electrónica</option>
+                    </select>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="file" name="archivo" class="form-input" required accept=".pdf,image/*" style="font-size: 12px; padding: 6px;" />
+                        <button type="submit" class="btn-lcp-primary btn-lcp-sm" style="white-space: nowrap; font-weight: 700;">
+                            📤 Subir
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+    </div>
+
+    <!-- COLUMNA DERECHA: MAPA LEAFLET INTERACTIVO EN VIVO -->
+    <div>
+        <div class="lcp-card" style="padding: 0; overflow: hidden; margin: 0; border: 1px solid var(--lcp-card-border); box-shadow: 0 4px 18px rgba(0,0,0,0.06);">
+            
+            <!-- HEADER DEL MAPA -->
+            <div style="padding: 16px 20px; background-color: #FFFFFF; border-bottom: 1px solid var(--lcp-card-border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <h3 style="font-size: 16px; font-weight: 800; color: #192A33; margin: 0;">
+                        🗺️ Trazado de Hoja de Ruta e Itinerario Vial
+                    </h3>
+                    <div style="font-size: 12px; color: var(--lcp-text-muted); margin-top: 2px;">
+                        @(esDoble ? $"Circuito Doble Viaje: Base LCP Santa Rosa ➔ {ciudadCliente} ➔ Base LCP Santa Rosa" : $"Trayecto Directo: {ciudadCliente} ➔ Base LCP Santa Rosa")
+                    </div>
+                </div>
+
+                <!-- LEYENDA DEL MAPA -->
+                <div style="display: flex; align-items: center; gap: 14px; font-size: 11px; font-weight: 700;">
+                    @if (esDoble)
+                    {
+                        <span style="display: inline-flex; align-items: center; gap: 5px; color: #28536B;">
+                            <span style="width: 14px; height: 4px; background-color: #28536B; border-radius: 2px; display: inline-block;"></span> Tramo 1 (Salida)
+                        </span>
+                        <span style="display: inline-flex; align-items: center; gap: 5px; color: #2B7A4B;">
+                            <span style="width: 14px; height: 4px; background-color: #2B7A4B; border-radius: 2px; display: inline-block;"></span> Tramo 2 (Retorno a Dárcena)
+                        </span>
+                    }
+                    else
+                    {
+                        <span style="display: inline-flex; align-items: center; gap: 5px; color: #2B7A4B;">
+                            <span style="width: 14px; height: 4px; background-color: #2B7A4B; border-radius: 2px; display: inline-block;"></span> Trayecto Carretero Directo
+                        </span>
+                    }
+                </div>
+            </div>
+
+            <!-- CONTENEDOR MAPA LEAFLET -->
+            <div id="mapaHojaRuta" style="height: 520px; width: 100%; position: relative; z-index: 1;"></div>
+
+            <!-- TELEMETRÍA Y DATOS VIALES AL PIE DEL MAPA -->
+            <div style="padding: 16px 20px; background-color: #F8F6F0; border-top: 1px solid var(--lcp-card-border); display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; font-size: 12px;">
+                <div>
+                    <span style="font-size: 11px; text-transform: uppercase; color: var(--lcp-text-muted); font-weight: 700;">Distancia Total</span>
+                    <div style="font-size: 16px; font-weight: 800; color: var(--lcp-text-dark); margin-top: 2px;">
+                        @kmTotales.ToString("N0") km @(esDoble ? "(Ida y Vuelta)" : "")
+                    </div>
+                </div>
+
+                <div>
+                    <span style="font-size: 11px; text-transform: uppercase; color: var(--lcp-text-muted); font-weight: 700;">Tiempo Estimado Conducción</span>
+                    <div style="font-size: 16px; font-weight: 800; color: #C2821E; margin-top: 2px;">
+                        @{
+                            double horasEstimadas = (double)kmTotales / 72.0;
+                            int hs = (int)horasEstimadas;
+                            int mins = (int)((horasEstimadas - hs) * 60);
+                        }
+                        ~@hs h @mins min (a 72 km/h prom.)
+                    </div>
+                </div>
+
+                <div>
+                    <span style="font-size: 11px; text-transform: uppercase; color: var(--lcp-text-muted); font-weight: 700;">Corredor Vial Asignado</span>
+                    <div style="font-size: 14px; font-weight: 700; color: var(--lcp-primary); margin-top: 2px;">
+                        RN 5 / RN 35 · Pampa Central
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+<!-- MODAL PARA REPORTAR DEMORA O INCIDENTE -->
+<div id="modalIncidente" class="lcp-modal-backdrop" style="display: none;">
+    <div class="lcp-modal" style="max-width: 480px;">
+        <div class="lcp-modal-header" style="border-bottom: 2px solid #C0392B;">
+            <h3 style="font-size: 17px; font-weight: 800; color: #C0392B; margin: 0; display: flex; align-items: center; gap: 8px;">
+                🚨 Reportar Demora o Incidente en Ruta
+            </h3>
+            <button type="button" class="lcp-modal-close" onclick="cerrarModalIncidente()">&times;</button>
+        </div>
+
+        <form asp-action="ReportarIncidente" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="solicitudId" value="@Model.Id" />
+
+            <div class="lcp-modal-body">
+                <p style="font-size: 13px; color: var(--lcp-text-dark); margin: 0 0 14px; line-height: 1.5;">
+                    Al reportar un incidente, se actualizará el estado de la hoja de ruta a <strong>Demora / Incidente</strong> y se enviará una notificación en vivo al operador de patio y al cliente.
+                </p>
+
+                <div class="form-group">
+                    <label class="form-label">Motivo o causa de la demora / novedad: *</label>
+                    <textarea name="motivo" class="form-input" rows="3" required placeholder="Ej: Pinchadura en km 280 de RN 5. Esperando auxilio mecánico. Estimación 1h de demora."></textarea>
+                </div>
+            </div>
+
+            <div class="lcp-modal-footer">
+                <button type="button" class="btn-lcp-outline btn-lcp-sm" onclick="cerrarModalIncidente()">Cancelar</button>
+                <button type="submit" class="btn-lcp-primary btn-lcp-sm" style="background-color: #C0392B; border-color: #C0392B;">
+                    Notificar Incidente
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <style>
+        .milestone-box {
+            display: flex;
+            gap: 14px;
+            padding: 14px 16px;
+            border-radius: 8px;
+            border: 1px solid var(--lcp-card-border);
+            background-color: #FFFFFF;
+            transition: all 0.2s ease;
+        }
+        .milestone-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background-color: #EFECE6;
+            color: var(--lcp-text-muted);
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 14px;
+        }
+        .milestone-content {
+            flex: 1;
+        }
+        .milestone-title {
+            font-weight: 700;
+            font-size: 14px;
+            color: var(--lcp-text-dark);
+        }
+        .milestone-desc {
+            font-size: 12px;
+            color: var(--lcp-text-muted);
+            margin-top: 2px;
+        }
+        .milestone-done {
+            background-color: #EBF8F0;
+            border-color: #C3E6D0;
+        }
+        .milestone-done .milestone-icon {
+            background-color: #2ECC71;
+            color: #FFFFFF;
+        }
+        .milestone-done .milestone-icon::after {
+            content: "✓";
+        }
+        .milestone-current {
+            background-color: #F8F6F0;
+            border-left: 4px solid var(--lcp-primary);
+        }
+        .milestone-current .milestone-icon {
+            background-color: var(--lcp-primary);
+            color: #FFFFFF;
+        }
+        .milestone-pending {
+            opacity: 0.65;
+        }
+        .lcp-modal-backdrop {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(22, 46, 59, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        .lcp-modal {
+            background: #FFFFFF;
+            border-radius: 8px;
+            width: 90%;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+            overflow: hidden;
+        }
+        .lcp-modal-header {
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .lcp-modal-close {
+            background: none; border: none; font-size: 24px; cursor: pointer; color: var(--lcp-text-muted);
+        }
+        .lcp-modal-body {
+            padding: 20px;
+        }
+        .lcp-modal-footer {
+            padding: 14px 20px;
+            background: #F8F6F0;
+            border-top: 1px solid var(--lcp-card-border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+    </style>
+
+    <script>
+        // COORDENADAS BASE CENTRAL LCP (SANTA ROSA, LA PAMPA)
+        const BASE_LCP = {
+            nombre: "Nodo Central Logística Centro País",
+            direccion: "Calle San Martín 245, Santa Rosa, La Pampa",
+            lat: -36.6204,
+            lng: -64.2906
+        };
+
+        // MATRIZ DE CIUDADES DE ARGENTINA
+        const CIUDADES_ARGENTINA = [
+            { nombre: "Buenos Aires (CABA)", km: 615, lat: -34.6037, lng: -58.3816 },
+            { nombre: "General Pico, La Pampa", km: 135, lat: -35.6566, lng: -63.7568 },
+            { nombre: "Bahía Blanca, Buenos Aires", km: 330, lat: -38.7183, lng: -62.2663 },
+            { nombre: "Córdoba Capital", km: 610, lat: -31.4201, lng: -64.1888 },
+            { nombre: "Río Cuarto, Córdoba", km: 410, lat: -33.1232, lng: -64.3499 },
+            { nombre: "Rosario, Santa Fe", km: 590, lat: -32.9468, lng: -60.6393 },
+            { nombre: "Neuquén Capital", km: 520, lat: -38.9516, lng: -68.0591 },
+            { nombre: "Mendoza Capital", km: 580, lat: -32.8895, lng: -68.8458 },
+            { nombre: "San Rafael, Mendoza", km: 490, lat: -34.6177, lng: -68.3301 },
+            { nombre: "San Carlos de Bariloche, Río Negro", km: 920, lat: -41.1335, lng: -71.3103 },
+            { nombre: "Mar del Plata, Buenos Aires", km: 690, lat: -38.0055, lng: -57.5562 },
+            { nombre: "San Luis Capital", km: 460, lat: -33.2950, lng: -66.3356 },
+            { nombre: "Trelew, Chubut", km: 780, lat: -43.2490, lng: -65.3051 },
+            { nombre: "Viedma, Río Negro", km: 510, lat: -40.8135, lng: -62.9967 },
+            { nombre: "Santa Fe Capital", km: 660, lat: -31.6333, lng: -60.7000 },
+            { nombre: "San Miguel de Tucumán", km: 1180, lat: -26.8083, lng: -65.2176 },
+            { nombre: "Salta Capital", km: 1350, lat: -24.7859, lng: -65.4117 },
+            { nombre: "Corrientes Capital", km: 1120, lat: -27.4692, lng: -58.8306 },
+            { nombre: "Comodoro Rivadavia, Chubut", km: 1160, lat: -45.8647, lng: -67.4966 },
+            { nombre: "Río Gallegos, Santa Cruz", km: 1950, lat: -51.6226, lng: -69.2181 }
+        ];
+
+        const esDobleViaje = @(esDoble ? "true" : "false");
+        const esConductor = @(esConductor ? "true" : "false");
+        const esDespacho = @(esDespacho ? "true" : "false");
+        const ciudadNombre = "@Html.Raw(ciudadCliente)";
+        const solicitudId = @Model.Id;
+
+        let map = null;
+        let markerBase = null;
+        let markerCliente = null;
+        let markerCamion = null;
+        let polylineIda = null;
+        let polylineVuelta = null;
+
+        function buscarCoordenadasCiudad(nombre) {
+            if (!nombre) return CIUDADES_ARGENTINA[0];
+            const lower = nombre.toLowerCase();
+            const encontrada = CIUDADES_ARGENTINA.find(c => lower.includes(c.nombre.toLowerCase()) || c.nombre.toLowerCase().includes(lower));
+            return encontrada || CIUDADES_ARGENTINA[0];
+        }
+
+        function inicializarMapaHojaRuta() {
+            const ciudad = buscarCoordenadasCiudad(ciudadNombre);
+
+            map = L.map('mapaHojaRuta').setView([BASE_LCP.lat, BASE_LCP.lng], 6);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 18
+            }).addTo(map);
+
+            // ÍCONOS PERSONALIZADOS
+            const iconHub = L.divIcon({
+                className: 'custom-hub-icon',
+                html: '<div style="background-color: #162E3B; color: #FFF; border: 2px solid #FFF; border-radius: 50%; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; font-size: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">🏢</div>',
+                iconSize: [34, 34],
+                iconAnchor: [17, 17]
+            });
+
+            const iconPlanta = L.divIcon({
+                className: 'custom-planta-icon',
+                html: '<div style="background-color: #C2821E; color: #FFF; border: 2px solid #FFF; border-radius: 50%; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; font-size: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">🏭</div>',
+                iconSize: [34, 34],
+                iconAnchor: [17, 17]
+            });
+
+            const iconCamion = L.divIcon({
+                className: 'custom-camion-icon',
+                html: '<div style="background-color: #2ECC71; color: #162E3B; border: 2px solid #FFF; border-radius: 50%; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 4px 12px rgba(46, 204, 113, 0.5); animation: pulse 2s infinite;">🚚</div>',
+                iconSize: [38, 38],
+                iconAnchor: [19, 19]
+            });
+
+            // MARCADOR BASE LCP
+            markerBase = L.marker([BASE_LCP.lat, BASE_LCP.lng], { icon: iconHub }).addTo(map)
+                .bindPopup(`<b>${BASE_LCP.nombre}</b><br>${BASE_LCP.direccion}<br><b>Dársena asignada:</b> @Model.DarsenaCodigo`)
+                .openPopup();
+
+            // MARCADOR CLIENTE
+            markerCliente = L.marker([ciudad.lat, ciudad.lng], { icon: iconPlanta }).addTo(map)
+                .bindPopup(`<b>Planta / Punto Cliente</b><br>${ciudad.nombre}<br><b>Cliente:</b> @Model.ClienteRazonSocial<br><b>Carga:</b> @Model.DescripcionMercaderia`);
+
+            // TRAZADO DE RUTAS
+            if (esDobleViaje) {
+                // TRAMO 1: SALIDA DE BASE LCP A DESTINO CLIENTE CON CARGA
+                const tramo1Coords = [
+                    [BASE_LCP.lat, BASE_LCP.lng],
+                    [ciudad.lat, ciudad.lng]
+                ];
+                polylineIda = L.polyline(tramo1Coords, {
+                    color: '#28536B',
+                    weight: 6,
+                    opacity: 0.85
+                }).addTo(map);
+
+                // TRAMO 2: RETORNO A BASE LCP DESPUÉS DE DESPACHAR
+                const offsetLat = 0.08;
+                const offsetLng = 0.08;
+                const tramo2Coords = [
+                    [ciudad.lat + offsetLat, ciudad.lng + offsetLng],
+                    [BASE_LCP.lat + offsetLat, BASE_LCP.lng + offsetLng]
+                ];
+                polylineVuelta = L.polyline(tramo2Coords, {
+                    color: '#2B7A4B',
+                    weight: 6,
+                    opacity: 0.85,
+                    dashArray: '10, 8'
+                }).addTo(map);
+
+                // MARCADOR CAMIÓN EN POSICIÓN INTERMEDIA
+                const midLat = (BASE_LCP.lat + ciudad.lat) / 2;
+                const midLng = (BASE_LCP.lng + ciudad.lng) / 2;
+                markerCamion = L.marker([midLat, midLng], { icon: iconCamion }).addTo(map)
+                    .bindPopup(`<b>Unidad en Ruta · Flota LCP</b><br>Camión: @(Model.ConductorPatente ?? "Oficial")<br>Conductor: @(Model.ConductorNombreCompleto ?? "Carlos Fernández")<br>Doble Viaje: Despacho a destino y retorno a LCP`);
+
+                map.fitBounds(L.latLngBounds([
+                    [BASE_LCP.lat, BASE_LCP.lng],
+                    [ciudad.lat, ciudad.lng]
+                ]), { padding: [60, 60] });
+            } else {
+                // VIAJE SIMPLE DIRECTO (ORIGEN CLIENTE ➔ BASE LCP o BASE LCP ➔ CLIENTE)
+                const tramoDirecto = esDespacho
+                    ? [[BASE_LCP.lat, BASE_LCP.lng], [ciudad.lat, ciudad.lng]]
+                    : [[ciudad.lat, ciudad.lng], [BASE_LCP.lat, BASE_LCP.lng]];
+
+                polylineIda = L.polyline(tramoDirecto, {
+                    color: '#2B7A4B',
+                    weight: 6,
+                    opacity: 0.9
+                }).addTo(map);
+
+                const midLat = (BASE_LCP.lat + ciudad.lat) / 2;
+                const midLng = (BASE_LCP.lng + ciudad.lng) / 2;
+                markerCamion = L.marker([midLat, midLng], { icon: iconCamion }).addTo(map)
+                    .bindPopup(`<b>Camión Propio en Ruta</b><br>${esDespacho ? "Traslado hacia destino en " + ciudad.nombre : "Traslado directo hacia Base LCP"}`);
+
+                map.fitBounds(L.latLngBounds(tramoDirecto), { padding: [60, 60] });
+            }
+        }
+
+        async function marcarHito(estadoNum, hitoDescripcion) {
+            if (!esConductor) {
+                alert("Modo solo lectura: solo el chofer asignado puede actualizar los hitos y etapas de su viaje.");
+                return;
+            }
+            try {
+                const response = await fetch(`/Conductor/ActualizarViajeAjax/${solicitudId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        estadoViaje: estadoNum,
+                        hitoAlcanzado: hitoDescripcion,
+                        observaciones: hitoDescripcion
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.exitoso) {
+                        // Feedback inmediato visual
+                        document.getElementById("badgeEstadoViajeVivo").textContent = `Viaje: Actualizado`;
+                        document.getElementById("badgeEstadoViajeVivo").style.backgroundColor = "#2ECC71";
+
+                        // Recargar vista para reflejar checklist y persistencia
+                        window.location.reload();
+                    } else {
+                        alert("No se pudo actualizar el estado de la hoja de ruta.");
+                    }
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Error al comunicarse con el servidor.");
+            }
+        }
+
+        function abrirModalIncidente() {
+            document.getElementById("modalIncidente").style.display = "flex";
+        }
+
+        function cerrarModalIncidente() {
+            document.getElementById("modalIncidente").style.display = "none";
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            inicializarMapaHojaRuta();
+        });
+    </script>
+}

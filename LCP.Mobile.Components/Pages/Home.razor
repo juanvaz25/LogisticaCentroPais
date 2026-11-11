@@ -1,0 +1,216 @@
+@page "/"
+@page "/home"
+@layout MobileLayout
+@inject IMobileApiClient ApiClient
+@inject ITokenStorage TokenStorage
+@inject NavigationManager Nav
+
+<div style="display: flex; flex-direction: column; gap: 14px; padding-bottom: 20px;">
+    <!-- Welcome Greeting Card -->
+    <div style="background: linear-gradient(135deg, var(--lcp-navy) 0%, var(--lcp-teal) 100%); border-radius: var(--radius-lg); padding: 18px; color: white; box-shadow: var(--shadow-md); position: relative; overflow: hidden;">
+        <div style="position: absolute; right: -15px; bottom: -20px; font-size: 110px; color: rgba(255,255,255,0.05); pointer-events: none;">
+            <i class="fa-solid fa-truck-fast"></i>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+            <div>
+                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.8px; color: #F59E0B; font-weight: 700;">
+                    @(CurrentUser?.Rol.ToString() ?? "Invitado")
+                </span>
+                <h2 style="font-size: 1.3rem; font-weight: 800; margin-top: 2px;">
+                    ¡Hola, @(CurrentUser?.Nombre ?? "Usuario")!
+                </h2>
+            </div>
+            <div style="background: rgba(255,255,255,0.15); border-radius: 12px; padding: 6px 10px; font-size: 0.72rem; text-align: right;">
+                <i class="fa-regular fa-clock"></i> @DateTime.Now.ToString("dd MMM, HH:mm")
+            </div>
+        </div>
+
+        <p style="font-size: 0.82rem; color: #CBD5E1; margin-bottom: 14px; max-width: 85%;">
+            @(CurrentUser?.EmpresaRazonSocial ?? "Logística Centro País - Predio Industrial Santa Rosa")
+        </p>
+
+        <!-- Quick Mini Stats -->
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; background: rgba(0, 0, 0, 0.2); padding: 10px; border-radius: 12px;">
+            <div style="text-align: center;">
+                <div style="font-size: 1.15rem; font-weight: 800; color: #FAF8F5;">@ActiveOperationsCount</div>
+                <div style="font-size: 0.65rem; color: #94A3B8; text-transform: uppercase;">Operaciones</div>
+            </div>
+            <div style="text-align: center; border-left: 1px solid rgba(255,255,255,0.1); border-right: 1px solid rgba(255,255,255,0.1);">
+                <div style="font-size: 1.15rem; font-weight: 800; color: #F59E0B;">@BusyDocksCount / 6</div>
+                <div style="font-size: 0.65rem; color: #94A3B8; text-transform: uppercase;">Dársenas</div>
+            </div>
+            <div style="text-align: center;">
+                <div style="font-size: 1.15rem; font-weight: 800; color: #10B981;">@PendingTasksCount</div>
+                <div style="font-size: 0.65rem; color: #94A3B8; text-transform: uppercase;">Tareas Hoy</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active In-Progress Operation Highlight -->
+    @if (OngoingOperation != null)
+    {
+        <div class="card-lcp" style="border-left: 4px solid var(--lcp-gold); padding: 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="width: 8px; height: 8px; border-radius: 50%; background-color: #3B82F6; animation: pulse 1.5s infinite;"></span>
+                    <span style="font-size: 0.72rem; font-weight: 700; color: var(--lcp-teal); text-transform: uppercase;">Operación En Curso</span>
+                </div>
+                <span class="badge-pill bg-encurso">@OngoingOperation.CodigoSolicitud</span>
+            </div>
+
+            <div style="font-size: 0.9rem; font-weight: 700; color: var(--lcp-navy); margin-bottom: 2px;">
+                @OngoingOperation.DescripcionMercaderia
+            </div>
+            <div style="font-size: 0.76rem; color: var(--lcp-text-muted); margin-bottom: 10px;">
+                <i class="fa-solid fa-route"></i> @OngoingOperation.CiudadOrigen <i class="fa-solid fa-arrow-right" style="font-size: 9px; margin: 0 4px;"></i> @OngoingOperation.CiudadDestino
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-size: 0.72rem; color: #64748B;">
+                    <i class="fa-solid fa-truck"></i> @(OngoingOperation.ConductorNombreCompleto?.Split('(')[0] ?? "Flota LCP")
+                </div>
+                <a href="/solicitudes/@OngoingOperation.Id" class="btn-lcp-outline btn-lcp-sm" style="padding: 4px 10px; font-size: 0.75rem;">
+                    <span>Ver Detalle</span>
+                    <i class="fa-solid fa-chevron-right" style="font-size: 9px;"></i>
+                </a>
+            </div>
+        </div>
+    }
+
+    <!-- Central Functions Hub -->
+    <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h3 style="font-size: 0.95rem; font-weight: 800; color: var(--lcp-navy);">Módulos del Sistema</h3>
+            <span style="font-size: 0.72rem; color: var(--lcp-text-muted);">Acceso Centralizado</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+            <!-- Nueva Solicitud -->
+            <a href="/solicitudes/nueva" class="card-lcp" style="text-decoration: none; margin-bottom: 0; padding: 14px; display: flex; flex-direction: column; justify-content: space-between; border-top: 3px solid var(--lcp-gold);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                    <div style="width: 38px; height: 38px; border-radius: 10px; background-color: var(--lcp-gold-light); display: flex; align-items: center; justify-content: center; color: var(--lcp-gold);">
+                        <i class="fa-solid fa-plus-circle" style="font-size: 1.2rem;"></i>
+                    </div>
+                    <span style="font-size: 0.65rem; font-weight: 700; color: var(--lcp-gold); background: #FEF3C7; padding: 2px 6px; border-radius: 6px;">NUEVA</span>
+                </div>
+                <div>
+                    <div style="font-weight: 700; font-size: 0.88rem; color: var(--lcp-navy);">Nueva Solicitud</div>
+                    <div style="font-size: 0.7rem; color: var(--lcp-text-muted); margin-top: 2px;">Arribo o Despacho</div>
+                </div>
+            </a>
+
+            <!-- Operaciones -->
+            <a href="/solicitudes" class="card-lcp" style="text-decoration: none; margin-bottom: 0; padding: 14px; display: flex; flex-direction: column; justify-content: space-between; border-top: 3px solid var(--lcp-teal);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                    <div style="width: 38px; height: 38px; border-radius: 10px; background-color: var(--lcp-teal-light); display: flex; align-items: center; justify-content: center; color: var(--lcp-teal);">
+                        <i class="fa-solid fa-truck-ramp-box" style="font-size: 1.2rem;"></i>
+                    </div>
+                    <span style="font-size: 0.65rem; font-weight: 700; color: var(--lcp-teal); background: #E0E7FF; padding: 2px 6px; border-radius: 6px;">@ActiveOperationsCount ACTIVAS</span>
+                </div>
+                <div>
+                    <div style="font-weight: 700; font-size: 0.88rem; color: var(--lcp-navy);">Operaciones</div>
+                    <div style="font-size: 0.7rem; color: var(--lcp-text-muted); margin-top: 2px;">Control de Cargas</div>
+                </div>
+            </a>
+
+            <!-- Dársenas -->
+            <a href="/darsenas" class="card-lcp" style="text-decoration: none; margin-bottom: 0; padding: 14px; display: flex; flex-direction: column; justify-content: space-between; border-top: 3px solid #10B981;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                    <div style="width: 38px; height: 38px; border-radius: 10px; background-color: #ECFDF5; display: flex; align-items: center; justify-content: center; color: #10B981;">
+                        <i class="fa-solid fa-warehouse" style="font-size: 1.2rem;"></i>
+                    </div>
+                    <span style="font-size: 0.65rem; font-weight: 700; color: #047857; background: #D1FAE5; padding: 2px 6px; border-radius: 6px;">D1 - D6</span>
+                </div>
+                <div>
+                    <div style="font-weight: 700; font-size: 0.88rem; color: var(--lcp-navy);">Dársenas</div>
+                    <div style="font-size: 0.7rem; color: var(--lcp-text-muted); margin-top: 2px;">Capacidad y Muelles</div>
+                </div>
+            </a>
+
+            <!-- Inventario -->
+            <a href="/inventario" class="card-lcp" style="text-decoration: none; margin-bottom: 0; padding: 14px; display: flex; flex-direction: column; justify-content: space-between; border-top: 3px solid #6366F1;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                    <div style="width: 38px; height: 38px; border-radius: 10px; background-color: #EEF2FF; display: flex; align-items: center; justify-content: center; color: #6366F1;">
+                        <i class="fa-solid fa-boxes-stacked" style="font-size: 1.2rem;"></i>
+                    </div>
+                    <span style="font-size: 0.65rem; font-weight: 700; color: #4338CA; background: #E0E7FF; padding: 2px 6px; border-radius: 6px;">STOCK</span>
+                </div>
+                <div>
+                    <div style="font-weight: 700; font-size: 0.88rem; color: var(--lcp-navy);">Inventario</div>
+                    <div style="font-size: 0.7rem; color: var(--lcp-text-muted); margin-top: 2px;">Lotes y Almacenaje</div>
+                </div>
+            </a>
+
+            <!-- Hoja de Ruta Conductor -->
+            <a href="/hoja-de-ruta" class="card-lcp" style="text-decoration: none; margin-bottom: 0; padding: 14px; display: flex; flex-direction: column; justify-content: space-between; border-top: 3px solid #F59E0B;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                    <div style="width: 38px; height: 38px; border-radius: 10px; background-color: #FEF3C7; display: flex; align-items: center; justify-content: center; color: #D97706;">
+                        <i class="fa-solid fa-route" style="font-size: 1.2rem;"></i>
+                    </div>
+                    <span style="font-size: 0.65rem; font-weight: 700; color: #B45309; background: #FEF3C7; padding: 2px 6px; border-radius: 6px;">CHOFER</span>
+                </div>
+                <div>
+                    <div style="font-weight: 700; font-size: 0.88rem; color: var(--lcp-navy);">Hoja de Ruta</div>
+                    <div style="font-size: 0.7rem; color: var(--lcp-text-muted); margin-top: 2px;">Hitos y Novedades</div>
+                </div>
+            </a>
+
+            <!-- Facturación -->
+            <a href="/facturacion" class="card-lcp" style="text-decoration: none; margin-bottom: 0; padding: 14px; display: flex; flex-direction: column; justify-content: space-between; border-top: 3px solid #8B5CF6;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                    <div style="width: 38px; height: 38px; border-radius: 10px; background-color: #F5F3FF; display: flex; align-items: center; justify-content: center; color: #8B5CF6;">
+                        <i class="fa-solid fa-file-invoice-dollar" style="font-size: 1.2rem;"></i>
+                    </div>
+                    <span style="font-size: 0.65rem; font-weight: 700; color: #6D28D9; background: #EDE9FE; padding: 2px 6px; border-radius: 6px;">AUDITORÍA</span>
+                </div>
+                <div>
+                    <div style="font-weight: 700; font-size: 0.88rem; color: var(--lcp-navy);">Facturación</div>
+                    <div style="font-size: 0.7rem; color: var(--lcp-text-muted); margin-top: 2px;">Liquidaciones y Canon</div>
+                </div>
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+@@keyframes pulse {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(59, 130, 246, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+}
+</style>
+
+@code {
+    private UsuarioDto? CurrentUser;
+    private int ActiveOperationsCount = 2;
+    private int BusyDocksCount = 2;
+    private int PendingTasksCount = 3;
+    private SolicitudOperacionDto? OngoingOperation;
+
+    protected override async Task OnInitializedAsync()
+    {
+        CurrentUser = await TokenStorage.GetUserAsync();
+
+        // If no user in storage, initialize default operator for instant preview
+        if (CurrentUser == null)
+        {
+            await ApiClient.LoginAsync(new LoginRequestDto { Email = "operador@lcp.com", Password = "Admin123!" });
+            CurrentUser = await TokenStorage.GetUserAsync();
+        }
+
+        try
+        {
+            var solicitudes = await ApiClient.GetSolicitudesAsync();
+            ActiveOperationsCount = solicitudes.Count(s => s.Estado == EstadoSolicitud.EnCurso || s.Estado == EstadoSolicitud.Programada || s.Estado == EstadoSolicitud.Pendiente);
+            OngoingOperation = solicitudes.FirstOrDefault(s => s.Estado == EstadoSolicitud.EnCurso) ?? solicitudes.FirstOrDefault();
+
+            var darsenas = await ApiClient.GetDarsenasAsync();
+            BusyDocksCount = darsenas.Count(d => d.EstadoActual == EstadoDarsena.Ocupada || d.EstadoActual == EstadoDarsena.TurnoAsignado);
+
+            var tareas = await ApiClient.GetTareasCalendarioAsync();
+            PendingTasksCount = tareas.Count(t => t.EstadoTarea != "Completada");
+        }
+        catch { }
+    }
+}

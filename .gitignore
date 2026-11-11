@@ -1,0 +1,28 @@
+## Visual Studio / .NET .gitignore
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+.vs/
+.vscode/
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+*.userprefs
+*.db-shm
+*.db-wal
+appsettings.Production.json
+
+# Android build outputs
+Platforms/Android/obj/
+Platforms/Android/bin/
+*.apk
+*.aab
+
+# OS files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store

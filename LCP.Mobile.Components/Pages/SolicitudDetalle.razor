@@ -1,0 +1,404 @@
+@page "/solicitudes/{Id:int}"
+@layout MobileLayout
+@inject IMobileApiClient ApiClient
+@inject ITokenStorage TokenStorage
+@inject NavigationManager Nav
+@inject UiNotificationService Notifier
+
+@if (IsLoading)
+{
+    <div style="text-align: center; padding: 40px; color: var(--lcp-text-muted);">
+        <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 1.8rem; color: var(--lcp-teal); margin-bottom: 10px;"></i>
+        <div>Cargando detalle de la operación...</div>
+    </div>
+}
+else if (Solicitud == null)
+{
+    <div class="card-lcp" style="text-align: center; padding: 30px;">
+        <i class="fa-solid fa-triangle-exclamation" style="font-size: 2rem; color: #EF4444; margin-bottom: 10px;"></i>
+        <div style="font-weight: 700; color: var(--lcp-navy);">Solicitud no encontrada</div>
+        <button class="btn-lcp-outline btn-lcp-sm" style="margin-top: 14px;" @onclick='() => Nav.NavigateTo("/solicitudes")'>Volver a Solicitudes</button>
+    </div>
+}
+else
+{
+    <div style="display: flex; flex-direction: column; gap: 14px; padding-bottom: 26px;">
+        <!-- Header Card -->
+        <div class="card-lcp" style="padding: 16px; border-left: 4px solid var(--lcp-teal);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
+                <div>
+                    <span style="font-size: 0.7rem; color: var(--lcp-text-muted); font-weight: 700; text-transform: uppercase;">Código de Operación</span>
+                    <h2 style="font-size: 1.25rem; font-weight: 800; color: var(--lcp-navy);">@Solicitud.CodigoSolicitud</h2>
+                </div>
+                <span class="badge-pill @GetStatusClass(Solicitud.Estado)">
+                    @Solicitud.Estado.ToString()
+                </span>
+            </div>
+
+            <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;">
+                <span class="badge-pill" style="@(Solicitud.TipoOperacion == TipoOperacionSolicitud.ArriboIngreso ? "background-color: #ECFDF5; color: #047857;" : "background-color: #EFF6FF; color: #1D4ED8;") font-size: 0.7rem;">
+                    <i class="fa-solid @(Solicitud.TipoOperacion == TipoOperacionSolicitud.ArriboIngreso ? "fa-arrow-down" : "fa-arrow-up")"></i>
+                    @Solicitud.TipoOperacionNombre
+                </span>
+                <span class="badge-pill" style="background-color: #F8FAFC; color: #334155; border: 1px solid #E2E8F0; font-size: 0.7rem;">
+                    <i class="fa-solid fa-truck"></i> @Solicitud.ModalidadNombre
+                </span>
+            </div>
+        </div>
+
+        <!-- Route & Travel Timeline Card -->
+        <div class="card-lcp" style="padding: 16px;">
+            <div class="card-header-clean" style="margin-bottom: 10px;">
+                <span style="font-weight: 700; font-size: 0.85rem; color: var(--lcp-navy);">
+                    <i class="fa-solid fa-map-location-dot" style="color: var(--lcp-gold); margin-right: 6px;"></i>
+                    Ruta y Tramos
+                </span>
+                <span style="font-size: 0.72rem; color: var(--lcp-text-muted);">
+                    @(Solicitud.EsDobleViaje ? "Doble Turno (Ida y Vuelta)" : "Tramo Directo")
+                </span>
+            </div>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; background: #F8FAFC; padding: 12px; border-radius: 12px; margin-bottom: 12px;">
+                <div style="text-align: left; flex: 1;">
+                    <div style="font-size: 0.68rem; color: #64748B; text-transform: uppercase;">Origen</div>
+                    <div style="font-size: 0.85rem; font-weight: 700; color: var(--lcp-navy);">@Solicitud.CiudadOrigen</div>
+                </div>
+                <div style="padding: 0 10px; color: var(--lcp-gold); text-align: center;">
+                    <i class="fa-solid fa-arrow-right"></i>
+                    <div style="font-size: 0.65rem; color: #64748B;">@Solicitud.DistanciaEstimadaKm km</div>
+                </div>
+                <div style="text-align: right; flex: 1;">
+                    <div style="font-size: 0.68rem; color: #64748B; text-transform: uppercase;">Destino</div>
+                    <div style="font-size: 0.85rem; font-weight: 700; color: var(--lcp-navy);">@Solicitud.CiudadDestino</div>
+                </div>
+            </div>
+
+            <div style="font-size: 0.75rem; color: var(--lcp-text-muted); display: flex; flex-direction: column; gap: 4px;">
+                <div><i class="fa-regular fa-calendar-check" style="width: 18px; color: var(--lcp-teal);"></i> <strong>Turno:</strong> @Solicitud.FechaHoraTurnoProgramado.ToString("dd/MM/yyyy HH:mm") hs</div>
+                @if (Solicitud.FechaSalidaCliente.HasValue)
+                {
+                    <div><i class="fa-solid fa-play" style="width: 18px; color: #10B981;"></i> <strong>Salida:</strong> @Solicitud.FechaSalidaCliente.Value.ToString("dd/MM/yyyy HH:mm") hs</div>
+                }
+            </div>
+        </div>
+
+        <!-- Cargo Details -->
+        <div class="card-lcp" style="padding: 16px;">
+            <div class="card-header-clean" style="margin-bottom: 10px;">
+                <span style="font-weight: 700; font-size: 0.85rem; color: var(--lcp-navy);">
+                    <i class="fa-solid fa-box-open" style="color: var(--lcp-teal); margin-right: 6px;"></i>
+                    Carga y Almacenaje
+                </span>
+                <span class="badge-pill" style="background-color: var(--lcp-gold-light); color: var(--lcp-gold); font-size: 0.68rem;">
+                    @Solicitud.DarsenaCodigo
+                </span>
+            </div>
+
+            <div style="font-size: 0.92rem; font-weight: 700; color: var(--lcp-navy); margin-bottom: 8px;">
+                @Solicitud.DescripcionMercaderia
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 6px;">
+                <div style="background-color: #F8FAFC; border-radius: 8px; padding: 8px 10px;">
+                    <div style="font-size: 0.68rem; color: #64748B;">PESO DECLARADO</div>
+                    <div style="font-size: 1rem; font-weight: 800; color: var(--lcp-navy);">@Solicitud.PesoTotalKg.ToString("N0") kg</div>
+                </div>
+                <div style="background-color: #F8FAFC; border-radius: 8px; padding: 8px 10px;">
+                    <div style="font-size: 0.68rem; color: #64748B;">VOLUMEN TOTAL</div>
+                    <div style="font-size: 1rem; font-weight: 800; color: var(--lcp-navy);">@Solicitud.VolumenTotalM3 m³</div>
+                </div>
+            </div>
+
+            <div style="margin-top: 10px; font-size: 0.75rem; color: var(--lcp-text-muted);">
+                <strong>Cliente:</strong> @Solicitud.ClienteRazonSocial
+            </div>
+        </div>
+
+        <!-- Actor info (Conductor & Operador) -->
+        <div class="card-lcp" style="padding: 16px;">
+            <div class="card-header-clean" style="margin-bottom: 10px;">
+                <span style="font-weight: 700; font-size: 0.85rem; color: var(--lcp-navy);">
+                    <i class="fa-solid fa-users" style="color: #6366F1; margin-right: 6px;"></i>
+                    Personal Asignado
+                </span>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 34px; height: 34px; border-radius: 50%; background: #ECFDF5; color: #10B981; display: flex; align-items: center; justify-content: center;">
+                        <i class="fa-solid fa-truck"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.68rem; color: #64748B; text-transform: uppercase;">Conductor Asignado</div>
+                        <div style="font-size: 0.85rem; font-weight: 700; color: var(--lcp-navy);">
+                            @(Solicitud.ConductorNombreCompleto ?? "Pendiente de Asignación")
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 34px; height: 34px; border-radius: 50%; background: #FEF3C7; color: var(--lcp-gold); display: flex; align-items: center; justify-content: center;">
+                        <i class="fa-solid fa-people-carry-box"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.68rem; color: #64748B; text-transform: uppercase;">Responsable en Depósito</div>
+                        <div style="font-size: 0.85rem; font-weight: 700; color: var(--lcp-navy);">
+                            @(Solicitud.ResponsableDepositoNombre ?? "Martín Benítez (Operador de Turno)")
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+            @if (Solicitud.Estado == EstadoSolicitud.EnCurso)
+            {
+                <button class="btn-lcp-gold" @onclick="() => MostrarModalDescarga = true">
+                    <i class="fa-solid fa-warehouse"></i>
+                    <span>Descargar y Guardar en Dársena</span>
+                </button>
+            }
+
+            @if (Solicitud.Estado == EstadoSolicitud.Pendiente)
+            {
+                <button class="btn-lcp-primary" @onclick="() => MostrarModalAsignar = true">
+                    <i class="fa-solid fa-clipboard-check"></i>
+                    <span>Asignar Recursos y Horario</span>
+                </button>
+            }
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <a href="/hoja-de-ruta" class="btn-lcp-outline" style="text-decoration: none; font-size: 0.82rem;">
+                    <i class="fa-solid fa-route" style="color: var(--lcp-gold);"></i>
+                    <span>Hoja de Ruta</span>
+                </a>
+                <a href="/chat" class="btn-lcp-outline" style="text-decoration: none; font-size: 0.82rem;">
+                    <i class="fa-solid fa-comment-dots" style="color: var(--lcp-teal);"></i>
+                    <span>Chat Operativo</span>
+                </a>
+            </div>
+
+            @if (Solicitud.Estado != EstadoSolicitud.Completada && Solicitud.Estado != EstadoSolicitud.Cancelada)
+            {
+                <button class="btn-lcp-outline" style="border-color: #FECACA; color: #DC2626;" @onclick="CancelarSolicitud">
+                    <i class="fa-solid fa-ban"></i>
+                    <span>Cancelar Solicitud</span>
+                </button>
+            }
+        </div>
+    </div>
+}
+
+<!-- Modal Descargar y Guardar Mercadería -->
+@if (MostrarModalDescarga && Solicitud != null)
+{
+    <div class="modal-overlay" @onclick="() => MostrarModalDescarga = false">
+        <div class="modal-content-mobile" @onclick:stopPropagation="true">
+            <div class="modal-handle-bar"></div>
+            <div class="modal-header-lcp">
+                <div>
+                    <h3 style="font-size: 1rem; font-weight: 800; color: var(--lcp-navy);">Guardar en Dársena</h3>
+                    <div style="font-size: 0.72rem; color: var(--lcp-text-muted);">Confirmar descarga física y generar lote</div>
+                </div>
+                <button style="background: none; border: none; font-size: 1.2rem; color: #94A3B8; cursor: pointer;" @onclick="() => MostrarModalDescarga = false">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="modal-body-scroll">
+                <div class="form-group-lcp">
+                    <label class="form-label-lcp">Código de Lote Generado</label>
+                    <input type="text" class="form-input-lcp" @bind="DescargaModel.CodigoLote" />
+                </div>
+
+                <div class="form-group-lcp">
+                    <label class="form-label-lcp">Descripción del Producto</label>
+                    <input type="text" class="form-input-lcp" @bind="DescargaModel.ProductoDescripcion" />
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <div class="form-group-lcp">
+                        <label class="form-label-lcp">Unidades</label>
+                        <input type="number" class="form-input-lcp" @bind="DescargaModel.CantidadUnidades" />
+                    </div>
+                    <div class="form-group-lcp">
+                        <label class="form-label-lcp">Cajas / Bultos</label>
+                        <input type="number" class="form-input-lcp" @bind="DescargaModel.CantidadBultosCajas" />
+                    </div>
+                </div>
+
+                <div class="form-group-lcp">
+                    <label class="form-label-lcp">Ubicación Interna en Dársena</label>
+                    <input type="text" class="form-input-lcp" placeholder="Ej: Racks A1 - Nivel 2" @bind="DescargaModel.UbicacionInternaDarsena" />
+                </div>
+            </div>
+
+            <div class="modal-footer-lcp">
+                <button class="btn-lcp-outline" @onclick="() => MostrarModalDescarga = false">Cancelar</button>
+                <button class="btn-lcp-gold" @onclick="ConfirmarDescarga">
+                    <i class="fa-solid fa-check"></i>
+                    <span>Confirmar y Guardar</span>
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal Asignar Recursos -->
+@if (MostrarModalAsignar && Solicitud != null)
+{
+    <div class="modal-overlay" @onclick="() => MostrarModalAsignar = false">
+        <div class="modal-content-mobile" @onclick:stopPropagation="true">
+            <div class="modal-handle-bar"></div>
+            <div class="modal-header-lcp">
+                <div>
+                    <h3 style="font-size: 1rem; font-weight: 800; color: var(--lcp-navy);">Asignar Recursos</h3>
+                    <div style="font-size: 0.72rem; color: var(--lcp-text-muted);">Programar turno, chofer y dársena</div>
+                </div>
+                <button style="background: none; border: none; font-size: 1.2rem; color: #94A3B8; cursor: pointer;" @onclick="() => MostrarModalAsignar = false">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="modal-body-scroll">
+                <div class="form-group-lcp">
+                    <label class="form-label-lcp">Dársena Asignada</label>
+                    <select class="form-select-lcp" @bind="AsignarModel.DarsenaId">
+                        <option value="1">Dársena 1 (Libre)</option>
+                        <option value="2">Dársena 2 (Alquiler Pampeana)</option>
+                        <option value="3">Dársena 3</option>
+                        <option value="4">Dársena 4</option>
+                        <option value="5">Dársena 5</option>
+                    </select>
+                </div>
+
+                <div class="form-group-lcp">
+                    <label class="form-label-lcp">Conductor Flota LCP</label>
+                    <select class="form-select-lcp" @bind="AsignarModel.ConductorId">
+                        <option value="5">Esteban Morales (Mercedes-Benz Actros)</option>
+                        <option value="6">Javier Díaz (Scania R450)</option>
+                    </select>
+                </div>
+
+                <div class="form-group-lcp">
+                    <label class="form-label-lcp">Horario Programado</label>
+                    <input type="datetime-local" class="form-input-lcp" @bind="TurnoProgramadoTemp" />
+                </div>
+            </div>
+
+            <div class="modal-footer-lcp">
+                <button class="btn-lcp-outline" @onclick="() => MostrarModalAsignar = false">Cerrar</button>
+                <button class="btn-lcp-primary" @onclick="ConfirmarAsignacion">
+                    <i class="fa-solid fa-check"></i>
+                    <span>Programar Solicitud</span>
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private SolicitudOperacionDto? Solicitud;
+    private bool IsLoading = true;
+    private bool MostrarModalDescarga = false;
+    private bool MostrarModalAsignar = false;
+
+    private CompletarDescargaDto DescargaModel = new();
+    private AsignarSolicitudDto AsignarModel = new();
+    private DateTime TurnoProgramadoTemp = DateTime.Now.AddHours(2);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Cargar();
+    }
+
+    private async Task Cargar()
+    {
+        IsLoading = true;
+        try
+        {
+            Solicitud = await ApiClient.GetSolicitudByIdAsync(Id);
+            if (Solicitud != null)
+            {
+                DescargaModel = new CompletarDescargaDto
+                {
+                    SolicitudId = Solicitud.Id,
+                    CodigoLote = $"LOT-{DateTime.UtcNow:yyyyMMdd}-{Solicitud.Id}",
+                    ProductoDescripcion = Solicitud.DescripcionMercaderia,
+                    CantidadUnidades = 200,
+                    CantidadBultosCajas = 25,
+                    PesoKg = Solicitud.PesoTotalKg,
+                    VolumenM3 = Solicitud.VolumenTotalM3,
+                    UbicacionInternaDarsena = "Racks A2 - Sector Carga"
+                };
+
+                AsignarModel = new AsignarSolicitudDto
+                {
+                    SolicitudId = Solicitud.Id,
+                    DarsenaId = Solicitud.DarsenaId,
+                    ConductorId = 5,
+                    ResponsableDepositoId = 2
+                };
+            }
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task ConfirmarDescarga()
+    {
+        var ok = await ApiClient.CompletarDescargaAsync(DescargaModel);
+        if (ok)
+        {
+            Notifier.Success("Mercadería descargada y stock incorporado al inventario.");
+            MostrarModalDescarga = false;
+            await Cargar();
+        }
+        else
+        {
+            Notifier.Error("No se pudo completar la descarga.");
+        }
+    }
+
+    private async Task ConfirmarAsignacion()
+    {
+        AsignarModel.FechaHoraTurnoProgramado = TurnoProgramadoTemp;
+        var ok = await ApiClient.AsignarSolicitudAsync(AsignarModel);
+        if (ok)
+        {
+            Notifier.Success("Operación programada exitosamente.");
+            MostrarModalAsignar = false;
+            await Cargar();
+        }
+        else
+        {
+            Notifier.Error("No se pudo asignar la solicitud.");
+        }
+    }
+
+    private async Task CancelarSolicitud()
+    {
+        if (Solicitud == null) return;
+        var ok = await ApiClient.CancelarSolicitudAsync(new CancelarSolicitudDto { SolicitudId = Solicitud.Id, Motivo = "Cancelado por usuario móvil" });
+        if (ok)
+        {
+            Notifier.Warning("La solicitud fue cancelada.");
+            await Cargar();
+        }
+    }
+
+    private string GetStatusClass(EstadoSolicitud estado) => estado switch
+    {
+        EstadoSolicitud.Pendiente => "bg-pendiente",
+        EstadoSolicitud.Programada => "bg-programada",
+        EstadoSolicitud.EnCurso => "bg-encurso",
+        EstadoSolicitud.Completada => "bg-completada",
+        EstadoSolicitud.Cancelada => "bg-cancelada",
+        _ => "bg-pendiente"
+    };
+}

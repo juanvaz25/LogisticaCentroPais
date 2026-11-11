@@ -1,0 +1,205 @@
+@page "/facturacion"
+@layout MobileLayout
+@inject IMobileApiClient ApiClient
+@inject ITokenStorage TokenStorage
+@inject UiNotificationService Notifier
+
+<div style="display: flex; flex-direction: column; gap: 14px; padding-bottom: 26px;">
+    <!-- Title -->
+    <div>
+        <h2 style="font-size: 1.15rem; font-weight: 800; color: var(--lcp-navy);">Liquidaciones y Facturación</h2>
+        <div style="font-size: 0.72rem; color: var(--lcp-text-muted);">Auditoría de Servicios y Canon de Dársenas</div>
+    </div>
+
+    <!-- Summary Metrics -->
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+        <div class="card-lcp" style="margin-bottom: 0; padding: 12px; border-left: 3px solid #F59E0B;">
+            <div style="font-size: 0.68rem; color: #64748B; text-transform: uppercase;">Pendientes Auditoría</div>
+            <div style="font-size: 1.15rem; font-weight: 800; color: var(--lcp-navy); margin-top: 2px;">
+                @Liquidaciones.Count(l => l.Estado == EstadoLiquidacion.PendienteDeAuditoria)
+            </div>
+            <div style="font-size: 0.7rem; color: #F59E0B; font-weight: 600;">Revisión Requerida</div>
+        </div>
+
+        <div class="card-lcp" style="margin-bottom: 0; padding: 12px; border-left: 3px solid #10B981;">
+            <div style="font-size: 0.68rem; color: #64748B; text-transform: uppercase;">Total Validadas</div>
+            <div style="font-size: 1.15rem; font-weight: 800; color: #10B981; margin-top: 2px;">
+                @Liquidaciones.Count(l => l.Estado == EstadoLiquidacion.Validada)
+            </div>
+            <div style="font-size: 0.7rem; color: #10B981; font-weight: 600;">Aprobadas</div>
+        </div>
+    </div>
+
+    <!-- Liquidations List -->
+    @if (IsLoading)
+    {
+        <div style="text-align: center; padding: 40px; color: var(--lcp-text-muted);">
+            <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 1.6rem; color: var(--lcp-teal); margin-bottom: 8px;"></i>
+            <div style="font-size: 0.8rem;">Cargando liquidaciones...</div>
+        </div>
+    }
+    else if (!Liquidaciones.Any())
+    {
+        <div class="card-lcp" style="text-align: center; padding: 30px;">
+            <i class="fa-solid fa-receipt" style="font-size: 2.2rem; color: #CBD5E1; margin-bottom: 8px;"></i>
+            <div style="font-weight: 700; color: var(--lcp-navy);">No hay liquidaciones emitidas</div>
+        </div>
+    }
+    else
+    {
+        @foreach (var liq in Liquidaciones)
+        {
+            <div class="card-lcp" style="padding: 14px; border-left: 4px solid @(liq.Estado == EstadoLiquidacion.Validada ? "#10B981" : liq.Estado == EstadoLiquidacion.Observada ? "#EF4444" : "#F59E0B");">
+                <div class="card-header-clean" style="margin-bottom: 8px; padding-bottom: 8px;">
+                    <div>
+                        <span style="font-weight: 800; font-size: 0.9rem; color: var(--lcp-navy);">@liq.NumeroComprobante</span>
+                        <div style="font-size: 0.68rem; color: var(--lcp-text-muted);">@liq.TipoLiquidacionNombre</div>
+                    </div>
+                    <span class="badge-pill" style="@GetLiqBadgeStyle(liq.Estado)">
+                        @liq.EstadoNombre
+                    </span>
+                </div>
+
+                <div style="font-size: 0.85rem; font-weight: 700; color: var(--lcp-navy); margin-bottom: 4px;">
+                    <i class="fa-solid fa-building" style="margin-right: 4px; color: #94A3B8;"></i>@liq.ClienteRazonSocial
+                </div>
+
+                <div style="font-size: 0.72rem; color: var(--lcp-text-muted); background: #F8FAFC; padding: 8px; border-radius: 6px; margin-bottom: 10px;">
+                    @liq.VariablesAplicadasResumen
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #F8FAFC; padding-top: 8px;">
+                    <div>
+                        <div style="font-size: 0.65rem; color: #64748B;">TOTAL LIQUIDADO</div>
+                        <div style="font-size: 1.15rem; font-weight: 800; color: var(--lcp-teal);">$@liq.ImporteTotal.ToString("N2")</div>
+                    </div>
+
+                    @if (CurrentUser?.Rol == RolUsuario.Auditor || CurrentUser?.Rol == RolUsuario.Administrador)
+                    {
+                        <button class="btn-lcp-outline btn-lcp-sm" style="font-size: 0.75rem; padding: 6px 12px;" @onclick="() => AbrirModalAuditoria(liq)">
+                            <i class="fa-solid fa-stamp" style="color: #8B5CF6;"></i>
+                            <span>Auditar</span>
+                        </button>
+                    }
+                    else
+                    {
+                        <span style="font-size: 0.7rem; color: #64748B;">
+                            <i class="fa-regular fa-calendar"></i> @liq.FechaEmision.ToString("dd/MM/yyyy")
+                        </span>
+                    }
+                </div>
+            </div>
+        }
+    }
+</div>
+
+<!-- Modal Auditoría de Liquidación -->
+@if (LiquidacionSeleccionada != null)
+{
+    <div class="modal-overlay" @onclick="() => LiquidacionSeleccionada = null">
+        <div class="modal-content-mobile" @onclick:stopPropagation="true">
+            <div class="modal-handle-bar"></div>
+            <div class="modal-header-lcp">
+                <div>
+                    <h3 style="font-size: 1rem; font-weight: 800; color: var(--lcp-navy);">Auditar Comprobante</h3>
+                    <div style="font-size: 0.72rem; color: var(--lcp-text-muted);">@LiquidacionSeleccionada.NumeroComprobante - $@LiquidacionSeleccionada.ImporteTotal.ToString("N2")</div>
+                </div>
+                <button style="background: none; border: none; font-size: 1.2rem; color: #94A3B8; cursor: pointer;" @onclick="() => LiquidacionSeleccionada = null">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="modal-body-scroll">
+                <p style="font-size: 0.8rem; color: var(--lcp-text-muted); margin-bottom: 12px;">
+                    Como Auditor, valide que las tarifas aplicadas correspondan al servicio realizado o consigne observaciones para rectificación.
+                </p>
+
+                <div class="form-group-lcp">
+                    <label class="form-label-lcp">Resolución de Auditoría</label>
+                    <select class="form-select-lcp" @bind="NuevoEstadoAuditoria">
+                        <option value="@EstadoLiquidacion.Validada">Validar / Aprobar Facturación</option>
+                        <option value="@EstadoLiquidacion.Observada">Observar / Rechazar con Motivo</option>
+                    </select>
+                </div>
+
+                <div class="form-group-lcp">
+                    <label class="form-label-lcp">Observaciones o Dictamen del Auditor</label>
+                    <textarea rows="3" class="form-textarea-lcp" placeholder="Detalle observaciones si corresponde..." @bind="ObservacionAuditoria"></textarea>
+                </div>
+            </div>
+
+            <div class="modal-footer-lcp">
+                <button class="btn-lcp-outline" @onclick="() => LiquidacionSeleccionada = null">Cancelar</button>
+                <button class="btn-lcp-gold" @onclick="ConfirmarAuditoria">
+                    <i class="fa-solid fa-check"></i>
+                    <span>Registrar Dictamen</span>
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<LiquidacionDto> Liquidaciones = new();
+    private bool IsLoading = true;
+    private UsuarioDto? CurrentUser;
+    private LiquidacionDto? LiquidacionSeleccionada;
+    private EstadoLiquidacion NuevoEstadoAuditoria = EstadoLiquidacion.Validada;
+    private string ObservacionAuditoria = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        CurrentUser = await TokenStorage.GetUserAsync();
+        await Cargar();
+    }
+
+    private async Task Cargar()
+    {
+        IsLoading = true;
+        try
+        {
+            Liquidaciones = await ApiClient.GetLiquidacionesAsync();
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void AbrirModalAuditoria(LiquidacionDto liq)
+    {
+        LiquidacionSeleccionada = liq;
+        NuevoEstadoAuditoria = EstadoLiquidacion.Validada;
+        ObservacionAuditoria = "Tarifas de pesaje y flete auditadas conforme a tarifario vigente.";
+    }
+
+    private async Task ConfirmarAuditoria()
+    {
+        if (LiquidacionSeleccionada == null) return;
+        var dto = new AuditarLiquidacionDto
+        {
+            LiquidacionId = LiquidacionSeleccionada.Id,
+            NuevoEstado = NuevoEstadoAuditoria,
+            Observacion = ObservacionAuditoria
+        };
+
+        var ok = await ApiClient.AuditarLiquidacionAsync(dto);
+        if (ok)
+        {
+            Notifier.Success($"Comprobante {LiquidacionSeleccionada.NumeroComprobante} marcado como {NuevoEstadoAuditoria}.");
+            LiquidacionSeleccionada = null;
+            await Cargar();
+        }
+        else
+        {
+            Notifier.Error("No se pudo completar la auditoría.");
+        }
+    }
+
+    private string GetLiqBadgeStyle(EstadoLiquidacion estado) => estado switch
+    {
+        EstadoLiquidacion.Validada => "background-color: #ECFDF5; color: #047857;",
+        EstadoLiquidacion.Observada => "background-color: #FEF2F2; color: #DC2626;",
+        _ => "background-color: #FEF3C7; color: #B45309;"
+    };
+}
