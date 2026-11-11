@@ -565,4 +565,211 @@ public class MobileApiClient : IMobileApiClient
 
         return new List<ContratoAlquilerDarsenaDto>();
     }
+
+    // ==========================================
+    // 10. ADMINISTRACIÓN (USUARIOS, CHOFERES, APROBACIONES, TARIFAS)
+    // ==========================================
+
+    public async Task<List<UsuarioDto>> GetUsuariosAsync()
+    {
+        try
+        {
+            await PrepareHttpClientAsync();
+            var response = await _http.GetAsync("api/usuarios");
+            if (response.IsSuccessStatusCode)
+            {
+                var list = await response.Content.ReadFromJsonAsync<List<UsuarioDto>>(_jsonOptions);
+                if (list != null) return list;
+            }
+        }
+        catch { }
+
+        return new List<UsuarioDto>();
+    }
+
+    public async Task<bool> CrearUsuarioAsync(UsuarioDto dto)
+    {
+        try
+        {
+            await PrepareHttpClientAsync();
+            var response = await _http.PostAsJsonAsync("api/usuarios", dto);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public async Task<bool> ToggleActivoUsuarioAsync(int id)
+    {
+        try
+        {
+            await PrepareHttpClientAsync();
+            var response = await _http.PutAsync($"api/usuarios/{id}/toggle-activo", null);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public async Task<bool> ReenviarConfirmacionPersonalAsync(int usuarioId)
+    {
+        try
+        {
+            await PrepareHttpClientAsync();
+            var response = await _http.PostAsync($"api/usuarios/{usuarioId}/reenviar-confirmacion", null);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public async Task<List<ConductorDetalleDto>> GetConductoresDetalleAsync(EstadoPostulacionAlta? estado = null, TipoConductor? tipo = null)
+    {
+        try
+        {
+            await PrepareHttpClientAsync();
+            var url = "api/conductores";
+            var query = new List<string>();
+            if (estado.HasValue) query.Add($"estado={estado.Value}");
+            if (tipo.HasValue) query.Add($"tipo={tipo.Value}");
+            if (query.Any()) url += "?" + string.Join("&", query);
+
+            var response = await _http.GetAsync(url);
+            if (response.IsSuccessStatusCode)
+            {
+                var list = await response.Content.ReadFromJsonAsync<List<ConductorDetalleDto>>(_jsonOptions);
+                if (list != null) return list;
+            }
+        }
+        catch { }
+
+        return new List<ConductorDetalleDto>();
+    }
+
+    public async Task<bool> CrearConductorFlotaAsync(CrearConductorFlotaDto dto)
+    {
+        try
+        {
+            await PrepareHttpClientAsync();
+            var response = await _http.PostAsJsonAsync("api/conductores/flota-lcp", dto);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public async Task<bool> AprobarConductorAsync(int id)
+    {
+        try
+        {
+            await PrepareHttpClientAsync();
+            var response = await _http.PutAsync($"api/conductores/{id}/aprobar", null);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public async Task<bool> RechazarConductorAsync(int id)
+    {
+        try
+        {
+            await PrepareHttpClientAsync();
+            var response = await _http.PutAsync($"api/conductores/{id}/rechazar", null);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public async Task<List<ClienteEmpresaDetalleDto>> GetClientesDetalleAsync(EstadoPostulacionAlta? estado = null)
+    {
+        try
+        {
+            await PrepareHttpClientAsync();
+            var url = "api/clientes";
+            if (estado.HasValue) url += $"?estado={estado.Value}";
+
+            var response = await _http.GetAsync(url);
+            if (response.IsSuccessStatusCode)
+            {
+                var list = await response.Content.ReadFromJsonAsync<List<ClienteEmpresaDetalleDto>>(_jsonOptions);
+                if (list != null) return list;
+            }
+        }
+        catch { }
+
+        return new List<ClienteEmpresaDetalleDto>();
+    }
+
+    public async Task<bool> AprobarClienteAsync(int id)
+    {
+        try
+        {
+            await PrepareHttpClientAsync();
+            var response = await _http.PutAsync($"api/clientes/{id}/aprobar", null);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public async Task<bool> RechazarClienteAsync(int id)
+    {
+        try
+        {
+            await PrepareHttpClientAsync();
+            var response = await _http.PutAsync($"api/clientes/{id}/rechazar", null);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public async Task<List<TarifaConfiguracionDto>> GetTarifasAsync()
+    {
+        try
+        {
+            await PrepareHttpClientAsync();
+            var response = await _http.GetAsync("api/tarifas");
+            if (response.IsSuccessStatusCode)
+            {
+                var list = await response.Content.ReadFromJsonAsync<List<TarifaConfiguracionDto>>(_jsonOptions);
+                if (list != null) return list;
+            }
+        }
+        catch { }
+
+        return new List<TarifaConfiguracionDto>();
+    }
+
+    public async Task<bool> ActualizarTarifaAsync(ActualizarTarifaDto dto)
+    {
+        try
+        {
+            await PrepareHttpClientAsync();
+            var response = await _http.PutAsJsonAsync("api/tarifas", dto);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 }

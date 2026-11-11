@@ -1,0 +1,356 @@
+@page "/admin/conductores"
+@layout MobileLayout
+@inject IMobileApiClient ApiClient
+@inject UiNotificationService Notifier
+@inject NavigationManager Nav
+
+<div style="display: flex; flex-direction: column; gap: 14px; padding-bottom: 26px;">
+    <!-- Title & Action -->
+    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div>
+            <h2 style="font-size: 1.15rem; font-weight: 800; color: var(--lcp-navy);">Choferes y Flota LCP</h2>
+            <div style="font-size: 0.72rem; color: var(--lcp-text-muted);">Unidades de transporte y conductores</div>
+        </div>
+        <button type="button" class="btn-lcp-primary btn-lcp-sm" @onclick="() => MostrarModalNuevo = true" style="padding: 6px 12px; font-size: 0.75rem;">
+            <i class="fa-solid fa-truck-medical"></i>
+            <span>Nuevo</span>
+        </button>
+    </div>
+
+    <!-- Search Input -->
+    <div style="position: relative;">
+        <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 14px; top: 12px; color: #94A3B8; font-size: 0.85rem;"></i>
+        <input type="text" class="form-input" style="padding-left: 36px;" placeholder="Buscar por nombre, patente o CUIL..." @bind="FiltroTexto" @bind:event="oninput" />
+    </div>
+
+    <!-- Filter Chips -->
+    <div style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px;">
+        <button type="button" class="badge-pill @(FiltroTipo == null && !SoloPendientes ? "active-chip" : "inactive-chip")" @onclick="() => { FiltroTipo = null; SoloPendientes = false; }">
+            Todos (@Conductores.Count)
+        </button>
+        <button type="button" class="badge-pill @(FiltroTipo == TipoConductor.FlotaLCP && !SoloPendientes ? "active-chip" : "inactive-chip")" @onclick="() => { FiltroTipo = TipoConductor.FlotaLCP; SoloPendientes = false; }">
+            Flota LCP
+        </button>
+        <button type="button" class="badge-pill @(FiltroTipo == TipoConductor.PropioCliente && !SoloPendientes ? "active-chip" : "inactive-chip")" @onclick="() => { FiltroTipo = TipoConductor.PropioCliente; SoloPendientes = false; }">
+            De Clientes
+        </button>
+        <button type="button" class="badge-pill @(SoloPendientes ? "active-chip" : "inactive-chip")" @onclick="() => { SoloPendientes = true; FiltroTipo = null; }">
+            Pendientes
+        </button>
+    </div>
+
+    @if (IsLoading)
+    {
+        <div style="text-align: center; padding: 40px; color: var(--lcp-text-muted);">
+            <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 1.6rem; color: var(--lcp-teal); margin-bottom: 8px;"></i>
+            <div style="font-size: 0.8rem;">Cargando choferes desde LCP.Api...</div>
+        </div>
+    }
+    else if (!ConductoresFiltrados.Any())
+    {
+        <div class="card-lcp" style="text-align: center; padding: 30px;">
+            <i class="fa-solid fa-truck-moving" style="font-size: 2rem; color: #CBD5E1; margin-bottom: 8px;"></i>
+            <div style="font-weight: 700; color: var(--lcp-navy);">No se encontraron choferes</div>
+            <div style="font-size: 0.75rem; color: var(--lcp-text-muted);">No hay registros con los filtros actuales.</div>
+        </div>
+    }
+    else
+    {
+        <!-- List of Drivers -->
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+            @foreach (var c in ConductoresFiltrados)
+            {
+                <div class="card-lcp" style="margin-bottom: 0; padding: 14px; border-left: 4px solid @(c.TipoConductor == TipoConductor.FlotaLCP ? "var(--lcp-teal)" : "var(--lcp-gold)");">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div style="width: 40px; height: 40px; border-radius: 12px; background: @(c.TipoConductor == TipoConductor.FlotaLCP ? "var(--lcp-teal-light)" : "var(--lcp-gold-light)"); color: @(c.TipoConductor == TipoConductor.FlotaLCP ? "var(--lcp-teal)" : "var(--lcp-gold)"); display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">
+                                <i class="fa-solid fa-truck"></i>
+                            </div>
+                            <div>
+                                <div style="font-weight: 800; font-size: 0.92rem; color: var(--lcp-navy);">
+                                    @c.NombreCompleto
+                                </div>
+                                <div style="font-size: 0.72rem; color: var(--lcp-text-muted);">
+                                    CUIL: @c.CUIL • Patente: <strong style="color: var(--lcp-navy);">@c.PatenteCamion</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <span class="badge-pill" style="background: @GetEstadoBg(c.EstadoPostulacion); color: @GetEstadoColor(c.EstadoPostulacion); font-size: 0.68rem; font-weight: 700;">
+                            @c.EstadoNombre
+                        </span>
+                    </div>
+
+                    <!-- Meta Details -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: #F8FAFC; padding: 8px 10px; border-radius: 8px; margin-bottom: 10px; font-size: 0.72rem;">
+                        <div>
+                            <span style="color: #64748B;">Tipo:</span>
+                            <strong style="color: var(--lcp-navy); margin-left: 4px;">@(c.TipoConductor == TipoConductor.FlotaLCP ? "Flota Oficial LCP" : "Chofer Propio")</strong>
+                        </div>
+                        <div>
+                            <span style="color: #64748B;">Celular:</span>
+                            <strong style="color: var(--lcp-navy); margin-left: 4px;">@c.CelularWhatsApp</strong>
+                        </div>
+                        <div>
+                            <span style="color: #64748B;">Carga Máx:</span>
+                            <strong style="color: var(--lcp-navy); margin-left: 4px;">@c.CapacidadCargaKg.ToString("N0") Kg</strong>
+                        </div>
+                        <div>
+                            <span style="color: #64748B;">Volumen:</span>
+                            <strong style="color: var(--lcp-navy); margin-left: 4px;">@c.CapacidadVolumenM3.ToString("N0") m³</strong>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(c.ClienteRazonSocial))
+                        {
+                            <div style="grid-column: span 2;">
+                                <span style="color: #64748B;">Empresa Cliente:</span>
+                                <strong style="color: var(--lcp-navy); margin-left: 4px;">@c.ClienteRazonSocial</strong>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Pending Approval Actions -->
+                    @if (c.EstadoPostulacion == EstadoPostulacionAlta.PendienteRevision)
+                    {
+                        <div style="display: flex; justify-content: flex-end; gap: 8px; border-top: 1px dashed #E2E8F0; padding-top: 8px;">
+                            <button type="button" class="btn-lcp-outline btn-lcp-sm" @onclick="() => Rechazar(c.Id)" style="border-color: #EF4444; color: #DC2626; padding: 4px 10px; font-size: 0.72rem;">
+                                <i class="fa-solid fa-xmark"></i>
+                                <span>Rechazar</span>
+                            </button>
+                            <button type="button" class="btn-lcp-primary btn-lcp-sm" @onclick="() => Aprobar(c.Id)" style="padding: 4px 10px; font-size: 0.72rem; background: #059669;">
+                                <i class="fa-solid fa-check"></i>
+                                <span>Aprobar</span>
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    <!-- Modal Nuevo Chofer Flota LCP -->
+    @if (MostrarModalNuevo)
+    {
+        <div class="modal-backdrop-mobile" @onclick="() => MostrarModalNuevo = false">
+            <div class="modal-sheet-mobile" @onclick:stopPropagation>
+                <div class="modal-header-mobile">
+                    <div>
+                        <h3 style="font-weight: 800; font-size: 1.05rem; color: var(--lcp-navy);">Incorporar Chofer a Flota LCP</h3>
+                        <div style="font-size: 0.72rem; color: var(--lcp-text-muted);">Alta de conductor de la flota oficial</div>
+                    </div>
+                    <button type="button" class="btn-close-modal" @onclick="() => MostrarModalNuevo = false">✕</button>
+                </div>
+
+                <div class="modal-body-mobile">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <div class="form-group-lcp">
+                            <label class="form-label-lcp">Nombre *</label>
+                            <input type="text" class="form-input" @bind="NuevoChofer.Nombre" placeholder="Esteban" />
+                        </div>
+                        <div class="form-group-lcp">
+                            <label class="form-label-lcp">Apellido *</label>
+                            <input type="text" class="form-input" @bind="NuevoChofer.Apellido" placeholder="Morales" />
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <div class="form-group-lcp">
+                            <label class="form-label-lcp">CUIL *</label>
+                            <input type="text" class="form-input" @bind="NuevoChofer.CUIL" placeholder="20-33445566-7" />
+                        </div>
+                        <div class="form-group-lcp">
+                            <label class="form-label-lcp">Patente Camión *</label>
+                            <input type="text" class="form-input" @bind="NuevoChofer.PatenteCamion" placeholder="AF-123-LP" />
+                        </div>
+                    </div>
+
+                    <div class="form-group-lcp">
+                        <label class="form-label-lcp">Correo Electrónico *</label>
+                        <input type="email" class="form-input" @bind="NuevoChofer.Email" placeholder="chofer@lcp.com" />
+                    </div>
+
+                    <div class="form-group-lcp">
+                        <label class="form-label-lcp">Celular / WhatsApp *</label>
+                        <input type="tel" class="form-input" @bind="NuevoChofer.CelularWhatsApp" placeholder="2954-555888" />
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <div class="form-group-lcp">
+                            <label class="form-label-lcp">Capacidad (Kg)</label>
+                            <input type="number" class="form-input" @bind="NuevoChofer.CapacidadCargaKg" />
+                        </div>
+                        <div class="form-group-lcp">
+                            <label class="form-label-lcp">Volumen (m³)</label>
+                            <input type="number" class="form-input" @bind="NuevoChofer.CapacidadVolumenM3" />
+                        </div>
+                    </div>
+
+                    <button type="button" class="btn-lcp-primary" style="width: 100%; margin-top: 10px;" @onclick="GuardarNuevoChofer" disabled="@IsSaving">
+                        @if (IsSaving)
+                        {
+                            <i class="fa-solid fa-circle-notch fa-spin"></i>
+                            <span>Guardando en API...</span>
+                        }
+                        else
+                        {
+                            <i class="fa-solid fa-truck"></i>
+                            <span>Dar de Alta Chofer</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<ConductorDetalleDto> Conductores = new();
+    private string FiltroTexto = "";
+    private TipoConductor? FiltroTipo = null;
+    private bool SoloPendientes = false;
+    private bool IsLoading = true;
+    private bool IsSaving = false;
+    private bool MostrarModalNuevo = false;
+
+    private CrearConductorFlotaDto NuevoChofer = new()
+    {
+        Nombre = "",
+        Apellido = "",
+        CUIL = "",
+        Email = "",
+        CelularWhatsApp = "",
+        PatenteCamion = "",
+        CapacidadCargaKg = 24000,
+        CapacidadVolumenM3 = 85,
+        FechaNacimiento = DateTime.Today.AddYears(-32),
+        Localidad = "Santa Rosa",
+        Provincia = "La Pampa"
+    };
+
+    private IEnumerable<ConductorDetalleDto> ConductoresFiltrados
+    {
+        get
+        {
+            var query = Conductores.AsEnumerable();
+            if (FiltroTipo.HasValue)
+            {
+                query = query.Where(c => c.TipoConductor == FiltroTipo.Value);
+            }
+            if (SoloPendientes)
+            {
+                query = query.Where(c => c.EstadoPostulacion == EstadoPostulacionAlta.PendienteRevision);
+            }
+            if (!string.IsNullOrWhiteSpace(FiltroTexto))
+            {
+                var f = FiltroTexto.Trim().ToLowerInvariant();
+                query = query.Where(c => c.NombreCompleto.ToLowerInvariant().Contains(f)
+                                      || c.PatenteCamion.ToLowerInvariant().Contains(f)
+                                      || c.CUIL.Contains(f));
+            }
+            return query;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarConductores();
+    }
+
+    private async Task CargarConductores()
+    {
+        IsLoading = true;
+        try
+        {
+            Conductores = await ApiClient.GetConductoresDetalleAsync();
+        }
+        catch (Exception ex)
+        {
+            Notifier.Error($"Error al cargar choferes: {ex.Message}");
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task Aprobar(int id)
+    {
+        var ok = await ApiClient.AprobarConductorAsync(id);
+        if (ok)
+        {
+            Notifier.Success("Postulación del chofer aprobada.");
+            await CargarConductores();
+        }
+        else
+        {
+            Notifier.Error("No se pudo aprobar el chofer.");
+        }
+    }
+
+    private async Task Rechazar(int id)
+    {
+        var ok = await ApiClient.RechazarConductorAsync(id);
+        if (ok)
+        {
+            Notifier.Warning("Postulación del chofer rechazada.");
+            await CargarConductores();
+        }
+        else
+        {
+            Notifier.Error("No se pudo rechazar la postulación.");
+        }
+    }
+
+    private async Task GuardarNuevoChofer()
+    {
+        if (string.IsNullOrWhiteSpace(NuevoChofer.Nombre) || string.IsNullOrWhiteSpace(NuevoChofer.Apellido) || string.IsNullOrWhiteSpace(NuevoChofer.PatenteCamion) || string.IsNullOrWhiteSpace(NuevoChofer.Email))
+        {
+            Notifier.Warning("Complete nombre, apellido, correo y patente.");
+            return;
+        }
+
+        IsSaving = true;
+        try
+        {
+            var ok = await ApiClient.CrearConductorFlotaAsync(NuevoChofer);
+            if (ok)
+            {
+                Notifier.Success($"Chofer {NuevoChofer.Nombre} incorporado a Flota LCP.");
+                MostrarModalNuevo = false;
+                NuevoChofer = new()
+                {
+                    CapacidadCargaKg = 24000,
+                    CapacidadVolumenM3 = 85,
+                    FechaNacimiento = DateTime.Today.AddYears(-32),
+                    Localidad = "Santa Rosa",
+                    Provincia = "La Pampa"
+                };
+                await CargarConductores();
+            }
+            else
+            {
+                Notifier.Error("Error al registrar chofer en LCP.Api. Verifique CUIL o patente.");
+            }
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+    private string GetEstadoColor(EstadoPostulacionAlta estado) => estado switch
+    {
+        EstadoPostulacionAlta.Aprobada => "#059669",
+        EstadoPostulacionAlta.PendienteRevision => "#D97706",
+        EstadoPostulacionAlta.Rechazada => "#DC2626",
+        _ => "#64748B"
+    };
+
+    private string GetEstadoBg(EstadoPostulacionAlta estado) => estado switch
+    {
+        EstadoPostulacionAlta.Aprobada => "#D1FAE5",
+        EstadoPostulacionAlta.PendienteRevision => "#FEF3C7",
+        EstadoPostulacionAlta.Rechazada => "#FEE2E2",
+        _ => "#F1F5F9"
+    };
+}
+

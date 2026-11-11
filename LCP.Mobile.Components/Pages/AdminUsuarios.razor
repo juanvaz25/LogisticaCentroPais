@@ -1,0 +1,340 @@
+@page "/admin/usuarios"
+@layout MobileLayout
+@inject IMobileApiClient ApiClient
+@inject UiNotificationService Notifier
+@inject NavigationManager Nav
+
+<div style="display: flex; flex-direction: column; gap: 14px; padding-bottom: 26px;">
+    <!-- Title & Action -->
+    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div>
+            <h2 style="font-size: 1.15rem; font-weight: 800; color: var(--lcp-navy);">Usuarios del Sistema</h2>
+            <div style="font-size: 0.72rem; color: var(--lcp-text-muted);">Personal LCP, Clientes y Choferes</div>
+        </div>
+        <button type="button" class="btn-lcp-primary btn-lcp-sm" @onclick="() => MostrarModalNuevo = true" style="padding: 6px 12px; font-size: 0.75rem;">
+            <i class="fa-solid fa-user-plus"></i>
+            <span>Nuevo</span>
+        </button>
+    </div>
+
+    <!-- Search Input -->
+    <div style="position: relative;">
+        <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 14px; top: 12px; color: #94A3B8; font-size: 0.85rem;"></i>
+        <input type="text" class="form-input" style="padding-left: 36px;" placeholder="Buscar por nombre o correo..." @bind="FiltroTexto" @bind:event="oninput" />
+    </div>
+
+    <!-- Role Filter Chips -->
+    <div style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px;">
+        <button type="button" class="badge-pill @(FiltroRol == null ? "active-chip" : "inactive-chip")" @onclick="() => FiltroRol = null">
+            Todos (@Usuarios.Count)
+        </button>
+        <button type="button" class="badge-pill @(FiltroRol == RolUsuario.Operador ? "active-chip" : "inactive-chip")" @onclick="() => FiltroRol = RolUsuario.Operador">
+            Operadores
+        </button>
+        <button type="button" class="badge-pill @(FiltroRol == RolUsuario.Auditor ? "active-chip" : "inactive-chip")" @onclick="() => FiltroRol = RolUsuario.Auditor">
+            Auditores
+        </button>
+        <button type="button" class="badge-pill @(FiltroRol == RolUsuario.Cliente ? "active-chip" : "inactive-chip")" @onclick="() => FiltroRol = RolUsuario.Cliente">
+            Clientes
+        </button>
+        <button type="button" class="badge-pill @(FiltroRol == RolUsuario.Conductor ? "active-chip" : "inactive-chip")" @onclick="() => FiltroRol = RolUsuario.Conductor">
+            Choferes
+        </button>
+    </div>
+
+    @if (IsLoading)
+    {
+        <div style="text-align: center; padding: 40px; color: var(--lcp-text-muted);">
+            <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 1.6rem; color: var(--lcp-teal); margin-bottom: 8px;"></i>
+            <div style="font-size: 0.8rem;">Cargando usuarios desde LCP.Api...</div>
+        </div>
+    }
+    else if (!UsuariosFiltrados.Any())
+    {
+        <div class="card-lcp" style="text-align: center; padding: 30px;">
+            <i class="fa-solid fa-users-slash" style="font-size: 2rem; color: #CBD5E1; margin-bottom: 8px;"></i>
+            <div style="font-weight: 700; color: var(--lcp-navy);">No se encontraron usuarios</div>
+            <div style="font-size: 0.75rem; color: var(--lcp-text-muted);">Prueba con otros términos de búsqueda.</div>
+        </div>
+    }
+    else
+    {
+        <!-- List of Users -->
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+            @foreach (var user in UsuariosFiltrados)
+            {
+                <div class="card-lcp" style="margin-bottom: 0; padding: 14px; border-left: 4px solid @GetRolColor(user.Rol);">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div style="width: 40px; height: 40px; border-radius: 12px; background: @GetRolBg(user.Rol); color: @GetRolColor(user.Rol); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.88rem;">
+                                @GetInitials(user.NombreCompleto)
+                            </div>
+                            <div>
+                                <div style="font-weight: 800; font-size: 0.92rem; color: var(--lcp-navy);">
+                                    @user.NombreCompleto
+                                </div>
+                                <div style="font-size: 0.72rem; color: var(--lcp-text-muted);">
+                                    @user.Email
+                                </div>
+                            </div>
+                        </div>
+
+                        <span class="badge-pill" style="background: @GetRolBg(user.Rol); color: @GetRolColor(user.Rol); font-size: 0.68rem; font-weight: 700;">
+                            @user.RolNombre
+                        </span>
+                    </div>
+
+                    <!-- Meta Details -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: #F8FAFC; padding: 8px 10px; border-radius: 8px; margin-bottom: 10px; font-size: 0.72rem;">
+                        <div>
+                            <span style="color: #64748B;">Teléfono:</span>
+                            <strong style="color: var(--lcp-navy); margin-left: 4px;">@(string.IsNullOrWhiteSpace(user.Telefono) ? "S/D" : user.Telefono)</strong>
+                        </div>
+                        <div>
+                            <span style="color: #64748B;">Estado:</span>
+                            @if (user.Activo)
+                            {
+                                <span style="color: #059669; font-weight: 700; margin-left: 4px;">● Activo</span>
+                            }
+                            else
+                            {
+                                <span style="color: #DC2626; font-weight: 700; margin-left: 4px;">● Inactivo</span>
+                            }
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(user.EmpresaRazonSocial))
+                        {
+                            <div style="grid-column: span 2;">
+                                <span style="color: #64748B;">Empresa:</span>
+                                <strong style="color: var(--lcp-navy); margin-left: 4px;">@user.EmpresaRazonSocial</strong>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                        @if (!user.EmailConfirmado)
+                        {
+                            <button type="button" class="btn-lcp-outline btn-lcp-sm" @onclick="() => ReenviarEmail(user.Id)" style="padding: 4px 8px; font-size: 0.7rem; border-color: #F59E0B; color: #D97706;">
+                                <i class="fa-solid fa-paper-plane"></i>
+                                <span>Reenviar Mail</span>
+                            </button>
+                        }
+
+                        @if (user.Rol != RolUsuario.Administrador)
+                        {
+                            <button type="button" class="btn-lcp-outline btn-lcp-sm" @onclick="() => ToggleEstado(user)" style="padding: 4px 8px; font-size: 0.7rem; border-color: @(user.Activo ? "#EF4444" : "#10B981"); color: @(user.Activo ? "#DC2626" : "#059669");">
+                                <i class="fa-solid @(user.Activo ? "fa-user-slash" : "fa-user-check")"></i>
+                                <span>@(user.Activo ? "Desactivar" : "Activar")</span>
+                            </button>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <!-- Modal Nuevo Usuario / Personal -->
+    @if (MostrarModalNuevo)
+    {
+        <div class="modal-backdrop-mobile" @onclick="() => MostrarModalNuevo = false">
+            <div class="modal-sheet-mobile" @onclick:stopPropagation>
+                <div class="modal-header-mobile">
+                    <div>
+                        <h3 style="font-weight: 800; font-size: 1.05rem; color: var(--lcp-navy);">Incorporar Nuevo Personal</h3>
+                        <div style="font-size: 0.72rem; color: var(--lcp-text-muted);">Creación de usuario en el sistema LCP</div>
+                    </div>
+                    <button type="button" class="btn-close-modal" @onclick="() => MostrarModalNuevo = false">✕</button>
+                </div>
+
+                <div class="modal-body-mobile">
+                    <div class="form-group-lcp">
+                        <label class="form-label-lcp">Nombre *</label>
+                        <input type="text" class="form-input" @bind="NuevoUsuario.Nombre" placeholder="Ej. Martín" />
+                    </div>
+
+                    <div class="form-group-lcp">
+                        <label class="form-label-lcp">Apellido *</label>
+                        <input type="text" class="form-input" @bind="NuevoUsuario.Apellido" placeholder="Ej. Benítez" />
+                    </div>
+
+                    <div class="form-group-lcp">
+                        <label class="form-label-lcp">Correo Electrónico *</label>
+                        <input type="email" class="form-input" @bind="NuevoUsuario.Email" placeholder="usuario@lcp.com" />
+                    </div>
+
+                    <div class="form-group-lcp">
+                        <label class="form-label-lcp">Teléfono Celular</label>
+                        <input type="tel" class="form-input" @bind="NuevoUsuario.Telefono" placeholder="2954-123456" />
+                    </div>
+
+                    <div class="form-group-lcp">
+                        <label class="form-label-lcp">Rol en LCP *</label>
+                        <select class="form-input" @bind="NuevoUsuario.Rol">
+                            <option value="@RolUsuario.Operador">Operador (Patio y Dársenas)</option>
+                            <option value="@RolUsuario.Auditor">Auditor (Finanzas y Alquileres)</option>
+                            <option value="@RolUsuario.Administrador">Administrador</option>
+                        </select>
+                    </div>
+
+                    <button type="button" class="btn-lcp-primary" style="width: 100%; margin-top: 10px;" @onclick="GuardarNuevoUsuario" disabled="@IsSaving">
+                        @if (IsSaving)
+                        {
+                            <i class="fa-solid fa-circle-notch fa-spin"></i>
+                            <span>Guardando en API...</span>
+                        }
+                        else
+                        {
+                            <i class="fa-solid fa-check"></i>
+                            <span>Crear Usuario</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<UsuarioDto> Usuarios = new();
+    private string FiltroTexto = "";
+    private RolUsuario? FiltroRol = null;
+    private bool IsLoading = true;
+    private bool IsSaving = false;
+    private bool MostrarModalNuevo = false;
+
+    private UsuarioDto NuevoUsuario = new()
+    {
+        Nombre = "",
+        Apellido = "",
+        Email = "",
+        Telefono = "",
+        Rol = RolUsuario.Operador,
+        Activo = true
+    };
+
+    private IEnumerable<UsuarioDto> UsuariosFiltrados
+    {
+        get
+        {
+            var query = Usuarios.AsEnumerable();
+            if (FiltroRol.HasValue)
+            {
+                query = query.Where(u => u.Rol == FiltroRol.Value);
+            }
+            if (!string.IsNullOrWhiteSpace(FiltroTexto))
+            {
+                var f = FiltroTexto.Trim().ToLowerInvariant();
+                query = query.Where(u => u.NombreCompleto.ToLowerInvariant().Contains(f) || u.Email.ToLowerInvariant().Contains(f));
+            }
+            return query;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarUsuarios();
+    }
+
+    private async Task CargarUsuarios()
+    {
+        IsLoading = true;
+        try
+        {
+            Usuarios = await ApiClient.GetUsuariosAsync();
+        }
+        catch (Exception ex)
+        {
+            Notifier.Error($"Error al cargar usuarios: {ex.Message}");
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task ToggleEstado(UsuarioDto user)
+    {
+        var ok = await ApiClient.ToggleActivoUsuarioAsync(user.Id);
+        if (ok)
+        {
+            user.Activo = !user.Activo;
+            Notifier.Success($"Usuario {(user.Activo ? "activado" : "desactivado")} exitosamente.");
+        }
+        else
+        {
+            Notifier.Error("No se pudo actualizar el estado del usuario.");
+        }
+    }
+
+    private async Task ReenviarEmail(int usuarioId)
+    {
+        var ok = await ApiClient.ReenviarConfirmacionPersonalAsync(usuarioId);
+        if (ok)
+        {
+            Notifier.Success("Correo de confirmación reenviado.");
+        }
+        else
+        {
+            Notifier.Error("No se pudo reenviar la confirmación.");
+        }
+    }
+
+    private async Task GuardarNuevoUsuario()
+    {
+        if (string.IsNullOrWhiteSpace(NuevoUsuario.Nombre) || string.IsNullOrWhiteSpace(NuevoUsuario.Apellido) || string.IsNullOrWhiteSpace(NuevoUsuario.Email))
+        {
+            Notifier.Warning("Por favor complete nombre, apellido y correo.");
+            return;
+        }
+
+        IsSaving = true;
+        try
+        {
+            var ok = await ApiClient.CrearUsuarioAsync(NuevoUsuario);
+            if (ok)
+            {
+                Notifier.Success($"Usuario {NuevoUsuario.Nombre} incorporado con éxito.");
+                MostrarModalNuevo = false;
+                NuevoUsuario = new() { Rol = RolUsuario.Operador, Activo = true };
+                await CargarUsuarios();
+            }
+            else
+            {
+                Notifier.Error("Error al crear usuario en LCP.Api. Verifique que el correo no esté duplicado.");
+            }
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+    private string GetRolColor(RolUsuario rol) => rol switch
+    {
+        RolUsuario.Administrador => "#EF4444",
+        RolUsuario.Operador => "#C2821E",
+        RolUsuario.Auditor => "#8B5CF6",
+        RolUsuario.Cliente => "#0284C7",
+        RolUsuario.Conductor => "#10B981",
+        _ => "#64748B"
+    };
+
+    private string GetRolBg(RolUsuario rol) => rol switch
+    {
+        RolUsuario.Administrador => "#FEE2E2",
+        RolUsuario.Operador => "#FEF3C7",
+        RolUsuario.Auditor => "#EDE9FE",
+        RolUsuario.Cliente => "#E0F2FE",
+        RolUsuario.Conductor => "#D1FAE5",
+        _ => "#F1F5F9"
+    };
+
+    private string GetInitials(string nombreCompleto)
+    {
+        if (string.IsNullOrWhiteSpace(nombreCompleto)) return "U";
+        var parts = nombreCompleto.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 1) return parts[0][0].ToString().ToUpper();
+        return $"{parts[0][0]}{parts[^1][0]}".ToUpper();
+    }
+}
+

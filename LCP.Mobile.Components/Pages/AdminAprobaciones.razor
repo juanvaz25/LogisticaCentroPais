@@ -1,0 +1,226 @@
+@page "/admin/aprobaciones"
+@layout MobileLayout
+@inject IMobileApiClient ApiClient
+@inject UiNotificationService Notifier
+@inject NavigationManager Nav
+
+<div style="display: flex; flex-direction: column; gap: 14px; padding-bottom: 26px;">
+    <!-- Title -->
+    <div>
+        <h2 style="font-size: 1.15rem; font-weight: 800; color: var(--lcp-navy);">Aprobaciones de Alta</h2>
+        <div style="font-size: 0.72rem; color: var(--lcp-text-muted);">Empresas clientes y choferes pendientes de habilitación</div>
+    </div>
+
+    <!-- Tab Selector -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: #E2E8F0; padding: 4px; border-radius: 10px;">
+        <button type="button" class="btn-lcp-outline btn-lcp-sm @(TabActivo == "empresas" ? "active-tab-btn" : "")" @onclick='() => TabActivo = "empresas"' style="border: none; border-radius: 8px;">
+            <i class="fa-solid fa-building"></i>
+            <span>Empresas (@EmpresasPendientes.Count)</span>
+        </button>
+        <button type="button" class="btn-lcp-outline btn-lcp-sm @(TabActivo == "choferes" ? "active-tab-btn" : "")" @onclick='() => TabActivo = "choferes"' style="border: none; border-radius: 8px;">
+            <i class="fa-solid fa-truck"></i>
+            <span>Choferes (@ChoferesPendientes.Count)</span>
+        </button>
+    </div>
+
+    @if (IsLoading)
+    {
+        <div style="text-align: center; padding: 40px; color: var(--lcp-text-muted);">
+            <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 1.6rem; color: var(--lcp-teal); margin-bottom: 8px;"></i>
+            <div style="font-size: 0.8rem;">Cargando postulaciones desde LCP.Api...</div>
+        </div>
+    }
+    else if (TabActivo == "empresas")
+    {
+        @if (!EmpresasPendientes.Any())
+        {
+            <div class="card-lcp" style="text-align: center; padding: 30px;">
+                <i class="fa-solid fa-clipboard-check" style="font-size: 2rem; color: #10B981; margin-bottom: 8px;"></i>
+                <div style="font-weight: 700; color: var(--lcp-navy);">Sin empresas pendientes</div>
+                <div style="font-size: 0.75rem; color: var(--lcp-text-muted);">Todas las solicitudes de registro de clientes fueron procesadas.</div>
+            </div>
+        }
+        else
+        {
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                @foreach (var emp in EmpresasPendientes)
+                {
+                    <div class="card-lcp" style="margin-bottom: 0; padding: 14px; border-left: 4px solid var(--lcp-gold);">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                            <div>
+                                <h3 style="font-weight: 800; font-size: 0.95rem; color: var(--lcp-navy);">@emp.RazonSocial</h3>
+                                <div style="font-size: 0.72rem; color: var(--lcp-text-muted);">CUIT: @emp.CUIT • Rubro: @emp.Rubro</div>
+                            </div>
+                            <span class="badge-pill" style="background: #FEF3C7; color: #D97706; font-size: 0.68rem; font-weight: 700;">
+                                Pendiente
+                            </span>
+                        </div>
+
+                        <div style="background: #F8FAFC; padding: 8px 10px; border-radius: 8px; font-size: 0.74rem; margin-bottom: 10px; display: flex; flex-direction: column; gap: 4px;">
+                            <div><i class="fa-solid fa-location-dot" style="color: #64748B; width: 14px;"></i> @emp.Domicilio, @emp.Localidad (@emp.Provincia)</div>
+                            <div><i class="fa-solid fa-envelope" style="color: #64748B; width: 14px;"></i> @emp.EmailContacto</div>
+                            <div><i class="fa-solid fa-phone" style="color: #64748B; width: 14px;"></i> @emp.TelefonoContacto</div>
+                        </div>
+
+                        <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                            <button type="button" class="btn-lcp-outline btn-lcp-sm" @onclick="() => RechazarEmpresa(emp.Id)" style="border-color: #EF4444; color: #DC2626;">
+                                <i class="fa-solid fa-xmark"></i>
+                                <span>Rechazar</span>
+                            </button>
+                            <button type="button" class="btn-lcp-primary btn-lcp-sm" @onclick="() => AprobarEmpresa(emp.Id)" style="background: #059669;">
+                                <i class="fa-solid fa-check"></i>
+                                <span>Aprobar Empresa</span>
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+    else
+    {
+        @if (!ChoferesPendientes.Any())
+        {
+            <div class="card-lcp" style="text-align: center; padding: 30px;">
+                <i class="fa-solid fa-id-card" style="font-size: 2rem; color: #10B981; margin-bottom: 8px;"></i>
+                <div style="font-weight: 700; color: var(--lcp-navy);">Sin choferes pendientes</div>
+                <div style="font-size: 0.75rem; color: var(--lcp-text-muted);">No hay postulaciones de conductores para revisar.</div>
+            </div>
+        }
+        else
+        {
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                @foreach (var ch in ChoferesPendientes)
+                {
+                    <div class="card-lcp" style="margin-bottom: 0; padding: 14px; border-left: 4px solid var(--lcp-teal);">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                            <div>
+                                <h3 style="font-weight: 800; font-size: 0.95rem; color: var(--lcp-navy);">@ch.NombreCompleto</h3>
+                                <div style="font-size: 0.72rem; color: var(--lcp-text-muted);">CUIL: @ch.CUIL • Patente: <strong style="color: var(--lcp-navy);">@ch.PatenteCamion</strong></div>
+                            </div>
+                            <span class="badge-pill" style="background: #FEF3C7; color: #D97706; font-size: 0.68rem; font-weight: 700;">
+                                Pendiente
+                            </span>
+                        </div>
+
+                        <div style="background: #F8FAFC; padding: 8px 10px; border-radius: 8px; font-size: 0.74rem; margin-bottom: 10px; display: flex; flex-direction: column; gap: 4px;">
+                            <div><i class="fa-solid fa-phone" style="color: #64748B; width: 14px;"></i> WhatsApp: @ch.CelularWhatsApp</div>
+                            <div><i class="fa-solid fa-envelope" style="color: #64748B; width: 14px;"></i> @ch.Email</div>
+                            <div><i class="fa-solid fa-weight-hanging" style="color: #64748B; width: 14px;"></i> Capacidad: @ch.CapacidadCargaKg.ToString("N0") Kg / @ch.CapacidadVolumenM3.ToString("N0") m³</div>
+                        </div>
+
+                        <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                            <button type="button" class="btn-lcp-outline btn-lcp-sm" @onclick="() => RechazarChofer(ch.Id)" style="border-color: #EF4444; color: #DC2626;">
+                                <i class="fa-solid fa-xmark"></i>
+                                <span>Rechazar</span>
+                            </button>
+                            <button type="button" class="btn-lcp-primary btn-lcp-sm" @onclick="() => AprobarChofer(ch.Id)" style="background: #059669;">
+                                <i class="fa-solid fa-check"></i>
+                                <span>Aprobar Chofer</span>
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+</div>
+
+<style>
+    .active-tab-btn {
+        background: white !important;
+        color: var(--lcp-navy) !important;
+        font-weight: 800 !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.08) !important;
+    }
+</style>
+
+@code {
+    private string TabActivo = "empresas";
+    private bool IsLoading = true;
+    private List<ClienteEmpresaDetalleDto> EmpresasPendientes = new();
+    private List<ConductorDetalleDto> ChoferesPendientes = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarDatos();
+    }
+
+    private async Task CargarDatos()
+    {
+        IsLoading = true;
+        try
+        {
+            var empTask = ApiClient.GetClientesDetalleAsync(EstadoPostulacionAlta.PendienteRevision);
+            var chTask = ApiClient.GetConductoresDetalleAsync(estado: EstadoPostulacionAlta.PendienteRevision);
+            await Task.WhenAll(empTask, chTask);
+            EmpresasPendientes = empTask.Result;
+            ChoferesPendientes = chTask.Result;
+        }
+        catch (Exception ex)
+        {
+            Notifier.Error($"Error al consultar aprobaciones: {ex.Message}");
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task AprobarEmpresa(int id)
+    {
+        var ok = await ApiClient.AprobarClienteAsync(id);
+        if (ok)
+        {
+            Notifier.Success("Empresa cliente aprobada y accesos habilitados.");
+            await CargarDatos();
+        }
+        else
+        {
+            Notifier.Error("No se pudo aprobar la empresa.");
+        }
+    }
+
+    private async Task RechazarEmpresa(int id)
+    {
+        var ok = await ApiClient.RechazarClienteAsync(id);
+        if (ok)
+        {
+            Notifier.Warning("Empresa rechazada.");
+            await CargarDatos();
+        }
+        else
+        {
+            Notifier.Error("No se pudo rechazar la empresa.");
+        }
+    }
+
+    private async Task AprobarChofer(int id)
+    {
+        var ok = await ApiClient.AprobarConductorAsync(id);
+        if (ok)
+        {
+            Notifier.Success("Chofer aprobado.");
+            await CargarDatos();
+        }
+        else
+        {
+            Notifier.Error("No se pudo aprobar el chofer.");
+        }
+    }
+
+    private async Task RechazarChofer(int id)
+    {
+        var ok = await ApiClient.RechazarConductorAsync(id);
+        if (ok)
+        {
+            Notifier.Warning("Postulación de chofer rechazada.");
+            await CargarDatos();
+        }
+        else
+        {
+            Notifier.Error("No se pudo rechazar al chofer.");
+        }
+    }
+}
+

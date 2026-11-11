@@ -74,7 +74,7 @@
         </p>
 
         <div class="form-group-lcp">
-            <input type="text" class="form-input-lcp" @bind="ApiUrlInput" placeholder="http://localhost:5147 o https://...somee.com" />
+            <input type="text" class="form-input-lcp" @bind="ApiUrlInput" placeholder="http://localhost:5152 o https://...somee.com" />
         </div>
 
         <button class="btn-lcp-outline btn-lcp-sm" style="width: 100%; font-size: 0.78rem;" @onclick="GuardarApiUrl">
@@ -82,6 +82,38 @@
             <span>Guardar Dirección de Servidor</span>
         </button>
     </div>
+
+    @if (CurrentUser?.Rol == RolUsuario.Administrador)
+    {
+        <!-- Accesos de Administrador -->
+        <div class="card-lcp" style="padding: 16px; border-left: 4px solid #EF4444;">
+            <div class="card-header-clean" style="margin-bottom: 10px;">
+                <span style="font-weight: 700; font-size: 0.85rem; color: #DC2626;">
+                    <i class="fa-solid fa-shield-halved" style="margin-right: 6px;"></i>
+                    Funciones de Administrador
+                </span>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <a href="/admin/usuarios" class="btn-lcp-outline btn-lcp-sm" style="justify-content: flex-start; text-decoration: none;">
+                    <i class="fa-solid fa-users" style="color: #EF4444;"></i>
+                    <span>Gestión de Usuarios y Personal LCP</span>
+                </a>
+                <a href="/admin/conductores" class="btn-lcp-outline btn-lcp-sm" style="justify-content: flex-start; text-decoration: none;">
+                    <i class="fa-solid fa-truck" style="color: #10B981;"></i>
+                    <span>Gestión de Choferes y Flota Oficial</span>
+                </a>
+                <a href="/admin/aprobaciones" class="btn-lcp-outline btn-lcp-sm" style="justify-content: flex-start; text-decoration: none;">
+                    <i class="fa-solid fa-clipboard-check" style="color: #F59E0B;"></i>
+                    <span>Aprobaciones de Clientes y Choferes</span>
+                </a>
+                <a href="/admin/tarifas" class="btn-lcp-outline btn-lcp-sm" style="justify-content: flex-start; text-decoration: none;">
+                    <i class="fa-solid fa-tags" style="color: #0284C7;"></i>
+                    <span>Configuración de Tarifas y Cánones</span>
+                </a>
+            </div>
+        </div>
+    }
 
     <!-- Switch Persona (Quick Demo) -->
     <div class="card-lcp" style="padding: 16px;">
@@ -93,19 +125,19 @@
         </div>
 
         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;">
-            <button class="btn-lcp-outline btn-lcp-sm" style="font-size: 0.72rem; justify-content: flex-start;" @onclick='() => CambiarUsuario("operador@lcp.com")'>
+            <button class="btn-lcp-outline btn-lcp-sm" style="font-size: 0.72rem; justify-content: flex-start;" @onclick='() => CambiarUsuario("operador@lcp.com", "Operador123!")'>
                 <i class="fa-solid fa-people-carry-box" style="color: #C2821E;"></i>
                 <span>Operador</span>
             </button>
-            <button class="btn-lcp-outline btn-lcp-sm" style="font-size: 0.72rem; justify-content: flex-start;" @onclick='() => CambiarUsuario("auditor@lcp.com")'>
+            <button class="btn-lcp-outline btn-lcp-sm" style="font-size: 0.72rem; justify-content: flex-start;" @onclick='() => CambiarUsuario("auditor@lcp.com", "Auditor123!")'>
                 <i class="fa-solid fa-clipboard-check" style="color: #8B5CF6;"></i>
                 <span>Auditor</span>
             </button>
-            <button class="btn-lcp-outline btn-lcp-sm" style="font-size: 0.72rem; justify-content: flex-start;" @onclick='() => CambiarUsuario("conductor@flota.com")'>
+            <button class="btn-lcp-outline btn-lcp-sm" style="font-size: 0.72rem; justify-content: flex-start;" @onclick='() => CambiarUsuario("conductor@flota.com", "Chofer123!")'>
                 <i class="fa-solid fa-truck" style="color: #10B981;"></i>
                 <span>Conductor</span>
             </button>
-            <button class="btn-lcp-outline btn-lcp-sm" style="font-size: 0.72rem; justify-content: flex-start;" @onclick='() => CambiarUsuario("admin@lcp.com")'>
+            <button class="btn-lcp-outline btn-lcp-sm" style="font-size: 0.72rem; justify-content: flex-start;" @onclick='() => CambiarUsuario("admin@lcp.com", "Admin123!")'>
                 <i class="fa-solid fa-shield-halved" style="color: #EF4444;"></i>
                 <span>Administrador</span>
             </button>
@@ -121,7 +153,7 @@
 
 @code {
     private UsuarioDto? CurrentUser;
-    private string ApiUrlInput = "http://localhost:5147";
+    private string ApiUrlInput = "http://localhost:5152";
 
     protected override async Task OnInitializedAsync()
     {
@@ -135,14 +167,18 @@
         Notifier.Success("URL de API guardada correctamente.");
     }
 
-    private async Task CambiarUsuario(string email)
+    private async Task CambiarUsuario(string email, string password)
     {
-        var res = await ApiClient.LoginAsync(new LoginRequestDto { Email = email, Password = "123" });
+        var res = await ApiClient.LoginAsync(new LoginRequestDto { Email = email, Password = password });
         if (res.Exitoso)
         {
             CurrentUser = res.Usuario;
-            Notifier.Success($"Perfil cambiado a {res.Usuario?.Rol}");
+            Notifier.Success($"Perfil cambiado a {res.Usuario?.RolNombre}");
             Nav.NavigateTo("/");
+        }
+        else
+        {
+            Notifier.Error(res.Mensaje);
         }
     }
 

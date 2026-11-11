@@ -1,12 +1,15 @@
 @inject UiNotificationService Notifier
 @implements IDisposable
 
-<div class="toast-container">
-    @foreach (var toast in Notifier.ActiveToasts)
+<div class="toast-container" style="pointer-events: none;">
+    @foreach (var toast in Notifier.GetActiveToasts())
     {
-        <div class="toast-item @toast.Type">
-            <i class="@GetIcon(toast.Type)"></i>
-            <span>@toast.Text</span>
+        <div class="toast-item @toast.Type" @onclick="() => Notifier.Dismiss(toast.Id)" style="cursor: pointer; pointer-events: auto; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <i class="@GetIcon(toast.Type)"></i>
+                <span>@toast.Text</span>
+            </div>
+            <i class="fa-solid fa-xmark" style="font-size: 0.8rem; opacity: 0.8; margin-left: 8px;"></i>
         </div>
     }
 </div>
@@ -14,7 +17,12 @@
 @code {
     protected override void OnInitialized()
     {
-        Notifier.OnChange += StateHasChanged;
+        Notifier.OnChange += HandleChange;
+    }
+
+    private void HandleChange()
+    {
+        _ = InvokeAsync(StateHasChanged);
     }
 
     private string GetIcon(string type) => type switch
@@ -27,7 +35,6 @@
 
     public void Dispose()
     {
-        Notifier.OnChange -= StateHasChanged;
+        Notifier.OnChange -= HandleChange;
     }
 }
-

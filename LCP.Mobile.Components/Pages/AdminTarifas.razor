@@ -1,0 +1,154 @@
+@page "/admin/tarifas"
+@layout MobileLayout
+@inject IMobileApiClient ApiClient
+@inject UiNotificationService Notifier
+@inject NavigationManager Nav
+
+<div style="display: flex; flex-direction: column; gap: 14px; padding-bottom: 26px;">
+    <!-- Title -->
+    <div>
+        <h2 style="font-size: 1.15rem; font-weight: 800; color: var(--lcp-navy);">Tarifario LCP</h2>
+        <div style="font-size: 0.72rem; color: var(--lcp-text-muted);">Configuración de valores logísticos y alquiler de dársenas</div>
+    </div>
+
+    @if (IsLoading)
+    {
+        <div style="text-align: center; padding: 40px; color: var(--lcp-text-muted);">
+            <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 1.6rem; color: var(--lcp-teal); margin-bottom: 8px;"></i>
+            <div style="font-size: 0.8rem;">Cargando tarifas desde LCP.Api...</div>
+        </div>
+    }
+    else if (!Tarifas.Any())
+    {
+        <div class="card-lcp" style="text-align: center; padding: 30px;">
+            <i class="fa-solid fa-tags" style="font-size: 2rem; color: #CBD5E1; margin-bottom: 8px;"></i>
+            <div style="font-weight: 700; color: var(--lcp-navy);">No se encontraron tarifas configuradas</div>
+        </div>
+    }
+    else
+    {
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+            @foreach (var t in Tarifas)
+            {
+                <div class="card-lcp" style="margin-bottom: 0; padding: 14px; border-left: 4px solid var(--lcp-gold);">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
+                        <div>
+                            <span style="font-size: 0.65rem; font-weight: 700; color: #64748B; font-family: monospace;">@t.CodigoConcepto</span>
+                            <div style="font-weight: 800; font-size: 0.9rem; color: var(--lcp-navy);">@t.Descripcion</div>
+                        </div>
+                    </div>
+
+                    @if (TarifaEnEdicion == t.CodigoConcepto)
+                    {
+                        <div style="display: flex; gap: 8px; align-items: center; margin-top: 8px;">
+                            <div style="position: relative; flex: 1;">
+                                <span style="position: absolute; left: 10px; top: 10px; font-weight: 700; color: #64748B;">$</span>
+                                <input type="number" step="0.01" class="form-input" style="padding-left: 24px;" @bind="ValorNuevoTemp" />
+                            </div>
+                            <button type="button" class="btn-lcp-primary btn-lcp-sm" @onclick="() => GuardarTarifa(t.CodigoConcepto)" disabled="@IsSaving">
+                                @if (IsSaving)
+                                {
+                                    <i class="fa-solid fa-circle-notch fa-spin"></i>
+                                }
+                                else
+                                {
+                                    <i class="fa-solid fa-check"></i>
+                                    <span>Guardar</span>
+                                }
+                            </button>
+                            <button type="button" class="btn-lcp-outline btn-lcp-sm" @onclick="() => TarifaEnEdicion = null" disabled="@IsSaving">
+                                ✕
+                            </button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; background: #F8FAFC; padding: 8px 10px; border-radius: 8px;">
+                            <div>
+                                <span style="font-size: 0.68rem; color: #64748B;">VALOR ACTUAL</span>
+                                <div style="font-size: 1.15rem; font-weight: 800; color: var(--lcp-navy);">
+                                    $@t.ValorUnitario.ToString("N2")
+                                </div>
+                            </div>
+                            <button type="button" class="btn-lcp-outline btn-lcp-sm" @onclick="() => IniciarEdicion(t)">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                                <span>Modificar</span>
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<TarifaConfiguracionDto> Tarifas = new();
+    private bool IsLoading = true;
+    private bool IsSaving = false;
+    private string? TarifaEnEdicion = null;
+    private decimal ValorNuevoTemp = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarTarifas();
+    }
+
+    private async Task CargarTarifas()
+    {
+        IsLoading = true;
+        try
+        {
+            Tarifas = await ApiClient.GetTarifasAsync();
+        }
+        catch (Exception ex)
+        {
+            Notifier.Error($"Error al cargar tarifas: {ex.Message}");
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void IniciarEdicion(TarifaConfiguracionDto t)
+    {
+        TarifaEnEdicion = t.CodigoConcepto;
+        ValorNuevoTemp = t.ValorUnitario;
+    }
+
+    private async Task GuardarTarifa(string codigoConcepto)
+    {
+        if (ValorNuevoTemp < 0)
+        {
+            Notifier.Warning("El valor tarifario no puede ser negativo.");
+            return;
+        }
+
+        IsSaving = true;
+        try
+        {
+            var ok = await ApiClient.ActualizarTarifaAsync(new ActualizarTarifaDto
+            {
+                CodigoConcepto = codigoConcepto,
+                NuevoValor = ValorNuevoTemp
+            });
+
+            if (ok)
+            {
+                Notifier.Success("Tarifa actualizada exitosamente en LCP.Api.");
+                TarifaEnEdicion = null;
+                await CargarTarifas();
+            }
+            else
+            {
+                Notifier.Error("No se pudo actualizar la tarifa.");
+            }
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+}
+

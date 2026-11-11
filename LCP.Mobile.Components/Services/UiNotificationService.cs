@@ -10,25 +10,56 @@ public class UiNotificationService
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 
-    public List<ToastMessage> ActiveToasts { get; } = new();
+    private readonly List<ToastMessage> _toasts = new();
+    private readonly object _lock = new();
+
     public event Action? OnChange;
 
-    public void Show(string text, string type = "info")
+    public List<ToastMessage> GetActiveToasts()
+    {
+        lock (_lock)
+        {
+            return _toasts.ToList();
+        }
+    }
+
+    public void Show(string text, string type = "info", int durationMs = 3500)
     {
         var toast = new ToastMessage { Text = text, Type = type };
-        ActiveToasts.Add(toast);
+        lock (_lock)
+        {
+            _toasts.Add(toast);
+        }
         OnChange?.Invoke();
 
-        Task.Delay(3500).ContinueWith(_ =>
+        _ = Task.Run(async () =>
         {
-            ActiveToasts.Remove(toast);
-            OnChange?.Invoke();
+            await Task.Delay(durationMs);
+            Dismiss(toast.Id);
         });
     }
 
-    public void Success(string text) => Show(text, "success");
-    public void Error(string text) => Show(text, "danger");
-    public void Warning(string text) => Show(text, "warning");
-    public void Info(string text) => Show(text, "info");
-}
+    public void Dismiss(string id)
+    {
+        bool removed = false;
+        lock (_lock)
+        {
+            var item = _toasts.FirstOrDefault(t => t.Id == id);
+            if (item != null)
+            {
+                _toasts.Remove(item);
+                removed = true;
+            }
+        }
 
+        if (removed)
+        {
+            OnChange?.Invoke();
+        }
+    }
+
+    public void Success(string text) => Show(text, "success", 3500);
+    public void Error(string text) => Show(text, "danger", 4500);
+    public void Warning(string text) => Show(text, "warning", 4500);
+    public void Info(string text) => Show(text, "info", 3500);
+}

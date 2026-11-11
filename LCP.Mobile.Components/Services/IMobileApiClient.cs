@@ -45,5 +45,24 @@ public interface IMobileApiClient
 
     // Auxiliares
     Task<List<ContratoAlquilerDarsenaDto>> GetMisContratosAsync();
-}
 
+    // ==========================================
+    // ADMINISTRADOR
+    // ==========================================
+    Task<List<UsuarioDto>> GetUsuariosAsync();
+    Task<bool> CrearUsuarioAsync(UsuarioDto dto);
+    Task<bool> ToggleActivoUsuarioAsync(int id);
+    Task<bool> ReenviarConfirmacionPersonalAsync(int usuarioId);
+
+    Task<List<ConductorDetalleDto>> GetConductoresDetalleAsync(EstadoPostulacionAlta? estado = null, TipoConductor? tipo = null);
+    Task<bool> CrearConductorFlotaAsync(CrearConductorFlotaDto dto);
+    Task<bool> AprobarConductorAsync(int id);
+    Task<bool> RechazarConductorAsync(int id);
+
+    Task<List<ClienteEmpresaDetalleDto>> GetClientesDetalleAsync(EstadoPostulacionAlta? estado = null);
+    Task<bool> AprobarClienteAsync(int id);
+    Task<bool> RechazarClienteAsync(int id);
+
+    Task<List<TarifaConfiguracionDto>> GetTarifasAsync();
+    Task<bool> ActualizarTarifaAsync(ActualizarTarifaDto dto);
+}
